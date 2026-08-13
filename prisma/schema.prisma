@@ -1,0 +1,46 @@
+// SelectIQ — Prisma schema
+// Prisma is the ONLY ORM. ALL database reads/writes go through Prisma.
+// Never query the database via the Supabase client — Supabase is storage-only.
+//
+// After any change to this file:
+//   npx prisma generate      (always)
+//   npx prisma migrate dev   (development)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// Application-level roles. Authentication identity lives in Firebase;
+/// authorization lives here and is resolved via `firebaseUid`.
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  RECRUITER
+  COLLEGE_ADMIN
+  CANDIDATE
+}
+
+/// Mirror of a Firebase Auth user, plus SelectIQ app-level data.
+/// `firebaseUid` is the join key between the Firebase session and this table.
+model User {
+  id          String  @id @default(cuid())
+  firebaseUid String  @unique
+  /// Null for phone-OTP-only accounts (MSG91 → Firebase custom token).
+  email       String? @unique
+  /// Null for OAuth-only accounts (Google / GitHub). E.164 format.
+  phone       String? @unique
+  displayName String?
+  photoURL    String?
+  role        Role    @default(CANDIDATE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+}

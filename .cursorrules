@@ -1,0 +1,47 @@
+# SelectIQ — Cursor Rules
+# Auto-read by Cursor on every interaction.
+# Backup implementation config. Primary tool is Claude Code (reads CLAUDE.md).
+
+## Project
+SelectIQ — AI-powered Campus Recruitment & Assessment Platform for Indian engineering colleges.
+
+## Stack (Non-Negotiable — Never Suggest Alternatives)
+- Framework: Next.js (App Router only — no `pages/` directory)
+- Auth: Firebase Auth (Google OAuth + GitHub OAuth + Phone OTP via MSG91 custom tokens)
+- Database: Supabase PostgreSQL
+- File Storage: Supabase Storage
+- ORM: Prisma (ALL database access — no exceptions)
+- Hosting: Vercel
+- Code Execution: Judge0 CE (self-hosted)
+- Secure Exam Browser: Electron (already built — do not rebuild)
+- Excluded: Neon, Cloudflare R2, Supabase Auth, Drizzle, Knex, raw SQL
+
+## Data Access Rules
+- Prisma → ALL database reads/writes/migrations
+- Supabase client → ONLY file storage (upload, download, signed URLs)
+- Firebase Admin SDK → ONLY auth (verify tokens, create custom tokens)
+- NEVER use Supabase client for database queries
+- NEVER use Firebase for data storage
+
+## Coding Rules
+- TypeScript everywhere — no plain JavaScript
+- Use App Router (`src/app/`) — never `pages/`
+- Prisma client singleton at `src/lib/prisma.ts`
+- Always verify Firebase ID token on server-side before processing requests
+- Always use parameterized queries via Prisma
+- Never hardcode secrets — use environment variables
+- Never prefix server-only keys with `NEXT_PUBLIC_`
+- Never commit `.env.local`
+- Run `npx prisma generate` after any schema change
+- Run `npx prisma migrate dev` after any schema change in development
+
+## File Restrictions
+- NEVER modify: `.cursorrules`, `CLAUDE.md`, `docs/project-context.md` without explicit instruction
+- Always confirm build passes before reporting completion
+- Report exact files created/modified/deleted after every task
+
+## Workflow
+- Plans come from Claude (claude.ai) — follow them exactly
+- If plan is ambiguous, ask — do not guess
+- Do not install packages not specified in the plan without asking
+- After task completion, provide list of files changed for documentation
