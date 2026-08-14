@@ -52,9 +52,11 @@ done
 # repeatedly collected real values by mistake.
 if printf '%s\n' "$staged" | grep -qx '.env.example'; then
   # Variable names only are printed below — never the values.
+  # Matched case-insensitively: Supabase's dashboard emits "[YOUR-PASSWORD]" in
+  # uppercase, which is a legitimate placeholder and must not trip the guard.
   bad=$(git show :.env.example \
     | grep -E '^[A-Za-z_0-9]+=.' \
-    | grep -vE '(your-|Your-|your_|localhost|example\.com|^NODE_ENV=)' || true)
+    | grep -viE '(your-|your_|localhost|example\.com|^NODE_ENV=)' || true)
 
   if [ -n "$bad" ]; then
     echo "BLOCKED: .env.example looks like it holds real values:"
