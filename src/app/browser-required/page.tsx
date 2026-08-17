@@ -1,19 +1,32 @@
+import { Suspense } from 'react'
+import type { Metadata } from 'next'
+
+import GatewayClient from './gateway-client'
+
 /**
- * /browser-required — Layer 3 of exam link enforcement (PLACEHOLDER).
+ * /browser-required — Layer 3 of exam link enforcement.
  *
- * Final behaviour: auto-fire the `selectiq://` deep link to hand the exam off
- * to the Electron secure browser, and show a download fallback when it is not
- * installed. Neither is wired up yet — this is the Sprint 1 landing target for
- * the middleware redirect.
+ * The interactive work lives in `GatewayClient`, which reads the `next` query
+ * param. `useSearchParams` needs a Suspense boundary, otherwise this route
+ * cannot be prerendered.
  */
+
+export const metadata: Metadata = {
+  title: 'Secure browser required — SelectIQ',
+  // Exam links must never be indexed.
+  robots: { index: false, follow: false },
+}
+
 export default function BrowserRequiredPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-      <h1 className="text-2xl font-semibold">Secure browser required</h1>
-      <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
-        SelectIQ exams run inside the SelectIQ secure browser. Open this link in
-        the SelectIQ app to continue.
-      </p>
-    </main>
+    <Suspense
+      fallback={
+        <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Opening SelectIQ…</h1>
+        </main>
+      }
+    >
+      <GatewayClient />
+    </Suspense>
   )
 }
