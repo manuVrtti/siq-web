@@ -1,0 +1,35 @@
+# SelectIQ — Code Owners
+#
+# Paths listed here require review from their owner before a pull request can
+# be merged. Ownership is defined in CLAUDE.md ("Security Rules") and covers
+# the files where a mistake is expensive: the data model, the exam gate, the
+# auth server keys, and the guardrail documents themselves.
+#
+# NOTE: This file only takes effect once branch protection on `main` has
+# "Require review from Code Owners" enabled. Without that, it is documentation.
+#
+# Syntax: <path pattern>  <owner>
+# Later matches win, so the most specific rule must come last.
+
+# --- Database schema and migrations -------------------------------
+# Every one of the 142 tables lands here. A bad migration is hard to undo.
+/prisma/                      @manuVrtti
+
+# --- Exam link enforcement (Layer 2) ------------------------------
+# Gates every /exam/* route. A regression here lets candidates sit exams
+# outside the locked-down Electron browser.
+/src/proxy.ts                 @manuVrtti
+
+# --- Server-side auth ---------------------------------------------
+# Reads FIREBASE_ADMIN_PRIVATE_KEY. Must never be imported client-side.
+/src/lib/firebase-admin.ts    @manuVrtti
+
+# --- Environment files --------------------------------------------
+# .env and .env.local are git-ignored, so in practice this guards
+# .env.example — the one env file that ships to GitHub.
+.env*                         @manuVrtti
+
+# --- Guardrail documents ------------------------------------------
+# These steer every AI-assisted change in the repo.
+/CLAUDE.md                    @manuVrtti
+/.cursorrules                 @manuVrtti
