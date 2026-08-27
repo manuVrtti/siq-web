@@ -1,11 +1,11 @@
-import type { Role } from '@prisma/client'
+import type { UserRole } from '@prisma/client'
 
 /**
- * Application role. Sourced from the Prisma `Role` enum so the schema stays the
+ * Application role, re-exported from the Prisma enum so the schema stays the
  * single source of truth — adding a role to `prisma/schema.prisma` widens this
- * type automatically after `npx prisma generate`.
+ * type automatically after `npm run db:generate`.
  */
-export type UserRole = Role
+export type { UserRole }
 
 /**
  * The authenticated caller, assembled from a verified Firebase ID token plus
@@ -22,7 +22,7 @@ export interface AuthUser {
   email: string | null
   /** E.164 format. Null for OAuth-only accounts. */
   phone: string | null
-  displayName: string | null
-  photoURL: string | null
+  name: string | null
+  avatarUrl: string | null
   role: UserRole
 }
