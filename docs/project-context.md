@@ -1,6 +1,6 @@
 # SelectIQ — Project Context (Living Document)
 
-> **Last updated:** 2026-08-12
+> **Last updated:** 2026-08-28
 > **Purpose:** Single source of truth for project state. Manually updated after each feature build.
 > **Used by:** Claude (planning), Claude Code (implementation), any new team member onboarding.
 
@@ -8,7 +8,11 @@
 
 ## 1. What is SelectIQ?
 
-SelectIQ is an AI-powered Campus Recruitment and Assessment Platform targeting Indian engineering colleges. It enables companies to conduct secure, proctored online assessments with coding challenges, MCQs, and subjective evaluations — all within a locked-down exam environment.
+SelectIQ is an AI-powered Campus Recruitment and Assessment Platform targeting Indian engineering colleges.
+
+**Phase 1 (current MVP focus):** A **mock placement drive** system for colleges, paired with **deep strength/weakness analytics and KPI dashboards** for three audiences — students, HODs, and college placement heads — so every student gets a continuously updated view of where they're strong and weak (across both topic **sections** and **skills**), and faculty can track cohort readiness ahead of real recruitment.
+
+**Beyond MVP:** Secure, proctored online assessments with coding challenges, MCQs, and subjective evaluations inside a locked-down exam environment, extending later into a full real-recruitment marketplace (company profiles, jobs, applications, interviews, offers).
 
 **Founder:** SG (solo founder, "vibe coder" — not deeply technical, uses AI-assisted development as primary engineering approach)
 
@@ -28,10 +32,10 @@ SelectIQ is an AI-powered Campus Recruitment and Assessment Platform targeting I
 | **Hosting** | Vercel | Next.js deployment |
 | **Code Execution** | Judge0 CE (self-hosted) | For running candidate code submissions. Chosen after evaluating Piston (shut down Feb 2026), E2B (AI-agent focused), Rustbox (no free self-hosting) |
 | **Secure Exam Browser** | Electron app | Already built. Registers `selectiq://` custom protocol + custom User-Agent |
-| **Face Proctoring** | MediaPipe | Local face comparison — reference photo before exam, random in-exam snapshots (Sprint 5) |
-| **Framework** | Next.js | Full-stack React framework |
+| **Face Proctoring** | MediaPipe | Local face comparison — reference photo before exam, random in-exam snapshots |
+| **Framework** | Next.js 14+ | App Router, TypeScript, Tailwind, shadcn/ui, Recharts |
 
-**Explicitly excluded:** Neon, Cloudflare R2, Supabase Auth (Firebase handles all auth)
+**Explicitly excluded:** Neon, Cloudflare R2, Supabase Auth (Firebase handles all auth), Drizzle, Knex, raw SQL
 
 **Data access rule:** Prisma handles ALL database access. Supabase client used ONLY for file storage operations. No exceptions.
 
@@ -42,13 +46,13 @@ SelectIQ is an AI-powered Campus Recruitment and Assessment Platform targeting I
 | Tool | Role |
 |---|---|
 | **Claude (claude.ai)** | Planning, architecture, documentation, decision-making |
-| **Claude Code** | Primary implementation tool — agentic coding from terminal |
-| **VS Code** | Visual code inspection alongside Claude Code |
+| **Claude Code (in Cursor)** | Primary implementation tool — agentic coding, connected inside Cursor |
+| **Cursor / VS Code** | Editor surface; visual code inspection alongside Claude Code |
 | **CLAUDE.md** | Auto-read by Claude Code on every session — architecture guardrails |
-| **.cursorrules** | Available if Cursor is ever used — same guardrails |
+| **.cursorrules** | Same guardrails for Cursor |
 | **docs/project-context.md** | This file — living state document, manually updated by SG |
 
-**Previous toolchain note:** Cursor Pro was originally planned as the primary implementation tool. Shifted to Claude Code for reduced friction (no copy-paste workflow between Claude and Cursor). VS Code kept open alongside for visual inspection.
+**Environment:** Windows / PowerShell. Project at `C:\SelectIQ\SelectIQ\selectiq`.
 
 ---
 
@@ -71,65 +75,102 @@ SelectIQ is an AI-powered Campus Recruitment and Assessment Platform targeting I
 
 - **Prisma over raw Supabase queries** — At 142 tables, migration system and type safety are essential. AI code generation quality is significantly better with Prisma's typed client. This decision must not be relitigated.
 - **Supabase consolidation** — One service for DB + storage reduces operational complexity vs. Neon + Cloudflare R2.
-- **MSG91 over Firebase Phone Auth** — DLT (Distributed Ledger Technology) compliance is legally required for sending OTPs via Indian carriers. Firebase Phone Auth doesn't handle DLT registration.
+- **MSG91 over Firebase Phone Auth** — DLT compliance is legally required for sending OTPs via Indian carriers. Firebase Phone Auth doesn't handle DLT registration.
 - **Judge0 CE (self-hosted)** — Only viable free self-hosted option after evaluating alternatives.
 - **Firebase for all auth** — Supabase Auth explicitly excluded. Firebase handles Google OAuth, GitHub OAuth, and custom tokens for MSG91 phone OTP.
-- **Internal teams use feature branches, not forks** — Forking is an open-source contribution pattern, not an internal dev workflow.
-- **Non-compete clauses unenforceable in India** — Contractor agreements focus on IP assignment, NDA, and non-solicitation instead.
+- **Phase 1 = Mock Drive + Analytics, NOT the recruitment marketplace** — The MVP proves the mock-drive-plus-strength/weakness-analytics loop first. Company profiles, job postings, applications, interviews, and offers are deferred to Phase 2. This reordering is reflected in the renumbered plan sequence (see §6).
+- **Strength/weakness diagnostic is built on BOTH axes** — topic **sections** (DSA, DBMS, Aptitude…) AND a **skill taxonomy** beneath them. Every diagnostic question must be tagged on both.
+- **Three co-equal MVP dashboards** — Student, HOD, and Placement Head are three first-class deliverables, not one role-filtered view. All three call the SAME comparative-analytics services so numbers match across views.
+- **Competency engine is deterministic in Phase 1** — Scoring rollups + rule-based weak-topic detection and recommendations. No ML, so every insight is explainable to a student or HOD.
+- **Internal teams use feature branches, not forks.**
+- **Non-compete clauses unenforceable in India** — Agreements focus on IP assignment, NDA, non-solicitation.
 - **Production credentials stay with founders only** — Supabase service role key, Firebase Admin SDK, MSG91 keys, Vercel env vars never shared with developers at early stage.
-- **Claude Code over Cursor** — Reduced workflow friction; planning + execution stay closer together. CLAUDE.md provides the same guardrails that .cursorrules did for Cursor.
+- **Claude Code over standalone copy-paste** — Planning + execution stay close; CLAUDE.md provides the guardrails.
 
 ### Exam Link Enforcement (3-Layer Architecture)
 
-1. **Electron app** registers `selectiq://` custom protocol + custom User-Agent (`SelectIQBrowser/{version}`)
-2. **Server middleware** intercepts exam routes and redirects non-Electron browsers to `/browser-required` gateway
+1. **Electron app** registers `selectiq://` custom protocol + custom User-Agent
+2. **Server middleware** intercepts exam-attempt routes and redirects non-Electron browsers to `/browser-required` gateway
 3. **Gateway page** auto-fires deep link with download fallback
 
 ---
 
-## 6. Current Sprint Status
+## 6. Plan Sequence & Phases (Renumbered — Canonical)
 
-### Sprint 1 — Project Scaffolding (NOT STARTED)
+All implementation plans live in `docs/plans/` as three-digit files (`001-…` through `051-…`) plus `000-master-index.md`. This is the single canonical build order.
 
-Tasks:
-- [ ] Next.js initialization
-- [ ] Place foundation files (`.cursorrules`, `CLAUDE.md`, `docs/project-context.md`)
-- [ ] Install dependencies (Prisma, Firebase SDK, Supabase client, etc.)
-- [ ] Prisma init + initial schema
-- [ ] Environment variables setup
-- [ ] Folder structure
-- [ ] First commit
+| Phase | Plans | Focus |
+|---|---|---|
+| **Foundation (Sprint 1)** | 001–010 | Next.js, env, DB, auth (Google/GitHub/OTP), RBAC, UI shell, storage, deploy |
+| **Assessment Engine (Sprint 2)** | 011–020 | Question bank, assessment builder, candidates, Judge0, exam runtime, grading, SEB, proctoring, analytics, import/export |
+| **⭐ Mock Drive + Analytics MVP (Phase 1)** | 021–031 | Section/skill taxonomy, HOD role + departments, mock drive (dual mode), drive runtime, competency scoring engine, weak-topic detection, **Student / HOD / Placement Head dashboards**, comparative analytics, reporting |
+| **Recruitment Marketplace (Phase 2)** | 032–041 | Company profiles, job postings, hiring rounds, application pipeline, resume search, interviews, offers, real campus drives, student journey, recruitment analytics |
+| **Platform Services (Phase 3)** | 042–051 | Notifications, real-time, search, background jobs, org settings, billing, audit, admin console, public API, email infra |
+
+**Phase 1 build order is strict:** 021→022→023→024 (taxonomy → HOD/departments → mock drive setup → runtime) MUST precede the competency engine (025→026), which MUST precede the three dashboards (027 Student / 028 HOD / 029 Placement Head), then comparative analytics (030) and reporting (031).
+
+> **Cross-reference note:** Plan bodies reference dependencies by pre-renumber labels; the old→new map lives in `docs/plans/000-master-index.md`. The competency engine was split from "25a/25b" into plans 025 and 026.
+
+**Highest-risk plan in the MVP:** Plan 025 (competency scoring/rollup engine). Its math (difficulty weighting, cumulative aggregation, cohort baselines) must be hand-verified against paper calculations before anything is built on top of it.
+
+**Access-control spine:** `lib/auth/department-scope.ts` (`scopeStudentsQuery`) — all HOD-scoped queries build on it. Introduced in Plan 022.
 
 ---
 
-## 7. Planned Future Work
+## 7. Current Sprint Status
+
+### Sprint 1 — Foundation (IN PROGRESS)
+
+- [x] **Plan 001 — Next.js Project Scaffolding** (App Router, TypeScript, Tailwind, folder structure, path aliases, Prettier)
+- [x] **Plan 002 — Environment & Configuration System** (Zod-validated env, typed config, `.env.example`)
+- [ ] **Plan 003 — Prisma + Supabase Database Connection** ← **NEXT**
+- [ ] Plan 004 — Firebase Auth (Google & GitHub OAuth)
+- [ ] Plan 005 — MSG91 Phone OTP + Firebase Custom Tokens
+- [ ] Plan 006 — Auth Middleware & Route Protection
+- [ ] Plan 007 — Role-Based Access Control (RBAC)
+- [ ] Plan 008 — UI Foundation & Layout System
+- [ ] Plan 009 — Supabase Storage Integration
+- [ ] Plan 010 — Error Handling, Health Checks & Deployment
+
+**Repo state:** `.env`, `.env.example`, `.env.local` present; `prisma/schema.prisma` scaffolded; `docs/plans/` populated with the full renumbered plan set; `.cursorrules`, `CLAUDE.md`, `docs/project-context.md` in place; GitHub org configured (branch protection, CODEOWNERS, secret scanning, push protection).
+
+---
+
+## 8. Planned Future Work
 
 | Timeline | Work |
 |---|---|
-| **Sprint 5** | Face snapshot proctoring (MediaPipe local comparison) |
-| **Phase 1 (now)** | GitHub Organization setup — branch protection, CODEOWNERS, secret scanning. Plan at `docs/plans/002-repo-security-phase1.md` |
-| **Phase 2 (5-10 devs)** | GitHub Team plan, least-privilege repo access, trunk-based development |
-| **Phase 3 (20+ devs)** | Turborepo monorepo with natural seams: `selectiq-web`, `selectiq-electron`, `selectiq-proctoring`, `selectiq-question-bank`, `selectiq-shared`, `selectiq-infra` |
+| **Phase 1 (now)** | Plans 021–031 — Mock Drive + Analytics MVP (after Sprints 1–2 land) |
+| **Phase 2** | Plans 032–041 — Recruitment marketplace (companies, jobs, applications, interviews, offers) |
+| **Phase 3** | Plans 042–051 — Platform services (notifications, billing, admin, API) |
+| **Investor deck** | 12-slide pitch deck complete (pptxgenjs, real brand colors navy ~#12213D / blue ~#3B6FD4, AICTE-grounded sizing). Placeholders remaining: traction counters, raise amount |
+| **Repo scaling** | Phase 2 (5–20 devs): GitHub Team plan, least-privilege access. Larger scale: Turborepo monorepo (`selectiq-web`, `selectiq-electron`, `selectiq-proctoring`, `selectiq-question-bank`, `selectiq-shared`, `selectiq-infra`) |
 
 ---
 
-## 8. Key Files Reference
+## 9. Key Files Reference
 
 | File | Purpose | Auto-read by |
 |---|---|---|
-| `.cursorrules` | Implementation constraints for Cursor | Cursor (if used) |
+| `.cursorrules` | Implementation constraints for Cursor | Cursor |
 | `CLAUDE.md` | Architecture guardrails, stack rules, coding patterns | Claude Code |
 | `docs/project-context.md` | Living state document (this file) | Manually referenced |
 | `docs/CHANGELOG.md` | Feature-level change log | Manually referenced |
-| `docs/plans/002-repo-security-phase1.md` | GitHub org security plan | Manually referenced |
+| `docs/plans/000-master-index.md` | Canonical plan sequence + old→new mapping | Manually referenced |
+| `docs/plans/001-…` → `051-…` | Individual implementation plans (9-section format) | Manually referenced |
+| `docs/plans/002-repo-security-phase1.md` | GitHub org security plan (separate from build sequence) | Manually referenced |
+
+> **Note:** `002-repo-security-phase1.md` shares a numeric prefix with `002-environment-configuration.md` but is a standalone security note, not part of the build sequence. Consider renaming it (e.g. `security-repo-phase1.md`) to avoid confusion.
 
 ---
 
-## 9. Principles & Patterns
+## 10. Principles & Patterns
 
-- **AI-assisted development is the primary engineering approach** — SG is not deeply technical; Claude and Claude Code do the heavy lifting
-- **Budget-conscious** — Free tiers and self-hosted solutions preferred where viable
-- **Documentation-first** — Three foundation files form the portable memory layer across tools and accounts
-- **Plan → Approve → Execute → Test → Document** — Never skip steps
-- **No auto-updates to docs** — Claude provides ready-to-paste text; SG pastes manually
-- **Security by separation** — Production credentials never leave founders; legal agreements are primary deterrent for contractors
+- **AI-assisted development is the primary engineering approach** — SG is not deeply technical; Claude and Claude Code do the heavy lifting.
+- **Plans are individual `.md` files** in `docs/plans/`, strict 9-section format: Objective, Scope, Prerequisites/Dependencies, Technical Approach, Implementation Steps, File Changes, Testing/Verification, Documentation Updates, Estimated Effort.
+- **Three-file portable memory layer** — `.cursorrules`, `CLAUDE.md`, `docs/project-context.md` — survives chat/session resets and seeds new sessions.
+- **Budget-conscious** — Free tiers and self-hosted solutions preferred where viable.
+- **Plan → Approve → Execute → Test → Document** — Never skip steps.
+- **No auto-updates to docs** — Claude provides ready-to-paste text; SG pastes manually.
+- **Security by separation** — Production credentials never leave founders; legal agreements are the primary deterrent for contractors.
+- **"Does this look AI-generated?" lens** — For pitch/product materials, prefer fewer words, more whitespace, warm non-techy aesthetics, story-based flow.
