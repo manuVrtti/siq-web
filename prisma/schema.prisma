@@ -1,10 +1,17 @@
 // SelectIQ — Prisma schema
+// Plan 003 — Prisma + Supabase Database Connection
+//
 // Prisma is the ONLY ORM. ALL database reads/writes go through Prisma.
 // Never query the database via the Supabase client — Supabase is storage-only.
 //
+// Conventions:
+//   - cuid() primary keys
+//   - createdAt / updatedAt on every mutable model
+//   - enums are SCREAMING_SNAKE_CASE
+//
 // After any change to this file:
-//   npx prisma generate      (always)
-//   npx prisma migrate dev   (development)
+//   npm run db:generate   (always)
+//   npm run db:migrate    (development)
 
 generator client {
   provider = "prisma-client-js"
@@ -13,34 +20,93 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
+  // Supabase's transaction pooler cannot run migrations. directUrl points at
+  // the session pooler so `prisma migrate` has a stable single connection.
   directUrl = env("DIRECT_URL")
 }
 
-/// Application-level roles. Authentication identity lives in Firebase;
-/// authorization lives here and is resolved via `firebaseUid`.
-enum Role {
+enum UserRole {
   SUPER_ADMIN
-  ADMIN
-  RECRUITER
   COLLEGE_ADMIN
-  CANDIDATE
+  RECRUITER
+  STUDENT
 }
 
-/// Mirror of a Firebase Auth user, plus SelectIQ app-level data.
+enum OrgType {
+  COLLEGE
+  COMPANY
+}
+
+enum OrgMemberRole {
+  ADMIN
+  MEMBER
+}
+
+/// Mirror of a Firebase Auth user plus SelectIQ app-level data.
 /// `firebaseUid` is the join key between the Firebase session and this table.
 model User {
-  id          String  @id @default(cuid())
-  firebaseUid String  @unique
+  id String @id @default(cuid())
   /// Null for phone-OTP-only accounts (MSG91 → Firebase custom token).
-  email       String? @unique
-  /// Null for OAuth-only accounts (Google / GitHub). E.164 format.
-  phone       String? @unique
-  displayName String?
-  photoURL    String?
-  role        Role    @default(CANDIDATE)
+  email       String?   @unique
+  /// Null for OAuth-only accounts. E.164 format.
+  phone       String?   @unique
+  name        String?
+  avatarUrl   String?
+  role        UserRole  @default(STUDENT)
+  firebaseUid String    @unique
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
+  memberships OrganizationMember[]
+  auditLogs   AuditLog[]
+
+  @@index([role])
+}
+
+/// A college or a hiring company. Users join via OrganizationMember.
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  type      OrgType
+  domain    String?
+  logoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([role])
+  members OrganizationMember[]
+
+  @@index([type])
+}
+
+/// Join table between User and Organization, carrying the org-scoped role.
+model OrganizationMember {
+  id       String        @id @default(cuid())
+  userId   String
+  orgId    String
+  role     OrgMemberRole @default(MEMBER)
+  joinedAt DateTime      @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+/// Append-only trail of user actions. Never updated, only inserted.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
