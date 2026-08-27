@@ -6,6 +6,8 @@ import {
   type Auth,
 } from 'firebase/auth'
 
+import { config } from '@/lib/config'
+
 /**
  * Firebase client SDK — browser-side authentication only.
  *
@@ -16,20 +18,14 @@ import {
  *
  * ⚠️  Never use Firestore or Realtime Database. Supabase PostgreSQL (via
  *     Prisma) is the only database.
+ *
+ * Config is read lazily inside `getFirebaseApp()` rather than at module load,
+ * so importing this file does not require Firebase to be configured yet.
  */
-
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-}
 
 /** Reuses the existing app across hot reloads instead of re-initializing. */
 export function getFirebaseApp(): FirebaseApp {
-  return getApps().length ? getApp() : initializeApp(firebaseConfig)
+  return getApps().length ? getApp() : initializeApp(config.firebase.client)
 }
 
 export function getFirebaseAuth(): Auth {
