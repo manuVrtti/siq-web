@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# SelectIQ pre-commit secret guard.
+#
+# Blocks a commit when staged content looks like a real credential. Written in
+# POSIX sh with no dependencies on purpose: GitHub secret scanning is a paid
+# add-on on private repos, so this must work regardless of plan tier.
+#
+# Enabled via:  git config core.hooksPath .githooks
+# Override (rarely correct):  git commit --no-verify
+#
+# See docs/plans/002-repo-security-phase1.md
+
+set -u
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+[ -z "$staged" ] && exit 0
+
+# --- 1. .env and .env.local must never be committed -------------------------
+# They are git-ignored, but `git add -f` bypasses that.
+for f in .env .env.local; do
+  if printf '%s\n' "$staged" | grep -qx "$f"; then
+    echo "BLOCKED: $f must never be committed (it holds live credentials)."
+    fail=1
+  fi
+done
+
+# --- 2. Scan added lines for credential patterns ----------------------------
+# Lock files are excluded: their integrity hashes trip naive base64 matching.
+scan_files=$(printf '%s\n' "$staged" \
+  | grep -vE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$' || true)
+
+# eyJhbGciOi -> base64 of a JWT header; catches Supabase anon + service_role keys
+patterns='-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJhbGciOi[A-Za-z0-9]|AIza[0-9A-Za-z_-]{35}|sbp_[0-9a-f]{40}'
+
+# `grep -- ` is required: $patterns starts with "-----BEGIN", which grep would
+# otherwise parse as command-line options.
+# `^+` alone would also match the "+++ b/path" diff header, so exclude it.
+for f in $scan_files; do
+  if git diff --cached -U0 -- "$f" \
+    | grep -E '^\+' | grep -vE '^\+\+\+' \
+    | grep -qE -- "$patterns"; then
+    echo "BLOCKED: $f contains something shaped like a live credential."
+    fail=1
+  fi
+done
+
+# --- 3. .env.example must hold placeholders only ----------------------------
+# This is the file that actually ships to GitHub, and the one that has
+# repeatedly collected real values by mistake.
+if printf '%s\n' "$staged" | grep -qx '.env.example'; then
+  # Variable names only are printed below — never the values.
+  # Matched case-insensitively: Supabase's dashboard emits "[YOUR-PASSWORD]" in
+  # uppercase, which is a legitimate placeholder and must not trip the guard.
+  bad=$(git show :.env.example \
+    | grep -E '^[A-Za-z_0-9]+=.' \
+    | grep -viE '(your-|your_|localhost|example\.com|^NODE_ENV=)' || true)
+
+  if [ -n "$bad" ]; then
+    echo "BLOCKED: .env.example looks like it holds real values:"
+    printf '%s\n' "$bad" | cut -d= -f1 | sed 's/^/    - /'
+    fail=1
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "Commit aborted. Real values belong in .env.local, which is git-ignored."
+  echo "If you are certain this is a false positive: git commit --no-verify"
+  exit 1
+fi
+
+exit 0
