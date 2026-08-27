@@ -29,8 +29,13 @@ done
 
 # --- 2. Scan added lines for credential patterns ----------------------------
 # Lock files are excluded: their integrity hashes trip naive base64 matching.
+#
+# .env.example is excluded here and checked by rule 3 instead. It legitimately
+# contains a placeholder PEM header to show the expected format, which this
+# pattern list cannot distinguish from a real key. Rule 3 is the stricter test
+# for that file anyway: it requires every value to look like a placeholder.
 scan_files=$(printf '%s\n' "$staged" \
-  | grep -vE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$' || true)
+  | grep -vE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|\.env\.example)$' || true)
 
 # eyJhbGciOi -> base64 of a JWT header; catches Supabase anon + service_role keys
 patterns='-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJhbGciOi[A-Za-z0-9]|AIza[0-9A-Za-z_-]{35}|sbp_[0-9a-f]{40}'

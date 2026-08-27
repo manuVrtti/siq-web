@@ -1,11 +1,14 @@
 import { cert, getApp, getApps, initializeApp, type App } from 'firebase-admin/app'
 import { getAuth, type DecodedIdToken } from 'firebase-admin/auth'
 
+import { config } from '@/lib/config'
+
 /**
  * Firebase Admin SDK — SERVER-SIDE ONLY.
  *
  * ⚠️  Never import this module from a client component. It reads
  *     FIREBASE_ADMIN_PRIVATE_KEY, which must never reach the browser.
+ *     `config.firebase.admin` throws if evaluated in a browser context.
  *
  * Responsibilities (authentication only):
  *   - verify Firebase ID tokens on incoming requests
@@ -18,16 +21,8 @@ import { getAuth, type DecodedIdToken } from 'firebase-admin/auth'
 function getAdminApp(): App {
   if (getApps().length) return getApp()
 
-  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID
-  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL
-  // Vercel and .env files store the PEM with literal "\n" sequences.
-  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n')
-
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      'Firebase Admin is not configured. Set FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL and FIREBASE_ADMIN_PRIVATE_KEY.',
-    )
-  }
+  // Throws a named-variable error if the admin credentials are unset.
+  const { projectId, clientEmail, privateKey } = config.firebase.admin
 
   return initializeApp({
     credential: cert({ projectId, clientEmail, privateKey }),

@@ -1,4 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+
+import { config } from '@/lib/config'
 
 /**
  * Supabase client — FILE STORAGE ONLY.
@@ -9,51 +11,46 @@ import { createClient } from '@supabase/supabase-js'
  *
  * Allowed operations: `.storage.from(bucket).upload() / .download() /
  * .createSignedUrl() / .remove() / .list()`
+ *
+ * Both clients are lazy. Creating them at module load would demand Supabase
+ * credentials just to import this file, and would break builds before storage
+ * is configured (Plan 009).
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+/** Firebase owns the session. Never let Supabase persist or refresh one. */
+const authOptions = {
+  auth: { persistSession: false, autoRefreshToken: false },
+} as const
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // Warn rather than throw: the module is imported during builds where storage
-  // credentials are not required.
-  console.warn(
-    '[supabase] NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are not set. Storage calls will fail.',
-  )
-}
+let browserClient: SupabaseClient | undefined
 
 /**
  * Browser-safe storage client. Uses the anon key and is bound by Supabase
- * Storage RLS policies. Safe to import from client components.
+ * Storage RLS policies. Safe to call from client components.
  *
  * ⚠️  Storage only. Do not call `.from()` for table access.
  */
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
-  auth: {
-    // Firebase owns the session. Never let Supabase persist or refresh one.
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-})
+export function getSupabaseClient(): SupabaseClient {
+  if (!browserClient) {
+    const { url, anonKey } = config.supabase.client
+    browserClient = createClient(url, anonKey, authOptions)
+  }
+  return browserClient
+}
 
 /**
  * Server-only storage client using the service-role key. Bypasses Storage RLS,
- * so it must NEVER be imported into a client component.
+ * so it must NEVER be imported into a client component — `config.supabase`
+ * throws if the service-role key is read in a browser context.
+ *
+ * Not cached: it holds the highest-privilege credential in the project, and a
+ * module-level singleton is easier to leak across request boundaries.
  *
  * Use for: signed URLs, admin uploads, bucket cleanup.
  *
  * ⚠️  Storage only. Do not call `.from()` for table access.
  */
-export function getSupabaseAdmin() {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error(
-      'Supabase admin client requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY',
-    )
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+export function getSupabaseAdmin(): SupabaseClient {
+  const { url } = config.supabase.client
+  return createClient(url, config.supabase.serviceRoleKey, authOptions)
 }
