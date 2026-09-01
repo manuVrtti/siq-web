@@ -3,9 +3,8 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import type { DecodedIdToken } from 'firebase-admin/auth'
 
+import { SESSION_COOKIE_NAME, SESSION_MAX_AGE_MS } from '@/lib/auth/session-constants'
 import { getAdminAuth } from '@/lib/firebase-admin'
-import { prisma } from '@/lib/prisma'
-import type { AuthUser } from '@/types'
 
 /**
  * Plan 004 — server-side session management.
@@ -18,11 +17,8 @@ import type { AuthUser } from '@/types'
  * `server-only` makes importing this from a client component a build error.
  */
 
-/** Firebase convention. Also the only cookie name Firebase Hosting forwards. */
-export const SESSION_COOKIE_NAME = '__session'
-
-/** 5 days, per plan 004. Firebase allows 5 minutes to 2 weeks. */
-export const SESSION_MAX_AGE_MS = 60 * 60 * 24 * 5 * 1000
+// Re-exported so existing imports from '@/lib/auth/session' keep working.
+export { SESSION_COOKIE_NAME, SESSION_MAX_AGE_MS }
 
 /**
  * How recently the user must have actually authenticated for us to mint a
@@ -71,41 +67,4 @@ export async function verifySessionCookie(
 export async function getSessionCookie(): Promise<string | undefined> {
   const store = await cookies()
   return store.get(SESSION_COOKIE_NAME)?.value
-}
-
-/**
- * Resolves the current user: cookie → Firebase claims → Postgres row.
- *
- * Returns null rather than throwing, so pages can branch on "not signed in"
- * without try/catch. An invalid or expired cookie is indistinguishable from
- * no cookie here, which is what callers want.
- *
- * Plan 006 supersedes this with a fuller `getCurrentUser` plus route
- * protection; this is the minimum needed to prove the round trip works.
- */
-export async function getSessionUser(): Promise<AuthUser | null> {
-  const cookie = await getSessionCookie()
-  if (!cookie) return null
-
-  try {
-    const decoded = await verifySessionCookie(cookie)
-
-    const user = await prisma.user.findUnique({
-      where: { firebaseUid: decoded.uid },
-    })
-    if (!user) return null
-
-    return {
-      uid: decoded.uid,
-      id: user.id,
-      email: user.email,
-      phone: user.phone,
-      name: user.name,
-      avatarUrl: user.avatarUrl,
-      role: user.role,
-    }
-  } catch {
-    // Expired, revoked or malformed — treat as signed out.
-    return null
-  }
 }

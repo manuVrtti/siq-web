@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-import { getSessionUser } from '@/lib/auth/session'
+import { getCurrentUser } from '@/lib/auth/get-current-user'
 
 /**
  * Plan 004 — layout for unauthenticated pages.
@@ -13,7 +13,7 @@ export default async function AuthLayout({
 }: {
   children: React.ReactNode
 }) {
-  const user = await getSessionUser()
+  const user = await getCurrentUser()
   if (user) redirect('/dashboard')
 
   return (

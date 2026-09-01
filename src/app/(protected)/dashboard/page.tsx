@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
-import { getSessionUser } from '@/lib/auth/session'
+import { getCurrentUser } from '@/lib/auth/get-current-user'
 
 import SignOutButton from './sign-out-button'
 
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const user = await getSessionUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/login')
 
   return (
