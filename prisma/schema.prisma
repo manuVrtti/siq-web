@@ -66,11 +66,18 @@ model User {
 
 /// A college or a hiring company. Users join via OrganizationMember.
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  type      OrgType
-  domain    String?
-  logoUrl   String?
+  id   String  @id @default(cuid())
+  name String
+  type OrgType
+  /// URL-safe identifier: "abes" for abes.selectsiq.in or /org/abes.
+  /// Lowercase letters, digits and hyphens only. Treat as permanent once set —
+  /// changing it breaks every saved link. Nullable while orgs predate it.
+  slug String? @unique
+  /// Email domain used to match students to their college, e.g. "abes.ac.in".
+  /// Distinct from `slug`: a college may have several email domains but only
+  /// one URL, and dots are not valid in a subdomain label.
+  domain String?
+  logoUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

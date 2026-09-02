@@ -12,11 +12,12 @@ build/
 dist/
 
 # Environment variables — NEVER commit
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Everything env-shaped, including editor and tooling backups such as
+# .env.local.bak / .env.local.save / .env.local~ — those are full copies of
+# live credentials and were previously NOT matched by exact-name patterns.
+.env*
+# ...except the committed placeholder template.
+!.env.example
 
 # Vercel
 .vercel
