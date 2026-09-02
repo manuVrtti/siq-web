@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server'
 
 /**
- * Health check.
+ * Plan 010 — liveness check.
  *
- * Intentionally unauthenticated — it is used by uptime monitors and Vercel
- * deploy checks. It reports process liveness only and must never expose
- * environment, database or build details.
+ * Answers only "is this process up and serving?". It touches no external
+ * service on purpose: a load balancer needs to distinguish "the app is dead"
+ * from "the database is slow", and a liveness probe that fails on a database
+ * blip would take healthy instances out of rotation.
+ *
+ * Unauthenticated by design. Reports nothing about environment or config.
  */
 
-// Never cache: a cached 200 would mask an unhealthy instance.
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
@@ -16,5 +18,6 @@ export async function GET() {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: '0.1.0',
+    uptime: Math.round(process.uptime()),
   })
 }

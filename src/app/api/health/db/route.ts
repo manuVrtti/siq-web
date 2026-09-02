@@ -3,34 +3,37 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 /**
- * Database health check — Plan 003.
+ * Plan 003/010 — database readiness.
  *
- * Verifies the Prisma connection to Supabase Postgres is live. Unauthenticated
- * so uptime monitors can reach it, and deliberately silent about the failure
- * detail: a connection error can carry the host and credentials, which must
- * never reach the client.
+ * `latencyMs` is the useful part: a database that answers in 40ms and one that
+ * answers in 4000ms are both "ok" to a boolean check, but only one of them is
+ * actually healthy.
+ *
+ * The failure body is deliberately generic — a Prisma connection error string
+ * contains the host and user.
  */
 
-// Never cache — a cached 200 would mask a database outage.
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const started = Date.now()
+
   try {
-    // Cheapest possible round trip that proves the connection works.
     await prisma.$queryRaw`SELECT 1`
 
     return NextResponse.json({
       status: 'ok',
+      latencyMs: Date.now() - started,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    // Log server-side only. The response stays generic.
-    console.error('[health/db] database check failed:', error)
+    console.error('[health/db] check failed:', error)
 
     return NextResponse.json(
       {
         status: 'error',
         message: 'Database connection failed',
+        latencyMs: Date.now() - started,
         timestamp: new Date().toISOString(),
       },
       { status: 503 },

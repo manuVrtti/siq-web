@@ -1,27 +1,42 @@
-import { NextResponse } from 'next/server'
-
 /**
- * Plan 007 — application error types.
+ * Plan 007/010 — application error types.
  *
- * Each carries the HTTP status it should produce, so route handlers can throw
- * from anywhere and let one catch block translate. Messages here are safe to
- * show a client; never put internal detail in them.
+ * Each carries the HTTP status it should produce and a stable machine-readable
+ * code, so a client can branch on `FORBIDDEN` without string-matching a
+ * message that might later be reworded or translated.
+ *
+ * Messages here are shown to clients. Never put internal detail in them —
+ * connection strings, file paths and stack traces belong in the server log.
  */
 
-export class AppError extends Error {
-  readonly status: number
+export type ErrorCode =
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'VALIDATION_ERROR'
+  | 'NOT_FOUND'
+  | 'INTERNAL_ERROR'
 
-  constructor(message: string, status: number) {
+export class AppError extends Error {
+  readonly statusCode: number
+  readonly code: ErrorCode
+
+  constructor(message: string, statusCode = 500, code: ErrorCode = 'INTERNAL_ERROR') {
     super(message)
     this.name = new.target.name
-    this.status = status
+    this.statusCode = statusCode
+    this.code = code
+  }
+
+  /** Kept for callers written against Plan 007's `status`. */
+  get status(): number {
+    return this.statusCode
   }
 }
 
 /** 401 — not signed in, or the session is invalid. */
 export class AuthError extends AppError {
   constructor(message = 'Unauthorized') {
-    super(message, 401)
+    super(message, 401, 'UNAUTHORIZED')
   }
 }
 
@@ -33,37 +48,24 @@ export class AuthError extends AppError {
  */
 export class ForbiddenError extends AppError {
   constructor(message = 'Forbidden') {
-    super(message, 403)
+    super(message, 403, 'FORBIDDEN')
   }
 }
 
 /** 400 — the request itself is malformed. */
 export class ValidationError extends AppError {
   constructor(message = 'Invalid request') {
-    super(message, 400)
+    super(message, 400, 'VALIDATION_ERROR')
   }
 }
 
 /** 404 — no such resource, or the caller may not know it exists. */
 export class NotFoundError extends AppError {
   constructor(message = 'Not found') {
-    super(message, 404)
+    super(message, 404, 'NOT_FOUND')
   }
 }
 
-/**
- * Translates a thrown error into a response.
- *
- * Known `AppError`s pass their message through. Anything else becomes a
- * generic 500 — an unexpected error can contain connection strings, file
- * paths or tokens, none of which belong in a response body.
- */
-export function handleApiError(error: unknown): NextResponse {
-  if (error instanceof AppError) {
-    return NextResponse.json({ error: error.message }, { status: error.status })
-  }
-
-  console.error('[api] unhandled error:', error)
-
-  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-}
+// Response helpers live in `@/lib/api-response`; re-exported so the Plan 007
+// call sites that import `handleApiError` from here keep working.
+export { errorResponse as handleApiError } from '@/lib/api-response'
