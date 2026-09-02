@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -72,14 +73,22 @@ export default function UserMenu() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col gap-0.5">
-            <span className="truncate text-sm font-medium">{user.name ?? 'Account'}</span>
-            <span className="text-muted-foreground truncate text-xs">
-              {user.email ?? user.phone ?? ''}
-            </span>
-          </div>
-        </DropdownMenuLabel>
+        {/*
+          The label MUST be wrapped in a group. This build of shadcn is backed
+          by Base UI, whose GroupLabel throws "MenuGroupContext is missing"
+          outside a Menu.Group — and the throw takes the whole menu down, so
+          the trigger silently stops opening. Radix allowed a bare label.
+        */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col gap-0.5">
+              <span className="truncate text-sm font-medium">{user.name ?? 'Account'}</span>
+              <span className="text-muted-foreground truncate text-xs">
+                {user.email ?? user.phone ?? ''}
+              </span>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
