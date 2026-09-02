@@ -1,17 +1,17 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
 
+import RoleGate from '@/components/auth/role-gate'
+import { PERMISSIONS } from '@/constants/permissions'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 
 import SignOutButton from './sign-out-button'
 
 /**
- * Plan 004 — minimal protected page.
+ * Plan 004/007 — minimal protected page.
  *
- * Proves the full round trip: OAuth popup -> ID token -> session cookie ->
- * Prisma row -> server-rendered name. Plan 006 moves this guard into
- * middleware so every protected route is covered by default; until then the
- * check lives here.
+ * The auth guard lives in `(protected)/layout.tsx`, so this page can assume a
+ * user. `getCurrentUser()` is React-cached, so calling it again here reuses the
+ * layout's result rather than re-verifying.
  */
 
 export const metadata: Metadata = {
@@ -19,8 +19,8 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser()
-  if (!user) redirect('/login')
+  // Non-null: the layout redirects when signed out.
+  const user = (await getCurrentUser())!
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 px-6">
@@ -32,6 +32,25 @@ export default async function DashboardPage() {
           Signed in as {user.email ?? user.phone ?? 'unknown'} &middot; role {user.role}
         </p>
       </div>
+
+      {/*
+        RoleGate decides what to draw, never what is permitted. The matching
+        server-side check lives in /api/admin/users.
+      */}
+      <RoleGate
+        allowedRoles={['COLLEGE_ADMIN', 'SUPER_ADMIN']}
+        fallback={
+          <p className="text-sm opacity-40">
+            Admin tools are hidden for your role ({user.role}).
+          </p>
+        }
+      >
+        <p className="text-sm">Admin tools would appear here.</p>
+      </RoleGate>
+
+      <RoleGate permission={PERMISSIONS.TAKE_ASSESSMENT}>
+        <p className="text-sm">You are eligible to take assessments.</p>
+      </RoleGate>
 
       <SignOutButton />
     </main>
