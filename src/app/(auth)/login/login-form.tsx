@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { signInWithPopup, type AuthProvider } from 'firebase/auth'
 import { FirebaseError } from 'firebase/app'
 
+import { Button } from '@/components/ui/button'
 import { getFirebaseAuth, githubProvider, googleProvider } from '@/lib/firebase-client'
 
 /**
@@ -81,26 +82,26 @@ export default function LoginForm() {
 
   return (
     <div className="flex w-full flex-col gap-3">
-      <button
+      <Button
         type="button"
+        variant="outline"
         disabled={busy}
         onClick={() => signIn('google', googleProvider)}
-        className="rounded-md border border-current/20 px-4 py-2.5 text-sm font-medium transition-colors hover:border-current/40 disabled:opacity-50"
       >
         {pending === 'google' ? 'Opening Google…' : 'Continue with Google'}
-      </button>
+      </Button>
 
-      <button
+      <Button
         type="button"
+        variant="outline"
         disabled={busy}
         onClick={() => signIn('github', githubProvider)}
-        className="rounded-md border border-current/20 px-4 py-2.5 text-sm font-medium transition-colors hover:border-current/40 disabled:opacity-50"
       >
         {pending === 'github' ? 'Opening GitHub…' : 'Continue with GitHub'}
-      </button>
+      </Button>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-destructive text-sm">
           {error}
         </p>
       )}

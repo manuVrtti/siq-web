@@ -18,6 +18,13 @@ import { useCurrentUser } from '@/lib/auth/user-context'
  *     it hides MUST also be enforced server-side with `withRole()`,
  *     `withPermission()` or `requireOrgAccess()`. If an action is gated only
  *     here, it is not gated.
+ *
+ *     Concretely, and measured rather than assumed: for a STUDENT, gated
+ *     content is absent from the rendered DOM but PRESENT in the RSC payload,
+ *     because `children` is serialised by the server before this component
+ *     decides anything. So never wrap real data in a RoleGate and assume it
+ *     was withheld — it was sent, just not painted. Fetch privileged data
+ *     behind a server-side check instead, so it is never serialised at all.
  */
 
 type RoleGateProps = {

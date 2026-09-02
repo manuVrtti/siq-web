@@ -1,18 +1,18 @@
 import { redirect } from 'next/navigation'
 
+import AppShell from '@/components/layout/app-shell'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { UserProvider } from '@/lib/auth/user-context'
 
 /**
- * Plan 007 — layout for authenticated pages.
+ * Plan 007/008 — layout for authenticated pages.
  *
- * Resolves the user once here and hands it to a client-side provider, so
- * components below can read the role synchronously via `useCurrentUser()`
- * without each one fetching. `getCurrentUser` is React-cached, so pages under
- * this layout calling it again cost nothing extra.
+ * Resolves the user once, hands it to the client provider, and wraps
+ * everything in the app shell. `getCurrentUser` is React-cached, so pages
+ * below calling it again cost nothing.
  *
- * The redirect is a real guard, not decoration: the proxy only checks that a
- * cookie exists, so an expired or forged one reaches this point.
+ * The redirect is a real guard: the proxy only checks that a cookie exists,
+ * so an expired or forged one reaches this point.
  */
 export default async function ProtectedLayout({
   children,
@@ -22,5 +22,9 @@ export default async function ProtectedLayout({
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
-  return <UserProvider user={user}>{children}</UserProvider>
+  return (
+    <UserProvider user={user}>
+      <AppShell>{children}</AppShell>
+    </UserProvider>
+  )
 }
