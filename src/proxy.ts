@@ -29,9 +29,17 @@ const PUBLIC_ROUTES = new Set([
   // the moment those routes land.
   '/api/auth/phone/send-otp',
   '/api/auth/phone/verify-otp',
-  '/api/health',
-  '/api/health/db',
 ])
+
+/**
+ * Health checks must be reachable without a session — an uptime monitor has no
+ * credentials, and a probe that 401s reads as an outage. Matched by prefix so
+ * new checks added under /api/health are public automatically rather than
+ * silently returning 401 until someone notices.
+ */
+function isHealthRoute(pathname: string): boolean {
+  return pathname === '/api/health' || pathname.startsWith('/api/health/')
+}
 
 /** Prefixes always allowed: framework internals and static assets. */
 const PUBLIC_PREFIXES = ['/_next', '/favicon', '/public', '/static']
@@ -41,6 +49,7 @@ export const SECURE_BROWSER_UA = 'SelectIQBrowser'
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true
+  if (isHealthRoute(pathname)) return true
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true
 
   // Files with an extension are static assets (favicon.ico, og.png, ...).

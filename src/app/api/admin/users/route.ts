@@ -1,7 +1,5 @@
-import { NextResponse } from 'next/server'
-
 import { withRole } from '@/lib/auth/require-role'
-import { handleApiError } from '@/lib/errors'
+import { errorResponse, successResponse } from '@/lib/api-response'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -26,8 +24,8 @@ export async function GET() {
       take: 50,
     })
 
-    return NextResponse.json({ users })
+    return successResponse({ users })
   } catch (error) {
-    return handleApiError(error)
+    return errorResponse(error)
   }
 }

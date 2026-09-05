@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers'
-import { NextResponse, type NextRequest } from 'next/server'
+import { type NextRequest } from 'next/server'
 
 import {
   SESSION_COOKIE_NAME,
@@ -8,6 +8,8 @@ import {
   getSessionCookie,
   verifySessionCookie,
 } from '@/lib/auth/session'
+import { errorResponse, successResponse } from '@/lib/api-response'
+import { AppError, AuthError, ValidationError } from '@/lib/errors'
 import { getAdminAuth } from '@/lib/firebase-admin'
 import { prisma } from '@/lib/prisma'
 
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
     const idToken = body?.idToken
 
     if (typeof idToken !== 'string' || !idToken) {
-      return NextResponse.json({ error: 'Missing idToken' }, { status: 400 })
+      throw new ValidationError('Missing idToken')
     }
 
     // Verifies the token and enforces the recent-sign-in window.
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
       maxAge: SESSION_MAX_AGE_MS / 1000,
     })
 
-    return NextResponse.json({
+    return successResponse({
       user: {
         id: user.id,
         email: user.email,
@@ -86,10 +88,16 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    // Never echo the error: it can contain the token or admin credentials.
+    // Never echo the raw error: it can contain the token or admin credentials.
     console.error('[auth/session] POST failed:', error)
 
-    return NextResponse.json({ error: 'Authentication failed' }, { status: 401 })
+    // Our own errors already carry a safe message and the right status — a
+    // malformed request is a 400, not a 401. Anything else (a Firebase
+    // rejection, a Prisma failure) collapses to a generic 401 so the client
+    // learns nothing about why verification failed.
+    return errorResponse(
+      error instanceof AppError ? error : new AuthError('Authentication failed'),
+    )
   }
 }
 
@@ -111,10 +119,10 @@ export async function DELETE() {
     const store = await cookies()
     store.set(SESSION_COOKIE_NAME, '', { ...cookieOptions(), maxAge: 0 })
 
-    return NextResponse.json({ success: true })
+    return successResponse({ signedOut: true })
   } catch (error) {
     console.error('[auth/session] DELETE failed:', error)
 
-    return NextResponse.json({ error: 'Sign out failed' }, { status: 500 })
+    return errorResponse(error)
   }
 }
