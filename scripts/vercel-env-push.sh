@@ -85,6 +85,9 @@ for f in "${FILES[@]}"; do
 
     [ -n "${SEEN[$key]:-}" ] && continue          # first file wins
     case "$SKIP_KEYS" in *" $key "*) echo "  skip  $key (managed manually)"; SEEN[$key]=1; continue ;; esac
+    # Vercel injects its own VERCEL_* vars (e.g. VERCEL_OIDC_TOKEN, which
+    # `vercel link` writes into .env.local). Never push those back as project vars.
+    case "$key" in VERCEL_*) echo "  skip  $key (Vercel-managed)"; SEEN[$key]=1; continue ;; esac
 
     # Strip one leading and one trailing double quote, if both present.
     if [ "${val#\"}" != "$val" ] && [ "${val%\"}" != "$val" ]; then
