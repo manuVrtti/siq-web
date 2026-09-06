@@ -58,9 +58,10 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  memberships   OrganizationMember[]
-  auditLogs     AuditLog[]
-  authoredQuestions Question[]
+  memberships        OrganizationMember[]
+  auditLogs          AuditLog[]
+  authoredQuestions  Question[]
+  createdAssessments Assessment[]
 
   @@index([role])
 }
@@ -83,9 +84,10 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members   OrganizationMember[]
-  questions Question[]
-  tags      Tag[]
+  members     OrganizationMember[]
+  questions   Question[]
+  tags        Tag[]
+  assessments Assessment[]
 
   @@index([type])
 }
@@ -163,6 +165,7 @@ model Question {
   createdBy User             @relation(fields: [createdById], references: [id], onDelete: Restrict)
   options   QuestionOption[]
   tags      QuestionTag[]
+  assessmentQuestions AssessmentQuestion[]
 
   @@index([orgId])
   @@index([type])
@@ -207,4 +210,79 @@ model QuestionTag {
 
   @@id([questionId, tagId])
   @@index([tagId])
+}
+
+// ============================================================
+// Plan 012 — Assessment Builder
+// ============================================================
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ScoringPolicy {
+  STANDARD
+  NEGATIVE_MARKING
+}
+
+/// A configurable, timed assessment: global config plus ordered sections of
+/// questions. Org-owned; DRAFT until validated and published.
+model Assessment {
+  id               String           @id @default(cuid())
+  orgId            String
+  title            String
+  description      String?          @db.Text
+  status           AssessmentStatus @default(DRAFT)
+  durationMinutes  Int
+  scoringPolicy    ScoringPolicy    @default(STANDARD)
+  maxAttempts      Int              @default(1)
+  shuffleQuestions Boolean          @default(false)
+  shuffleOptions   Boolean          @default(false)
+  passingScore     Float?
+  startAt          DateTime?
+  endAt            DateTime?
+  createdById      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  org       Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User                @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  sections  AssessmentSection[]
+
+  @@index([orgId])
+  @@index([status])
+}
+
+/// A named group of questions within an assessment, optionally its own timer.
+model AssessmentSection {
+  id              String  @id @default(cuid())
+  assessmentId    String
+  title           String
+  description     String?
+  order           Int
+  durationMinutes Int?
+
+  assessment Assessment           @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  questions  AssessmentQuestion[]
+
+  @@index([assessmentId])
+}
+
+/// A question placed in a section, with optional per-assessment marks override.
+model AssessmentQuestion {
+  id            String @id @default(cuid())
+  sectionId     String
+  questionId    String
+  order         Int
+  marksOverride Int?
+
+  section  AssessmentSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  // Restrict: a question used in an assessment cannot be silently deleted from
+  // under it — remove it from the assessment first.
+  question Question          @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@unique([sectionId, questionId])
+  @@index([sectionId])
 }
