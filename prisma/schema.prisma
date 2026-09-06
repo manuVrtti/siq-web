@@ -70,10 +70,11 @@ model Organization {
   id   String  @id @default(cuid())
   name String
   type OrgType
-  /// URL-safe identifier: "abes" for abes.selectsiq.in or /org/abes.
-  /// Lowercase letters, digits and hyphens only. Treat as permanent once set —
-  /// changing it breaks every saved link. Nullable while orgs predate it.
-  slug String? @unique
+  /// URL-safe tenant identifier: "abes" in selectsiq.in/abes/... (and later
+  /// abes.selectsiq.in). Lowercase letters, digits and hyphens only. Required
+  /// and permanent — it is the routing key, and changing it breaks every saved
+  /// link. (Plan T01 — was nullable before any org existed.)
+  slug String @unique
   /// Email domain used to match students to their college, e.g. "abes.ac.in".
   /// Distinct from `slug`: a college may have several email domains but only
   /// one URL, and dots are not valid in a subdomain label.
