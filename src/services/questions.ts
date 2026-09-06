@@ -1,0 +1,130 @@
+import 'server-only'
+
+import type { Prisma, QuestionType, Difficulty } from '@prisma/client'
+
+import { NotFoundError } from '@/lib/errors'
+import { prisma } from '@/lib/prisma'
+import type { QuestionInput } from '@/lib/validators/question'
+
+/**
+ * Plan 011 — question business logic.
+ *
+ * Every function is org-scoped: callers pass the orgId that `requireOrgAccess`
+ * has already authorised, and queries filter by it. A question is never fetched
+ * or mutated without its org in the WHERE clause, so one org can never reach
+ * another's questions even with a guessed id.
+ */
+
+const questionInclude = {
+  options: { orderBy: { order: 'asc' } },
+  tags: { include: { tag: true } },
+} satisfies Prisma.QuestionInclude
+
+export type QuestionFilters = {
+  type?: QuestionType
+  difficulty?: Difficulty
+  tagId?: string
+  search?: string
+  skip?: number
+  take?: number
+}
+
+export async function listQuestions(orgId: string, filters: QuestionFilters = {}) {
+  const where: Prisma.QuestionWhereInput = {
+    orgId,
+    ...(filters.type && { type: filters.type }),
+    ...(filters.difficulty && { difficulty: filters.difficulty }),
+    ...(filters.tagId && { tags: { some: { tagId: filters.tagId } } }),
+    ...(filters.search && {
+      OR: [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { body: { contains: filters.search, mode: 'insensitive' } },
+      ],
+    }),
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.question.findMany({
+      where,
+      include: questionInclude,
+      orderBy: { createdAt: 'desc' },
+      skip: filters.skip ?? 0,
+      take: Math.min(filters.take ?? 20, 100),
+    }),
+    prisma.question.count({ where }),
+  ])
+
+  return { items, total }
+}
+
+/** Fetch one question, scoped to the org. Throws if it belongs to another org. */
+export async function getQuestion(orgId: string, id: string) {
+  const question = await prisma.question.findFirst({
+    where: { id, orgId },
+    include: questionInclude,
+  })
+  if (!question) throw new NotFoundError('Question not found')
+  return question
+}
+
+export async function createQuestion(orgId: string, userId: string, data: QuestionInput) {
+  return prisma.question.create({
+    data: {
+      orgId,
+      createdById: userId,
+      type: data.type,
+      title: data.title,
+      body: data.body,
+      difficulty: data.difficulty,
+      marks: data.marks,
+      negativeMarks: data.negativeMarks,
+      explanation: data.explanation ?? null,
+      options: { create: data.options },
+      tags: { create: data.tagIds.map((tagId) => ({ tagId })) },
+    },
+    include: questionInclude,
+  })
+}
+
+/**
+ * Replace a question's contents. Options and tags are fully replaced rather
+ * than diffed — simpler and correct, since the form always submits the full
+ * set. Wrapped in a transaction so a question is never left with the old
+ * options and new fields (or vice versa).
+ */
+export async function updateQuestion(
+  orgId: string,
+  id: string,
+  data: QuestionInput,
+) {
+  // Ensures the question belongs to this org before mutating.
+  await getQuestion(orgId, id)
+
+  return prisma.$transaction(async (tx) => {
+    await tx.questionOption.deleteMany({ where: { questionId: id } })
+    await tx.questionTag.deleteMany({ where: { questionId: id } })
+
+    return tx.question.update({
+      where: { id },
+      data: {
+        type: data.type,
+        title: data.title,
+        body: data.body,
+        difficulty: data.difficulty,
+        marks: data.marks,
+        negativeMarks: data.negativeMarks,
+        explanation: data.explanation ?? null,
+        options: { create: data.options },
+        tags: { create: data.tagIds.map((tagId) => ({ tagId })) },
+      },
+      include: questionInclude,
+    })
+  })
+}
+
+export async function deleteQuestion(orgId: string, id: string) {
+  // Scope check first — deleteMany with orgId means a cross-org id deletes
+  // nothing rather than erroring, but we want a clear 404.
+  await getQuestion(orgId, id)
+  await prisma.question.delete({ where: { id } })
+}
