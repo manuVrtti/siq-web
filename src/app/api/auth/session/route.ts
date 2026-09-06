@@ -53,24 +53,62 @@ export async function POST(request: NextRequest) {
     // Firebase is the identity source; Postgres is the app-level record.
     // Email/name/avatar are refreshed on every login so a changed Google
     // profile does not go stale here.
-    const user = await prisma.user.upsert({
-      where: { firebaseUid: decoded.uid },
-      update: {
-        lastLoginAt: new Date(),
-        email: decoded.email ?? null,
-        name: decoded.name ?? null,
-        avatarUrl: decoded.picture ?? null,
-      },
-      create: {
-        firebaseUid: decoded.uid,
-        email: decoded.email ?? null,
-        name: decoded.name ?? null,
-        avatarUrl: decoded.picture ?? null,
-        lastLoginAt: new Date(),
-        // Role is never taken from the client. Elevation happens in Plan 007.
-        role: 'STUDENT',
-      },
-    })
+    //
+    // Three cases (Plan 013 added the middle one):
+    //
+    //   1. Existing user matched by firebaseUid → normal login, refresh fields.
+    //   2. No firebaseUid match, but a pre-provisioned row exists with the same
+    //      verified email → CLAIM it. This is how a college-imported student
+    //      lands in their own row instead of getting a unique-email conflict
+    //      on `create`. Only claimed when Firebase reports email_verified
+    //      (Google always does; GitHub does not guarantee it), or someone could
+    //      register an unverified account with a student's address and inherit
+    //      their college memberships.
+    //   3. Neither → create a fresh row with no org access.
+    let user = await prisma.user.findUnique({ where: { firebaseUid: decoded.uid } })
+
+    if (!user && decoded.email && decoded.email_verified) {
+      const pending = await prisma.user.findUnique({ where: { email: decoded.email } })
+      // Only claim a row that hasn't been claimed yet (the `pending:` prefix
+      // means "created by an import, never signed in"). A real user's row is
+      // never overwritten by an email match.
+      if (pending && pending.firebaseUid.startsWith('pending:')) {
+        user = await prisma.user.update({
+          where: { id: pending.id },
+          data: {
+            firebaseUid: decoded.uid,
+            name: pending.name ?? decoded.name ?? null,
+            avatarUrl: decoded.picture ?? null,
+            lastLoginAt: new Date(),
+          },
+        })
+      }
+    }
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          firebaseUid: decoded.uid,
+          email: decoded.email ?? null,
+          name: decoded.name ?? null,
+          avatarUrl: decoded.picture ?? null,
+          lastLoginAt: new Date(),
+          // Role is never taken from the client. Elevation happens in Plan 007.
+          role: 'STUDENT',
+        },
+      })
+    } else if (!user.firebaseUid.startsWith('pending:')) {
+      // Already-claimed row: refresh mutable identity fields.
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+          email: decoded.email ?? user.email,
+          name: decoded.name ?? user.name,
+          avatarUrl: decoded.picture ?? user.avatarUrl,
+        },
+      })
+    }
 
     const store = await cookies()
     store.set(SESSION_COOKIE_NAME, sessionCookie, {

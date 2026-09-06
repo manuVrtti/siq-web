@@ -3,10 +3,12 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { useActiveOrg } from '@/lib/org-context'
 import { cn } from '@/lib/utils'
 
 /**
@@ -55,6 +57,7 @@ export default function AssessmentBuilder({
   tags: Tag[]
 }) {
   const router = useRouter()
+  const org = useActiveOrg()
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -122,7 +125,10 @@ export default function AssessmentBuilder({
         <span className="text-muted-foreground">
           {assessment.sections.length} sections · {totalQuestions} questions · {totalMarks} marks
         </span>
-        <Button className="ml-auto" onClick={publish} disabled={busy}>
+        <Button variant="outline" className="ml-auto" render={<Link href={`/${org.slug}/assessments/${assessment.id}/assign`} />}>
+          Assign
+        </Button>
+        <Button onClick={publish} disabled={busy}>
           Publish
         </Button>
       </div>
