@@ -66,7 +66,7 @@ export default function LoginForm() {
         }
 
         // refresh() re-runs the server components so the new cookie is picked up.
-        router.replace('/dashboard')
+        router.replace('/select-org')
         router.refresh()
       } catch (err) {
         setError(err instanceof Error && !(err instanceof FirebaseError)

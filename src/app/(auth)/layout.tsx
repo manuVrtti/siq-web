@@ -14,7 +14,7 @@ export default async function AuthLayout({
   children: React.ReactNode
 }) {
   const user = await getCurrentUser()
-  if (user) redirect('/dashboard')
+  if (user) redirect('/select-org')
 
   return (
     <main className="bg-muted/30 flex min-h-screen items-center justify-center p-6">

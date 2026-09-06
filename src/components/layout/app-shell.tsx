@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useCurrentUser } from '@/lib/auth/user-context'
+import { useActiveOrg } from '@/lib/org-context'
 
 /**
  * Plan 008 — the authenticated app shell.
@@ -24,8 +25,9 @@ import { useCurrentUser } from '@/lib/auth/user-context'
  */
 
 function Brand() {
+  const org = useActiveOrg()
   return (
-    <Link href="/dashboard" className="flex items-center gap-2 px-3 py-1">
+    <Link href={`/${org.slug}/dashboard`} className="flex items-center gap-2 px-3 py-1">
       <span className="bg-primary text-primary-foreground grid size-7 place-items-center rounded-md text-xs font-bold">
         S
       </span>
