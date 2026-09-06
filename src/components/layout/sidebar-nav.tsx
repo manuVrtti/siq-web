@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 
 import { navItemsForRole } from '@/constants/navigation'
 import { useCurrentUser } from '@/lib/auth/user-context'
+import { useActiveOrg } from '@/lib/org-context'
 import { cn } from '@/lib/utils'
 
 /**
@@ -15,6 +16,7 @@ import { cn } from '@/lib/utils'
  */
 export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const user = useCurrentUser()
+  const org = useActiveOrg()
   const pathname = usePathname()
 
   if (!user) return null
@@ -22,14 +24,16 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
   return (
     <nav className="flex flex-col gap-1" aria-label="Main">
       {navItemsForRole(user.role).map(({ label, href, icon: Icon }) => {
-        // Exact match, or a nested route beneath it — so /assessments/new
-        // still highlights Assessments, while /results does not match /r.
-        const active = pathname === href || pathname.startsWith(`${href}/`)
+        // Nav hrefs are sub-paths; prefix with the active org's slug.
+        const fullHref = `/${org.slug}${href}`
+        // Exact match, or a nested route beneath it — so /questions/new
+        // still highlights Questions, while /results does not match /r.
+        const active = pathname === fullHref || pathname.startsWith(`${fullHref}/`)
 
         return (
           <Link
             key={href}
-            href={href}
+            href={fullHref}
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(

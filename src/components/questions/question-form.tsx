@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { useActiveOrg } from '@/lib/org-context'
 import { DIFFICULTIES, QUESTION_TYPES } from '@/lib/validators/question'
 
 /**
@@ -57,6 +58,7 @@ export default function QuestionForm({
   initial?: QuestionFormData
 }) {
   const router = useRouter()
+  const activeOrg = useActiveOrg()
   const [tags, setTags] = useState<TagOption[]>(orgTags)
 
   const [type, setType] = useState(initial?.type ?? 'MCQ_SINGLE')
@@ -160,7 +162,7 @@ export default function QuestionForm({
     setSaving(false)
 
     if (res.ok && json.success) {
-      router.push('/questions')
+      router.push(`/${activeOrg.slug}/questions`)
       router.refresh()
     } else {
       setError(json?.error?.message ?? 'Could not save question')
@@ -337,7 +339,7 @@ export default function QuestionForm({
         <Button onClick={submit} disabled={saving}>
           {saving ? 'Saving…' : initial?.id ? 'Save changes' : 'Create question'}
         </Button>
-        <Button variant="outline" onClick={() => router.push('/questions')} disabled={saving}>
+        <Button variant="outline" onClick={() => router.push(`/${activeOrg.slug}/questions`)} disabled={saving}>
           Cancel
         </Button>
       </div>

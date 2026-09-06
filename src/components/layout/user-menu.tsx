@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useCurrentUser } from '@/lib/auth/user-context'
+import { useActiveOrg } from '@/lib/org-context'
 import { getFirebaseAuth } from '@/lib/firebase-client'
 
 /** First letters of the name, or the email's first character. */
@@ -41,6 +42,7 @@ function initials(name: string | null, email: string | null): string {
  */
 export default function UserMenu() {
   const user = useCurrentUser()
+  const org = useActiveOrg()
   const router = useRouter()
   const [pending, setPending] = useState(false)
 
@@ -92,11 +94,11 @@ export default function UserMenu() {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem onClick={() => router.push('/profile')}>
+        <DropdownMenuItem onClick={() => router.push(`/${org.slug}/settings/profile`)}>
           <UserIcon className="size-4" aria-hidden />
           Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push('/settings')}>
+        <DropdownMenuItem onClick={() => router.push(`/${org.slug}/settings`)}>
           <SettingsIcon className="size-4" aria-hidden />
           Settings
         </DropdownMenuItem>

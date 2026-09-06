@@ -1,18 +1,17 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 
 import QuestionForm from '@/components/questions/question-form'
 import PageHeader from '@/components/ui/page-header'
-import { getActiveOrg } from '@/lib/auth/active-org'
-import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { prisma } from '@/lib/prisma'
+import { getOrgBySlug } from '@/services/organizations'
 
 export const metadata: Metadata = { title: 'New Question — SelectIQ' }
 
-export default async function NewQuestionPage() {
-  const user = (await getCurrentUser())!
-  const org = await getActiveOrg(user)
-  if (!org) redirect('/questions')
+export default async function NewQuestionPage({ params }: { params: Promise<{ org: string }> }) {
+  const { org: slug } = await params
+  const org = await getOrgBySlug(slug)
+  if (!org) notFound()
 
   const tags = await prisma.tag.findMany({ where: { orgId: org.id }, orderBy: { name: 'asc' } })
 

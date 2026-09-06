@@ -1,20 +1,22 @@
 import type { Metadata } from 'next'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 
 import QuestionForm from '@/components/questions/question-form'
 import PageHeader from '@/components/ui/page-header'
-import { getActiveOrg } from '@/lib/auth/active-org'
-import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { prisma } from '@/lib/prisma'
 import { getQuestion } from '@/services/questions'
+import { getOrgBySlug } from '@/services/organizations'
 
 export const metadata: Metadata = { title: 'Edit Question — SelectIQ' }
 
-export default async function EditQuestionPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const user = (await getCurrentUser())!
-  const org = await getActiveOrg(user)
-  if (!org) redirect('/questions')
+export default async function EditQuestionPage({
+  params,
+}: {
+  params: Promise<{ org: string; id: string }>
+}) {
+  const { org: slug, id } = await params
+  const org = await getOrgBySlug(slug)
+  if (!org) notFound()
 
   const question = await getQuestion(org.id, id).catch(() => null)
   if (!question) notFound()

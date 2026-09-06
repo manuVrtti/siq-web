@@ -29,9 +29,9 @@ const DIFFICULTY_VARIANT: Record<string, 'secondary' | 'outline'> = {
   HARD: 'outline',
 }
 
-export default function QuestionCard({ question }: { question: QuestionCardData }) {
+export default function QuestionCard({ orgSlug, question }: { orgSlug: string; question: QuestionCardData }) {
   return (
-    <Link href={`/questions/${question.id}/edit`} className="block">
+    <Link href={`/${orgSlug}/questions/${question.id}/edit`} className="block">
       <Card className="transition-colors hover:border-current/30">
         <CardHeader className="gap-2">
           <div className="flex flex-wrap items-center gap-2">
