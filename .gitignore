@@ -8,8 +8,12 @@ node_modules/
 out/
 
 # Production
-build/
-dist/
+# Anchored (leading /) so these only match the repo root — an unanchored
+# `build/` also matches nested route directories like
+# src/app/(protected)/[org]/assessments/[id]/build/, which silently swallowed
+# a real page. Same for dist/.
+/build/
+/dist/
 
 # Environment variables — NEVER commit
 # Everything env-shaped, including editor and tooling backups such as
