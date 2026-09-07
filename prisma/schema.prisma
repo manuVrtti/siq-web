@@ -64,6 +64,7 @@ model User {
   createdAssessments Assessment[]
   batchMemberships   BatchMember[]
   assignments        AssessmentAssignment[]
+  examAttempts       ExamAttempt[]
 
   @@index([role])
 }
@@ -342,11 +343,58 @@ model AssessmentAssignment {
   submittedAt  DateTime?
   expiresAt    DateTime?
 
-  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessment Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt    ExamAttempt?
 
   @@unique([assessmentId, userId])
   @@index([token])
   @@index([userId])
   @@index([status])
+}
+
+// ============================================================
+// Plan 015 — Exam-Taking Runtime
+// ============================================================
+
+/// One in-progress or completed attempt at an assigned assessment.
+/// Timer is server-authoritative: deadlineAt is set at start and enforced on
+/// every save/submit. questionOrder pins the shuffle so refreshes see the
+/// same order.
+model ExamAttempt {
+  id             String    @id @default(cuid())
+  assignmentId   String    @unique
+  userId         String
+  assessmentId   String
+  startedAt      DateTime  @default(now())
+  deadlineAt     DateTime
+  submittedAt    DateTime?
+  /// { sections: [{ sectionId, questionIds: string[] }] }
+  questionOrder  Json
+  currentSection Int       @default(0)
+
+  assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers    ExamAnswer[]
+
+  @@index([userId])
+  @@index([assessmentId])
+}
+
+/// One saved answer per (attempt, question). Autosaved as the candidate works.
+model ExamAnswer {
+  id                String   @id @default(cuid())
+  attemptId         String
+  questionId        String
+  /// String[] to support both single- and multi-select MCQs uniformly.
+  selectedOptionIds String[]
+  textAnswer        String?  @db.Text
+  /// codeSubmissionId — reserved for Plan 014 (Judge0). Nullable for now.
+  codeSubmissionId  String?
+  savedAt           DateTime @default(now())
+
+  attempt ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
 }
