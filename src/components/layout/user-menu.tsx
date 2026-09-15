@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'firebase/auth'
-import { LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react'
+import { FileText, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -97,6 +97,10 @@ export default function UserMenu() {
         <DropdownMenuItem onClick={() => router.push(`/${org.slug}/settings/profile`)}>
           <UserIcon className="size-4" aria-hidden />
           Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push('/my-results')}>
+          <FileText className="size-4" aria-hidden />
+          My results
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push(`/${org.slug}/settings`)}>
           <SettingsIcon className="size-4" aria-hidden />

@@ -65,6 +65,7 @@ model User {
   batchMemberships   BatchMember[]
   assignments        AssessmentAssignment[]
   examAttempts       ExamAttempt[]
+  results            Result[]
 
   @@index([role])
 }
@@ -255,6 +256,7 @@ model Assessment {
   createdBy   User                   @relation(fields: [createdById], references: [id], onDelete: Restrict)
   sections    AssessmentSection[]
   assignments AssessmentAssignment[]
+  results     Result[]
 
   @@index([orgId])
   @@index([status])
@@ -376,6 +378,7 @@ model ExamAttempt {
   assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   answers    ExamAnswer[]
+  result     Result?
 
   @@index([userId])
   @@index([assessmentId])
@@ -397,4 +400,59 @@ model ExamAnswer {
 
   @@unique([attemptId, questionId])
   @@index([attemptId])
+}
+
+// ============================================================
+// Plan 016 — Grading Engine & Results
+// ============================================================
+
+enum ResultStatus {
+  /// At least one question needs manual review (subjective, or coding pre Plan 014).
+  PENDING_REVIEW
+  /// Fully scored; totalScore and passed are final.
+  GRADED
+}
+
+/// One graded outcome per exam attempt. Auto-created when the attempt is
+/// submitted (services/grading.ts gradeAttempt).
+model Result {
+  id           String       @id @default(cuid())
+  attemptId    String       @unique
+  assessmentId String
+  userId       String
+  status       ResultStatus @default(PENDING_REVIEW)
+  totalScore   Float        @default(0)
+  maxScore     Float
+  percentage   Float        @default(0)
+  passed       Boolean?
+  gradedAt     DateTime?
+  createdAt    DateTime     @default(now())
+
+  attempt         ExamAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  assessment      Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionResults QuestionResult[]
+
+  @@index([assessmentId])
+  @@index([userId])
+  @@index([status])
+}
+
+/// Per-question breakdown of a Result.
+model QuestionResult {
+  id           String  @id @default(cuid())
+  resultId     String
+  questionId   String
+  scoreAwarded Float   @default(0)
+  maxMarks     Float
+  isCorrect    Boolean?
+  /// True while awaiting manual review (subjective, coding). Prevents result finalisation.
+  needsReview  Boolean @default(false)
+  reviewedById String?
+  feedback     String? @db.Text
+
+  result Result @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@index([resultId])
+  @@index([questionId])
 }

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import AssessmentBuilder from '@/components/assessments/assessment-builder'
+import { Button } from '@/components/ui/button'
 import PageHeader from '@/components/ui/page-header'
 import { getAssessment } from '@/services/assessments'
 import { getOrgBySlug } from '@/services/organizations'
@@ -30,7 +32,20 @@ export default async function BuildPage({
 
   return (
     <>
-      <PageHeader title={assessment.title} description={`${org.name} · ${assessment.status.toLowerCase()}`} />
+      <PageHeader title={assessment.title} description={`${org.name} · ${assessment.status.toLowerCase()}`}>
+        <Button
+          variant="outline"
+          render={<Link href={`/${slug}/assessments/${id}/assign`} />}
+        >
+          Assign
+        </Button>
+        <Button
+          variant="outline"
+          render={<Link href={`/${slug}/assessments/${id}/results`} />}
+        >
+          Results
+        </Button>
+      </PageHeader>
       <AssessmentBuilder
         assessment={JSON.parse(JSON.stringify(assessment))}
         bank={questions.map((q) => ({

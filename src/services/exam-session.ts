@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client'
 
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { gradeAttempt } from '@/services/grading'
 
 /**
  * Plan 015 — exam runtime service.
@@ -334,5 +335,10 @@ export async function submitAttempt(token: string, userId: string) {
       data: { status: 'SUBMITTED', submittedAt: now },
     }),
   ])
+
+  // Grade immediately (Plan 016). gradeAttempt is idempotent — a second
+  // submitAttempt returns early above before reaching this point.
+  await gradeAttempt(assignment.attempt.id)
+
   return { alreadySubmitted: false }
 }
