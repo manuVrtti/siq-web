@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { SESSION_COOKIE_NAME } from '@/lib/auth/session-constants'
+import { isSecureExamBrowserRequest } from '@/lib/seb'
 
 /**
  * SelectIQ proxy — auth enforcement (Plan 006) and exam link enforcement.
@@ -44,12 +45,37 @@ function isHealthRoute(pathname: string): boolean {
 /** Prefixes always allowed: framework internals and static assets. */
 const PUBLIC_PREFIXES = ['/_next', '/favicon', '/public', '/static']
 
-/** Marker the Electron shell puts in its User-Agent. */
-export const SECURE_BROWSER_UA = 'SelectIQBrowser'
+/**
+ * Only the exam ATTEMPT surface is SEB-only. The entry page (`/exam/[token]`)
+ * must stay reachable in an ordinary browser so a candidate who clicks their
+ * invite link sees the "Open in SelectIQ Secure Browser" instructions.
+ */
+function requiresSecureBrowser(pathname: string): boolean {
+  // Page: /exam/<token>/attempt (and any deeper sub-path if we add one)
+  if (/^\/exam\/[^/]+\/attempt(\/|$)/.test(pathname)) return true
+  // API: /api/exam/<token>/{start,answer,submit}
+  if (/^\/api\/exam\/[^/]+\/(start|answer|submit)$/.test(pathname)) return true
+  return false
+}
+
+function extractExamToken(pathname: string): string | null {
+  const m = pathname.match(/^\/(?:api\/)?exam\/([^/]+)\//)
+  return m ? m[1] : null
+}
+
+/**
+ * The SEB self-check endpoint (`/api/exam/<token>/verify-browser`) must be
+ * reachable without a session — the Electron shell hits it on startup, before
+ * the candidate has signed in, to confirm the server recognises it.
+ */
+function isSebVerifyRoute(pathname: string): boolean {
+  return /^\/api\/exam\/[^/]+\/verify-browser$/.test(pathname)
+}
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true
   if (isHealthRoute(pathname)) return true
+  if (isSebVerifyRoute(pathname)) return true
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true
 
   // Files with an extension are static assets (favicon.ico, og.png, ...).
@@ -76,19 +102,26 @@ export default function proxy(request: NextRequest) {
   }
 
   // --- Exam link enforcement (Layer 2) --------------------------------------
-  // Exam routes additionally require the Electron secure browser.
-  //
-  // TODO(sprint-exam): enable once the Electron build ships its User-Agent.
-  //
-  // if (pathname.startsWith('/exam')) {
-  //   const userAgent = request.headers.get('user-agent') ?? ''
-  //   if (!userAgent.includes(SECURE_BROWSER_UA)) {
-  //     const url = request.nextUrl.clone()
-  //     url.pathname = '/browser-required'
-  //     url.searchParams.set('next', pathname)
-  //     return NextResponse.redirect(url)
-  //   }
-  // }
+  // Attempt routes are SEB-only. Everything else (including the entry page and
+  // /api/exam/[token] for token metadata) stays reachable so a candidate can
+  // read the instructions.
+  if (requiresSecureBrowser(pathname) && !isSecureExamBrowserRequest(request.headers)) {
+    // API callers get JSON with a stable error code — the SEB itself uses this
+    // response to decide whether to prompt the user to reopen in SEB.
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { success: false, error: { code: 'SECURE_BROWSER_REQUIRED', message: 'Secure browser required' } },
+        { status: 403 },
+      )
+    }
+    const url = request.nextUrl.clone()
+    url.pathname = '/browser-required'
+    url.search = ''
+    url.searchParams.set('next', pathname)
+    const token = extractExamToken(pathname)
+    if (token) url.searchParams.set('token', token)
+    return NextResponse.redirect(url)
+  }
 
   return NextResponse.next()
 }
