@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Copy, Download, Check } from 'lucide-react'
+import { Check, Copy, Download } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
@@ -11,21 +11,25 @@ import { Button } from '@/components/ui/button'
  *
  * Reached when the middleware catches a request for `/exam/<token>/attempt`
  * (or the exam API) coming from an ordinary browser instead of the SelectIQ
- * Secure Browser. The Electron shell does not register a `selectiq://`
- * protocol handler, so we cannot deep-link the URL. Instead:
+ * Secure Browser. Flow:
  *
- *   1. Show the destination URL and a copy button.
- *   2. Offer a download link for the shell.
- *   3. Instruct the candidate to paste the URL into SEB's address bar.
+ *   1. If we have a token, immediately fire a `selectiq://exam/<token>` deep
+ *      link. If SEB is installed, the OS launches it and this tab loses
+ *      focus — that's success.
+ *   2. If nothing responds within ~2.5s (focus still here, tab still visible),
+ *      show the Download panel + copy-URL fallback.
+ *   3. Manual retry re-fires the deep link.
  *
- * The `next` and `token` search params are attacker-controllable, so we only
- * accept a same-origin path and rebuild the absolute URL against the current
- * `window.location.origin`.
+ * `next` and `token` in the query string are attacker-controllable, so only
+ * same-origin `next` paths and the alphanumeric shape of a token are accepted.
  */
 
 const DOWNLOAD_URL =
   process.env.NEXT_PUBLIC_SEB_DOWNLOAD_URL ||
   'https://github.com/manuVrtti/siq-Secure-browser/releases/latest'
+
+/** How long to wait for SEB to take focus before assuming it isn't installed. */
+const LAUNCH_TIMEOUT_MS = 2500
 
 function safeNextPath(raw: string | null): string {
   if (!raw) return '/'
@@ -33,18 +37,74 @@ function safeNextPath(raw: string | null): string {
   return raw
 }
 
+function safeToken(raw: string | null): string | null {
+  if (!raw) return null
+  return /^[A-Za-z0-9_-]{6,}$/.test(raw) ? raw : null
+}
+
 export default function GatewayClient() {
   const searchParams = useSearchParams()
   const target = safeNextPath(searchParams.get('next'))
+  const token = safeToken(searchParams.get('token'))
+
   const [copied, setCopied] = useState(false)
-  // 'use client' — origin is only read in the browser. useMemo keeps the URL
-  // stable across renders without a useEffect + setState round-trip.
+  const [timedOut, setTimedOut] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const absoluteUrl = useMemo(
     () => (typeof window === 'undefined' ? target : `${window.location.origin}${target}`),
     [target],
   )
+  const deepLink = token ? `selectiq://exam/${token}` : null
 
-  async function copy() {
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  // Pure side effect: does NOT set state synchronously so it's safe to call
+  // from the mount effect. The only state change is the deferred
+  // `setTimedOut(true)` inside setTimeout.
+  const fire = useCallback(() => {
+    if (!deepLink) return
+    clearTimer()
+    timerRef.current = setTimeout(() => setTimedOut(true), LAUNCH_TIMEOUT_MS)
+    window.location.href = deepLink
+  }, [deepLink, clearTimer])
+
+  const retry = useCallback(() => {
+    setTimedOut(false)
+    fire()
+  }, [fire])
+
+  useEffect(() => {
+    // The moment the tab loses focus or is hidden, the OS handed off to SEB.
+    // Cancel the fallback so we don't nag someone who is already inside SEB.
+    const onBlur = () => clearTimer()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') clearTimer()
+    }
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    if (deepLink) {
+      fire()
+    } else {
+      // No token → nothing to hand off. Show the manual copy panel straight
+      // away. Runs asynchronously so this isn't a sync setState in an effect.
+      queueMicrotask(() => setTimedOut(true))
+    }
+
+    return () => {
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearTimer()
+    }
+  }, [deepLink, fire, clearTimer])
+
+  const copy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(absoluteUrl)
       setCopied(true)
@@ -62,53 +122,60 @@ export default function GatewayClient() {
         }
       }
     }
-  }
+  }, [absoluteUrl])
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 py-10 text-center">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Secure browser required</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {timedOut ? 'Secure browser required' : 'Opening SelectIQ Secure Browser…'}
+        </h1>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          Exams run inside the SelectIQ Secure Browser. Open it, then paste
-          this link into its address bar.
+          {timedOut
+            ? 'Exams run inside the SelectIQ Secure Browser. Install it, then click below to try again.'
+            : 'Your OS should be handing this exam off. If it asks for permission, approve it.'}
         </p>
       </div>
 
-      <div className="w-full text-left">
-        <label
-          htmlFor="gateway-url-input"
-          className="text-muted-foreground mb-1 block text-xs"
-        >
-          Exam URL
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="gateway-url-input"
-            readOnly
-            value={absoluteUrl}
-            className="border-input flex-1 rounded-md border bg-transparent px-2.5 py-1.5 text-sm font-mono outline-none"
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <Button type="button" variant="outline" onClick={copy} className="shrink-0">
-            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            {copied ? 'Copied' : 'Copy'}
+      {timedOut ? (
+        <>
+          <Button
+            render={<a href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" />}
+          >
+            <Download className="size-4" aria-hidden />
+            Download SelectIQ Secure Browser
           </Button>
-        </div>
-      </div>
 
-      <Button
-        variant="outline"
-        render={<a href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" />}
-      >
-        <Download className="size-4" aria-hidden />
-        Download SelectIQ Secure Browser
-      </Button>
+          {deepLink ? (
+            <Button type="button" variant="outline" onClick={retry}>
+              Try opening it again
+            </Button>
+          ) : null}
 
-      <ol className="text-muted-foreground list-inside list-decimal space-y-1 text-left text-sm">
-        <li>Install the SelectIQ Secure Browser (link above) if you haven&apos;t already.</li>
-        <li>Open it — it launches to an address bar.</li>
-        <li>Paste the exam URL and press Enter.</li>
-      </ol>
+          <div className="w-full text-left">
+            <p className="text-muted-foreground mb-2 text-xs">
+              Already installed? Copy this URL and paste it into SEB&apos;s address bar.
+            </p>
+            <div className="flex gap-2">
+              <input
+                id="gateway-url-input"
+                readOnly
+                value={absoluteUrl}
+                className="border-input flex-1 rounded-md border bg-transparent px-2.5 py-1.5 text-sm font-mono outline-none"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <Button type="button" variant="outline" onClick={copy} className="shrink-0">
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="text-muted-foreground text-xs" aria-live="polite">
+          Waiting for the secure browser to take over…
+        </p>
+      )}
     </main>
   )
 }
