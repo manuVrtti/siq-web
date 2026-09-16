@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Copy, Download, Check } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, Copy, Download } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
@@ -9,27 +9,72 @@ import { Button } from '@/components/ui/button'
  * Plan 017 — panel shown on `/exam/[token]` when the request did NOT come from
  * the SelectIQ Secure Browser.
  *
- * The Electron shell does not register a `selectiq://` protocol, so we cannot
- * hand the URL off with a deep link. Instead: copy the URL, launch SIQ Secure
- * Browser, paste it into the address bar (which the shell already accepts).
- * A download link covers the "not installed yet" case.
+ * On mount we fire the `selectiq://exam/<token>` deep link. If SEB is
+ * installed, the OS launches it and this tab loses focus — done. If nothing
+ * responds in ~2.5s, we show the Download panel + a manual copy fallback so
+ * a candidate can still paste the URL into SEB's address bar as a last resort.
  */
+
+const LAUNCH_TIMEOUT_MS = 2500
+
 export default function ExamEntryOpenInSeb({
+  token,
   examUrl,
   downloadUrl,
 }: {
+  token: string
   examUrl: string
   downloadUrl: string
 }) {
   const [copied, setCopied] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  async function copy() {
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  // Pure side effect: does NOT touch state synchronously so it's safe to call
+  // from the mount effect. State changes only occur later from the timeout or
+  // from the external `blur`/`visibilitychange` listeners.
+  const fire = useCallback(() => {
+    clearTimer()
+    timerRef.current = setTimeout(() => setTimedOut(true), LAUNCH_TIMEOUT_MS)
+    window.location.href = `selectiq://exam/${token}`
+  }, [token, clearTimer])
+
+  const retry = useCallback(() => {
+    setTimedOut(false)
+    fire()
+  }, [fire])
+
+  useEffect(() => {
+    // Blur / visibilitychange = OS handed off, we're done.
+    const onBlur = () => clearTimer()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') clearTimer()
+    }
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    fire()
+
+    return () => {
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearTimer()
+    }
+  }, [fire, clearTimer])
+
+  const copy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(examUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Older browsers / permissions-denied — do a manual selection fallback.
       const input = document.getElementById('exam-url-input') as HTMLInputElement | null
       if (input) {
         input.select()
@@ -42,46 +87,55 @@ export default function ExamEntryOpenInSeb({
         }
       }
     }
-  }
+  }, [examUrl])
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
-        <p className="font-medium">Secure browser required</p>
+        <p className="font-medium">
+          {timedOut ? 'Secure browser required' : 'Opening SelectIQ Secure Browser…'}
+        </p>
         <p className="text-muted-foreground mt-1">
-          Exams run inside the SelectIQ Secure Browser. Open it, then paste
-          this link into its address bar.
+          {timedOut
+            ? 'It looks like the secure browser isn’t installed on this device yet. Download it, then click below to try again.'
+            : 'Your OS is being asked to launch the secure browser. Approve the prompt if it appears.'}
         </p>
       </div>
 
-      <div>
-        <label htmlFor="exam-url-input" className="text-muted-foreground mb-1 block text-xs">
-          Exam URL
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="exam-url-input"
-            readOnly
-            value={examUrl}
-            className="border-input flex-1 rounded-md border bg-transparent px-2.5 py-1.5 text-sm font-mono outline-none"
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <Button type="button" variant="outline" onClick={copy} className="shrink-0">
-            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
-        </div>
-      </div>
+      {timedOut ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              render={<a href={downloadUrl} target="_blank" rel="noopener noreferrer" />}
+            >
+              <Download className="size-4" aria-hidden />
+              Download SelectIQ Secure Browser
+            </Button>
+            <Button type="button" variant="outline" onClick={retry}>
+              Try opening it again
+            </Button>
+          </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          render={<a href={downloadUrl} target="_blank" rel="noopener noreferrer" />}
-        >
-          <Download className="size-4" aria-hidden />
-          Download SelectIQ Secure Browser
-        </Button>
-      </div>
+          <div>
+            <label htmlFor="exam-url-input" className="text-muted-foreground mb-1 block text-xs">
+              Already installed? Paste this URL into the SEB address bar.
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="exam-url-input"
+                readOnly
+                value={examUrl}
+                className="border-input flex-1 rounded-md border bg-transparent px-2.5 py-1.5 text-sm font-mono outline-none"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <Button type="button" variant="outline" onClick={copy} className="shrink-0">
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

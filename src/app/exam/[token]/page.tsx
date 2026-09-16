@@ -105,6 +105,7 @@ export default async function ExamEntryPage({
             <ExamEntryStart token={token} started={started} />
           ) : (
             <ExamEntryOpenInSeb
+              token={token}
               examUrl={buildExamUrl(hs, token)}
               downloadUrl={SEB_DOWNLOAD_URL}
             />
