@@ -15,6 +15,7 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
   | 'INTERNAL_ERROR'
+  | 'SECURE_BROWSER_REQUIRED'
 
 export class AppError extends Error {
   readonly statusCode: number
@@ -63,6 +64,18 @@ export class ValidationError extends AppError {
 export class NotFoundError extends AppError {
   constructor(message = 'Not found') {
     super(message, 404, 'NOT_FOUND')
+  }
+}
+
+/**
+ * 403 — Plan 017 — request must come from the SelectIQ Secure Browser.
+ * Distinct code from ordinary FORBIDDEN so the SEB itself can react (prompt
+ * the user to reopen inside the shell) rather than treat it as a permission
+ * error.
+ */
+export class SecureBrowserRequiredError extends AppError {
+  constructor(message = 'Secure browser required') {
+    super(message, 403, 'SECURE_BROWSER_REQUIRED')
   }
 }
 

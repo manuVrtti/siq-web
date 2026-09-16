@@ -1,10 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
+import ExamEntryOpenInSeb from '@/components/exam/exam-entry-open-in-seb'
 import ExamEntryStart from '@/components/exam/exam-entry-start'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
+import { SEB_DOWNLOAD_URL, isSecureExamBrowserRequest } from '@/lib/seb'
 import { validateToken } from '@/services/exam-session'
 
 export const metadata: Metadata = {
@@ -33,6 +36,8 @@ export default async function ExamEntryPage({
   params: Promise<{ token: string }>
 }) {
   const { token } = await params
+  const hs = await headers()
+  const inSeb = isSecureExamBrowserRequest(hs)
   const user = await getCurrentUser()
 
   // Not signed in → send to login. After login, land back here.
@@ -96,11 +101,38 @@ export default async function ExamEntryPage({
             </ul>
           </div>
 
-          <ExamEntryStart token={token} started={started} />
+          {inSeb ? (
+            <ExamEntryStart token={token} started={started} />
+          ) : (
+            <ExamEntryOpenInSeb
+              examUrl={buildExamUrl(hs, token)}
+              downloadUrl={SEB_DOWNLOAD_URL}
+            />
+          )}
         </CardContent>
       </Card>
     </ExamShell>
   )
+}
+
+/**
+ * Rebuild the absolute exam URL so the candidate can paste it into the SEB.
+ * Uses `NEXT_PUBLIC_APP_URL` when set (canonical prod host), else the current
+ * request's forwarded host — so preview deployments and localhost still copy a
+ * link that resolves in SEB.
+ */
+function buildExamUrl(
+  hs: { get(name: string): string | null | undefined },
+  token: string,
+): string {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (() => {
+      const proto = hs.get('x-forwarded-proto') ?? 'http'
+      const host = hs.get('x-forwarded-host') ?? hs.get('host') ?? 'localhost:3000'
+      return `${proto}://${host}`
+    })()
+  return `${base}/exam/${token}`
 }
 
 function ExamShell({ children }: { children: React.ReactNode }) {
