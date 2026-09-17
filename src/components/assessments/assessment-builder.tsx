@@ -42,6 +42,11 @@ type Assessment = {
   scoringPolicy: string
   maxAttempts: number
   passingScore: number | null
+  /** Plan 018 — proctoring toggles. */
+  proctoringEnabled: boolean
+  snapshotIntervalSec: number
+  storeSnapshots: boolean
+  faceMatchThreshold: number
   sections: Section[]
 }
 
@@ -67,6 +72,11 @@ export default function AssessmentBuilder({
   const [durationMinutes, setDuration] = useState(assessment.durationMinutes)
   const [scoringPolicy, setScoring] = useState(assessment.scoringPolicy)
   const [maxAttempts, setMaxAttempts] = useState(assessment.maxAttempts)
+  // Plan 018 — proctoring
+  const [proctoringEnabled, setProctoringEnabled] = useState(assessment.proctoringEnabled)
+  const [snapshotIntervalSec, setSnapshotIntervalSec] = useState(assessment.snapshotIntervalSec)
+  const [storeSnapshots, setStoreSnapshots] = useState(assessment.storeSnapshots)
+  const [faceMatchThreshold, setFaceMatchThreshold] = useState(assessment.faceMatchThreshold)
 
   const [newSection, setNewSection] = useState('')
 
@@ -104,7 +114,19 @@ export default function AssessmentBuilder({
   const base = `/api/assessments/${assessment.id}`
 
   const saveSettings = async () => {
-    if (await call(base, 'PATCH', { title: title.trim(), description: description.trim() || undefined, durationMinutes: Number(durationMinutes), scoringPolicy, maxAttempts: Number(maxAttempts) }))
+    if (
+      await call(base, 'PATCH', {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        durationMinutes: Number(durationMinutes),
+        scoringPolicy,
+        maxAttempts: Number(maxAttempts),
+        proctoringEnabled,
+        snapshotIntervalSec: Number(snapshotIntervalSec),
+        storeSnapshots,
+        faceMatchThreshold: Number(faceMatchThreshold),
+      })
+    )
       setMsg({ kind: 'ok', text: 'Settings saved.' })
   }
   const addSection = async () => {
@@ -161,6 +183,60 @@ export default function AssessmentBuilder({
             <Input type="number" min={1} value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} className="w-24" />
           </label>
         </div>
+
+        {/* Plan 018 — proctoring */}
+        <div className="flex flex-col gap-2 rounded-md border p-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={proctoringEnabled}
+              onChange={(e) => setProctoringEnabled(e.target.checked)}
+            />
+            <span className="font-medium">Enable proctoring</span>
+          </label>
+          <p className="text-muted-foreground text-xs">
+            Requests webcam access when the candidate enters the exam,
+            captures a reference photo, and periodically checks for face
+            presence and match. Activity events (tab switch, focus loss) are
+            also logged.
+          </p>
+          {proctoringEnabled ? (
+            <div className="mt-2 flex flex-wrap gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                Snapshot interval (sec)
+                <Input
+                  type="number"
+                  min={5}
+                  max={300}
+                  value={snapshotIntervalSec}
+                  onChange={(e) => setSnapshotIntervalSec(Number(e.target.value))}
+                  className="w-28"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                Face match threshold
+                <Input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={faceMatchThreshold}
+                  onChange={(e) => setFaceMatchThreshold(Number(e.target.value))}
+                  className="w-28"
+                />
+              </label>
+              <label className="flex items-center gap-2 self-end pb-1 text-sm">
+                <input
+                  type="checkbox"
+                  checked={storeSnapshots}
+                  onChange={(e) => setStoreSnapshots(e.target.checked)}
+                />
+                Store trigger snapshots
+              </label>
+            </div>
+          ) : null}
+        </div>
+
         <Button variant="outline" onClick={saveSettings} disabled={busy} className="self-start">
           Save settings
         </Button>

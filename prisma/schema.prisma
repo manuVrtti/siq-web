@@ -66,6 +66,7 @@ model User {
   assignments        AssessmentAssignment[]
   examAttempts       ExamAttempt[]
   results            Result[]
+  proctoringSessions ProctoringSession[]
 
   @@index([role])
 }
@@ -248,6 +249,14 @@ model Assessment {
   passingScore     Float?
   startAt          DateTime?
   endAt            DateTime?
+  /// Plan 018 — turns on webcam capture + activity monitoring during the attempt.
+  proctoringEnabled   Boolean @default(false)
+  /// Snapshot cadence in seconds. Ignored when proctoringEnabled is false.
+  snapshotIntervalSec Int     @default(30)
+  /// When false, snapshots are analysed and discarded; only flags persist.
+  storeSnapshots      Boolean @default(true)
+  /// Cosine-similarity threshold below which a snapshot triggers FACE_MISMATCH.
+  faceMatchThreshold  Float   @default(0.6)
   createdById      String
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -379,6 +388,7 @@ model ExamAttempt {
   user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   answers    ExamAnswer[]
   result     Result?
+  proctoringSession ProctoringSession?
 
   @@index([userId])
   @@index([assessmentId])
@@ -455,4 +465,70 @@ model QuestionResult {
 
   @@index([resultId])
   @@index([questionId])
+}
+
+// ============================================================
+// Plan 018 — Proctoring: face + activity monitoring
+// ============================================================
+
+enum ProctoringFlagType {
+  NO_FACE
+  MULTIPLE_FACES
+  FACE_MISMATCH
+  TAB_SWITCH
+  FOCUS_LOSS
+  FULLSCREEN_EXIT
+  WINDOW_BLUR
+  WEBCAM_DENIED
+}
+
+enum FlagSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// One proctoring session per exam attempt. Created when the candidate grants
+/// webcam access; the reference photo is captured immediately after.
+model ProctoringSession {
+  id                String   @id @default(cuid())
+  attemptId         String   @unique
+  userId            String
+  /// Supabase Storage path (private bucket) of the reference photo taken at
+  /// exam start. Null when either proctoringEnabled=false or the candidate
+  /// denied webcam access — either way, no photo exists.
+  referencePhotoUrl String?
+  snapshotCount     Int      @default(0)
+  flagCount         Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  attempt ExamAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flags   ProctoringFlag[]
+
+  @@index([userId])
+}
+
+/// One entry per proctoring event. Client-side detection posts these to
+/// /api/exam/[token]/proctoring/flag as they occur.
+model ProctoringFlag {
+  id          String             @id @default(cuid())
+  sessionId   String
+  type        ProctoringFlagType
+  severity    FlagSeverity       @default(LOW)
+  /// Supabase Storage path if the trigger snapshot was stored. Absent when
+  /// Assessment.storeSnapshots=false or the trigger has no visual (activity
+  /// events like TAB_SWITCH).
+  snapshotUrl String?
+  /// Cosine-similarity score for FACE_MISMATCH; null for every other type.
+  similarity  Float?
+  /// Free-form context (e.g. faceCount for MULTIPLE_FACES, durationMs for
+  /// FOCUS_LOSS).
+  metadata    Json?
+  occurredAt  DateTime           @default(now())
+
+  session ProctoringSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([type])
 }

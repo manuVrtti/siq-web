@@ -17,6 +17,12 @@ export const assessmentInputSchema = z.object({
   passingScore: z.number().min(0).max(100000).optional(),
   startAt: z.string().datetime().optional(),
   endAt: z.string().datetime().optional(),
+  // Plan 018 — proctoring config. All optional so existing PATCH callers keep
+  // working; when omitted, the server keeps the current values (partial updates).
+  proctoringEnabled: z.boolean().optional(),
+  snapshotIntervalSec: z.number().int().min(5).max(300).optional(),
+  storeSnapshots: z.boolean().optional(),
+  faceMatchThreshold: z.number().min(0).max(1).optional(),
 })
 
 export type AssessmentInput = z.infer<typeof assessmentInputSchema>

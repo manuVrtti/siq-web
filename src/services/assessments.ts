@@ -67,6 +67,17 @@ export async function createAssessment(orgId: string, userId: string, data: Asse
       passingScore: data.passingScore ?? null,
       startAt: data.startAt ? new Date(data.startAt) : null,
       endAt: data.endAt ? new Date(data.endAt) : null,
+      // Plan 018 — pass through when the client set them; otherwise DB defaults.
+      ...(data.proctoringEnabled !== undefined
+        ? { proctoringEnabled: data.proctoringEnabled }
+        : {}),
+      ...(data.snapshotIntervalSec !== undefined
+        ? { snapshotIntervalSec: data.snapshotIntervalSec }
+        : {}),
+      ...(data.storeSnapshots !== undefined ? { storeSnapshots: data.storeSnapshots } : {}),
+      ...(data.faceMatchThreshold !== undefined
+        ? { faceMatchThreshold: data.faceMatchThreshold }
+        : {}),
     },
     include: fullInclude,
   })
@@ -87,6 +98,19 @@ export async function updateAssessment(orgId: string, id: string, data: Assessme
       passingScore: data.passingScore ?? null,
       startAt: data.startAt ? new Date(data.startAt) : null,
       endAt: data.endAt ? new Date(data.endAt) : null,
+      // Plan 018 — only overwrite when the client sent the field; otherwise
+      // the existing value stays, so a partial PATCH cannot accidentally
+      // reset proctoring config.
+      ...(data.proctoringEnabled !== undefined
+        ? { proctoringEnabled: data.proctoringEnabled }
+        : {}),
+      ...(data.snapshotIntervalSec !== undefined
+        ? { snapshotIntervalSec: data.snapshotIntervalSec }
+        : {}),
+      ...(data.storeSnapshots !== undefined ? { storeSnapshots: data.storeSnapshots } : {}),
+      ...(data.faceMatchThreshold !== undefined
+        ? { faceMatchThreshold: data.faceMatchThreshold }
+        : {}),
     },
     include: fullInclude,
   })

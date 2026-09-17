@@ -18,6 +18,18 @@ export const FILE_LIMITS = {
     types: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
     bucket: 'org-logos',
   },
+  /**
+   * Plan 018 — proctoring reference photos and per-snapshot triggers. Bucket
+   * must be PRIVATE (Supabase dashboard) — nothing here is meant to be
+   * publicly reachable; admins fetch via short-lived signed URLs.
+   */
+  proctoring: {
+    // A 640×480 JPEG at Q0.7 is ~40KB; 512KB is generous headroom for
+    // higher-res webcams and PNG debug uploads.
+    maxSize: 512 * 1024,
+    types: ['image/jpeg', 'image/png', 'image/webp'],
+    bucket: 'proctoring',
+  },
 } as const
 
 export type FileCategory = keyof typeof FILE_LIMITS
