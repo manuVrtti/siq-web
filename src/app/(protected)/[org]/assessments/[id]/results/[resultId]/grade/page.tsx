@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import ManualGradingPanel from '@/components/results/manual-grading-panel'
+import { ProctoringReview } from '@/components/proctoring/proctoring-review'
 import PageHeader from '@/components/ui/page-header'
 import { PERMISSIONS } from '@/constants/permissions'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
@@ -12,6 +13,7 @@ import { prisma } from '@/lib/prisma'
 import { getAssessment } from '@/services/assessments'
 import { getOrgBySlug } from '@/services/organizations'
 import { getResultForAdmin } from '@/services/grading'
+import { getSessionForAdmin } from '@/services/proctoring'
 
 export const metadata: Metadata = { title: 'Grade Result — SelectIQ' }
 
@@ -58,6 +60,17 @@ export default async function GradeResultPage({
   const qById = new Map(questions.map((q) => [q.id, q]))
   const aById = new Map(answers.map((a) => [a.questionId, a]))
 
+  // Plan 018 — attach the proctoring session for this attempt, if one exists.
+  // `getSessionForAdmin` throws NotFound when there is no session, so we
+  // resolve by id via a bare lookup first.
+  const proctoringRow = await prisma.proctoringSession.findUnique({
+    where: { attemptId: result.attemptId },
+    select: { id: true },
+  })
+  const proctoring = proctoringRow
+    ? await getSessionForAdmin(org.id, proctoringRow.id).catch(() => null)
+    : null
+
   const enriched = result.questionResults.map((qr) => {
     const q = qById.get(qr.questionId)
     const a = aById.get(qr.questionId)
@@ -100,6 +113,20 @@ export default async function GradeResultPage({
         candidateEmail={result.user.email}
         questionResults={enriched}
       />
+
+      {proctoring ? (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Proctoring
+          </h2>
+          <ProctoringReview
+            referenceSignedUrl={proctoring.referenceSignedUrl}
+            flags={proctoring.flags}
+            flagCount={proctoring.flagCount}
+            snapshotCount={proctoring.snapshotCount}
+          />
+        </section>
+      ) : null}
     </>
   )
 }

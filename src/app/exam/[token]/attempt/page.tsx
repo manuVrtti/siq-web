@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import ExamRuntime from '@/components/exam/exam-runtime'
+import ProctoringMonitor from '@/components/exam/proctoring-monitor'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { getAttemptState } from '@/services/exam-session'
 
@@ -50,15 +51,27 @@ export default async function AttemptPage({
     })),
   }))
 
+  const a = state.assignment.assessment
+
   return (
-    <ExamRuntime
-      token={token}
-      title={state.assignment.assessment.title}
-      sections={sections}
-      questionOrder={state.attempt.questionOrder}
-      answers={state.attempt.answers}
-      deadlineAtIso={state.attempt.deadlineAt.toISOString()}
-      serverNowIso={state.now.toISOString()}
-    />
+    <>
+      <ExamRuntime
+        token={token}
+        title={a.title}
+        sections={sections}
+        questionOrder={state.attempt.questionOrder}
+        answers={state.attempt.answers}
+        deadlineAtIso={state.attempt.deadlineAt.toISOString()}
+        serverNowIso={state.now.toISOString()}
+      />
+      {a.proctoringEnabled ? (
+        <ProctoringMonitor
+          token={token}
+          intervalSec={a.snapshotIntervalSec}
+          storeSnapshots={a.storeSnapshots}
+          faceMatchThreshold={a.faceMatchThreshold}
+        />
+      ) : null}
+    </>
   )
 }

@@ -38,6 +38,29 @@ export function getPublicUrl(bucket: string, path: string): string {
   return getSupabaseAdmin().storage.from(bucket).getPublicUrl(path).data.publicUrl
 }
 
+/**
+ * Short-lived signed URL for a file in a private bucket. Used for proctoring
+ * snapshots (Plan 018) — the bucket is private, and only admins reviewing a
+ * flag need a URL, which we mint just in time and let expire.
+ *
+ * @param bucket   Private bucket name.
+ * @param path     Object path within the bucket.
+ * @param ttlSecs  Expiry in seconds. Default 60s — long enough for the admin
+ *                 to render the image once, short enough that a leaked URL
+ *                 is worthless.
+ */
+export async function getSignedUrl(
+  bucket: string,
+  path: string,
+  ttlSecs: number = 60,
+): Promise<string> {
+  const { data, error } = await getSupabaseAdmin()
+    .storage.from(bucket)
+    .createSignedUrl(path, ttlSecs)
+  if (error) throw error
+  return data.signedUrl
+}
+
 export async function deleteFile(bucket: string, path: string): Promise<void> {
   const { error } = await getSupabaseAdmin().storage.from(bucket).remove([path])
   if (error) throw error
