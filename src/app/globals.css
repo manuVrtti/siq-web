@@ -4,12 +4,39 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * ============================================================================
+ * SelectIQ UI — Design System v1 (Plan 019 redesign)
+ * ============================================================================
+ *
+ * A LIGHT system built around a MONOCHROMATIC blue palette. No violet, no
+ * gradients, no glow, no AI-startup neon. Every hue used decoratively lives
+ * on a single blue ramp; the only non-blue colors are semantic
+ * (success / warning / danger), which don't get a choice.
+ *
+ *   Ground    #F7F9FC page · #FFFFFF card · #FFFFFF popover · #E2E8F0 border
+ *   Primary   #2563EB blue-600 (CTA / active) · #1D4ED8 blue-700 (hover)
+ *   Accent    #DBEAFE blue-100 (chip bg) · #1E3A8A blue-900 (chip text)
+ *   Text      #0F172A slate-900 · #475569 slate-500 (muted)
+ *   Semantic  #10B981 emerald · #F59E0B amber · #EF4444 red
+ *   Charts    #1E40AF · #2563EB · #3B82F6 · #60A5FA · #93C5FD (blue-800→300)
+ *   Type      Outfit (display / headings 500-700) · Inter (body / UI 400-600)
+ *   Radius    8 buttons/inputs · 12 cards · 16 hero containers
+ *   Motion    dur-1 120ms · dur-2 200ms · dur-3 320ms · dur-4 480ms
+ *             ease-spark cubic-bezier(0.22, 1, 0.36, 1)
+ *   Density   32-36px table rows · 20-24px card padding · 8px column gap
+ *
+ * Grep signature: `siq-` prefixes every custom component class in this file.
+ * ============================================================================
+ */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-display), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -27,6 +54,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -39,92 +68,334 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 2);
+  --radius-3xl: calc(var(--radius) * 3);
+
+  /* Signature motion. Reuse these instead of inventing ad-hoc durations. */
+  --ease-spark: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spark-soft: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-spark-out: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 480ms;
+
+  /* Elevation utilities — dark-mode tuned. Shadows read as depth against
+     navy grounds, not as visible dark blobs. */
+  --shadow-card: var(--elevation-card);
+  --shadow-card-hover: var(--elevation-card-hover);
+  --shadow-primary: var(--elevation-primary);
+  --shadow-pop: var(--elevation-pop);
 }
 
+/* ---------------------------------------------------------------------------
+   :root — LIGHT MODE (the theme that actually renders)
+   --------------------------------------------------------------------------- */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Page ground is a whisper off-white with a blue undertone. Pure white
+     reads as sterile against a blue primary; a hint of blue-50 warms it. */
+  --background: #f7f9fc;
+  --foreground: #0f172a;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+
+  --secondary: #eef4fb;
+  --secondary-foreground: #0f172a;
+
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+
+  /* Accent used for chip / badge backgrounds — pale blue with a strong
+     blue text foreground reads as "informational" at a glance. */
+  --accent: #dbeafe;
+  --accent-foreground: #1e3a8a;
+
+  --destructive: #ef4444;
+  --success: #10b981;
+  --warning: #f59e0b;
+
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #2563eb;
+
+  --radius: 0.75rem;
+
+  /* Sidebar sits one step darker than the ground so it reads as a real
+     panel, not an extension of the page. */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef4fb;
+  --sidebar-accent-foreground: #1e40af;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #2563eb;
+
+  --chart-1: #1e40af;
+  --chart-2: #2563eb;
+  --chart-3: #3b82f6;
+  --chart-4: #60a5fa;
+  --chart-5: #93c5fd;
+
+  /* Elevations tuned for a light ground — very subtle. */
+  --elevation-card: 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 12px rgba(15, 23, 42, 0.04);
+  --elevation-card-hover: 0 2px 4px rgba(15, 23, 42, 0.06),
+    0 12px 32px rgba(15, 23, 42, 0.08);
+  --elevation-primary: 0 4px 12px rgba(37, 99, 235, 0.26);
+  --elevation-pop: 0 12px 32px rgba(15, 23, 42, 0.12);
 }
 
+/* ---------------------------------------------------------------------------
+   .dark — DARK MODE (opt-in; not rendered by default)
+   The tokens stay so a future toggle is a one-line change on <html>. Every
+   value is dark-adapted; edit here if the toggle ships. Same blue family.
+   --------------------------------------------------------------------------- */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0a1226;
+  --foreground: #e2e8f0;
+  --card: #101a33;
+  --card-foreground: #e2e8f0;
+  --popover: #162041;
+  --popover-foreground: #e2e8f0;
+
+  /* Primary = blue-500. Bright enough to signal action on a navy ground,
+     restrained enough not to read as an "AI accent". */
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+
+  --secondary: #162041;
+  --secondary-foreground: #e2e8f0;
+
+  --muted: #101a33;
+  --muted-foreground: #94a3b8;
+
+  --accent: #1c2a52;
+  --accent-foreground: #e2e8f0;
+
+  --destructive: #ef4444;
+  --success: #10b981;
+  --warning: #f59e0b;
+
+  --border: #1f2a4a;
+  --input: #1f2a4a;
+  --ring: #3b82f6;
+
+  /* Monochromatic blue ramp — chart-1 deep to chart-5 pale. Read as
+     ordinal progression when used together (e.g. score histogram). */
+  --chart-1: #1e40af;
+  --chart-2: #2563eb;
+  --chart-3: #3b82f6;
+  --chart-4: #60a5fa;
+  --chart-5: #93c5fd;
+
+  /* Sidebar sits slightly darker than the main ground so content reads
+     as "elevated" without a shadow. */
+  --sidebar: #08101f;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #162041;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #172244;
+  --sidebar-ring: #3b82f6;
+
+  /* Dark-mode elevations: quieter than light-mode. Pure black on a navy
+     ground reads as depth without a visible blob. */
+  --elevation-card: 0 1px 0 rgba(255, 255, 255, 0.02), 0 8px 24px rgba(0, 0, 0, 0.32);
+  --elevation-card-hover: 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 40px rgba(0, 0, 0, 0.42);
+  --elevation-primary: 0 6px 18px rgba(59, 130, 246, 0.4);
+  --elevation-pop: 0 20px 44px rgba(0, 0, 0, 0.5);
 }
 
+/* ---------------------------------------------------------------------------
+   Named component classes (siq-*)
+   Kept alongside Tailwind utilities so a page can compose with utilities
+   still refining. Unlayered classes for the sticky header — see comment on
+   `.abt-nav-idle` in the ABtalks source; the same rationale applies here.
+   --------------------------------------------------------------------------- */
+@layer components {
+  /* ------ Cards --------------------------------------------------------- */
+  .siq-card {
+    background: var(--card);
+    color: var(--card-foreground);
+    border: 1px solid var(--border);
+    border-radius: 16px; /* rounded-2xl */
+    box-shadow: var(--shadow-card);
+    transition:
+      border-color var(--dur-2) var(--ease-spark),
+      box-shadow var(--dur-2) var(--ease-spark),
+      transform var(--dur-2) var(--ease-spark);
+  }
+
+  .siq-card-hover:hover {
+    border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Elevated surface used for KPI tiles and hero cards — slightly brighter
+     background so it reads as "up" against a page of regular cards. */
+  .siq-card-elevated {
+    background: color-mix(in oklab, var(--card) 92%, #ffffff 8%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* ------ Sticky header (frosted glass) --------------------------------- */
+  .siq-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 56px;
+    padding-inline: 16px;
+    background: color-mix(in oklab, var(--background) 78%, transparent);
+    -webkit-backdrop-filter: saturate(160%) blur(16px);
+    backdrop-filter: saturate(160%) blur(16px);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-sans);
+    color: var(--foreground);
+  }
+
+  @media (min-width: 768px) {
+    .siq-header {
+      padding-inline: 32px;
+    }
+  }
+
+  /* ------ Sidebar nav row ---------------------------------------------- */
+  .siq-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    line-height: 20px;
+    font-weight: 500;
+    color: var(--sidebar-foreground);
+    transition:
+      background-color var(--dur-2) var(--ease-spark),
+      color var(--dur-2) var(--ease-spark);
+  }
+
+  .siq-nav-idle {
+    color: var(--muted-foreground);
+  }
+
+  .siq-nav-idle:hover {
+    background: var(--sidebar-accent);
+    color: var(--sidebar-foreground);
+  }
+
+  .siq-nav-active {
+    position: relative;
+    background: color-mix(in oklab, var(--primary) 14%, transparent);
+    color: var(--sidebar-foreground);
+    font-weight: 600;
+  }
+
+  /* Left marker on the active row. Absolute so it never shifts layout. */
+  .siq-nav-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    background: var(--primary);
+    border-radius: 2px;
+  }
+
+  /* ------ Editorial small-caps label ------------------------------------ */
+  .siq-eyebrow {
+    font-size: 10.5px;
+    line-height: 14px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* ------ Data density: numeric ---------------------------------------- */
+  .siq-numeric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* ------ Focus ring — used by any interactive element without shadcn --- */
+  .siq-focus:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 3px;
+    transition: outline-offset var(--dur-2) var(--ease-spark);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
-    @apply font-sans;
+    font-family: var(--font-sans);
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    /* Tabular numbers everywhere: score tiles, tables, timers align without
+       per-component overrides. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Every heading uses the display face. Utility classes still set size and
+     weight — this only enforces the family. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2 {
+    font-weight: 600;
+  }
+
+  h3, h4 {
+    font-weight: 600;
+  }
+}
+
+/* Reduced-motion: kill all durations globally so the whole system respects it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
