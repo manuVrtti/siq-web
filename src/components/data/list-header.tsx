@@ -10,7 +10,7 @@ export function ListHeader({
   description,
   actions,
 }: {
-  eyebrow?: string
+  eyebrow?: ReactNode
   title: string
   description?: ReactNode
   actions?: ReactNode
@@ -18,7 +18,7 @@ export function ListHeader({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow ? <p className="siq-eyebrow mb-2">{eyebrow}</p> : null}
+        {eyebrow ? <div className="siq-eyebrow mb-2">{eyebrow}</div> : null}
         <h1 className="text-[26px] leading-tight font-semibold tracking-tight">{title}</h1>
         {description ? (
           <p className="text-muted-foreground mt-1.5 text-sm">{description}</p>

@@ -1,8 +1,15 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { ChevronDown, UserPlus, Users } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronDown, FolderKanban, UserPlus, Users } from 'lucide-react'
 
 import CandidateImport from '@/components/candidates/candidate-import'
+import {
+  BulkBar,
+  HeaderCheckbox,
+  RowCheckbox,
+  SelectionProvider,
+} from '@/components/candidates/candidate-selection'
 import { Initials, Pill } from '@/components/dashboard/bits'
 import {
   DataTable,
@@ -17,10 +24,13 @@ import {
 import { FilterBar } from '@/components/data/filter-bar'
 import { ListHeader } from '@/components/data/list-header'
 import { parseTableParams, type SearchParams } from '@/components/data/table-params'
+import { Button } from '@/components/ui/button'
 import { timeAgo } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { CANDIDATE_SORTS, listBatches, listCandidates } from '@/services/candidates'
 import { getOrgBySlug } from '@/services/organizations'
+import { requirePagePermission } from '@/lib/auth/page-guard'
+import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Candidates — SelectIQ' }
 
@@ -37,6 +47,9 @@ export default async function CandidatesPage({
   params: Promise<{ org: string }>
   searchParams: Promise<SearchParams>
 }) {
+  // Managers only — [org]/layout proves membership, and students are members.
+  await requirePagePermission(PERMISSIONS.MANAGE_ORG_USERS)
+
   const { org: slug } = await params
   const org = await getOrgBySlug(slug)
   if (!org) notFound()
@@ -85,6 +98,12 @@ export default async function CandidatesPage({
             {pendingCount.toLocaleString('en-IN')} yet to sign in · {batches.length} batch
             {batches.length === 1 ? '' : 'es'}
           </>
+        }
+        actions={
+          <Button variant="outline" render={<Link href={`${pathname}/batches`} />}>
+            <FolderKanban className="size-4" aria-hidden />
+            Manage batches
+          </Button>
         }
       />
 
@@ -145,8 +164,13 @@ export default async function CandidatesPage({
           body="Use Import candidates above to add your college's roster."
         />
       ) : (
-        <DataTable minWidth={760} footer={<Pagination pathname={pathname} params={p} total={total} />}>
+        // key = current query, so paging / filtering resets the selection.
+        <SelectionProvider key={JSON.stringify(p.raw)} pageIds={items.map((c) => c.id)}>
+        <DataTable minWidth={800} footer={<Pagination pathname={pathname} params={p} total={total} />}>
           <THead>
+            <th className={`${TH} w-10 pr-0`}>
+              <HeaderCheckbox />
+            </th>
             <SortHeader label="Candidate" field="name" pathname={pathname} params={p} />
             <th className={TH}>Batches</th>
             <th className={`${TH} text-right`}>Exams</th>
@@ -157,6 +181,9 @@ export default async function CandidatesPage({
           <tbody>
             {items.map((c) => (
               <TRow key={c.id}>
+                <td className={`${TD} w-10 pr-0`}>
+                  <RowCheckbox id={c.id} label={c.name ?? c.email ?? c.phone ?? 'candidate'} />
+                </td>
                 <td className={TD}>
                   <div className="flex items-center gap-3">
                     <Initials name={c.name} email={c.email} />
@@ -202,6 +229,8 @@ export default async function CandidatesPage({
             ))}
           </tbody>
         </DataTable>
+        <BulkBar batches={batches.map((b) => ({ id: b.id, name: b.name }))} />
+        </SelectionProvider>
       )}
     </div>
   )

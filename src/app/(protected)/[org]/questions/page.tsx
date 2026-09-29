@@ -24,6 +24,8 @@ import { shortDateTime } from '@/lib/format'
 import { DIFFICULTIES, QUESTION_TYPES } from '@/lib/validators/question'
 import { QUESTION_SORTS, listQuestions } from '@/services/questions'
 import { getOrgBySlug } from '@/services/organizations'
+import { requirePagePermission } from '@/lib/auth/page-guard'
+import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Question bank — SelectIQ' }
 
@@ -45,6 +47,9 @@ export default async function QuestionsPage({
   params: Promise<{ org: string }>
   searchParams: Promise<SearchParams>
 }) {
+  // Managers only — [org]/layout proves membership, and students are members.
+  await requirePagePermission(PERMISSIONS.EDIT_ASSESSMENT)
+
   const { org: slug } = await params
   const org = await getOrgBySlug(slug) // access already enforced by [org]/layout
   if (!org) notFound()

@@ -8,6 +8,8 @@ import { getAssessment } from '@/services/assessments'
 import { getOrgBySlug } from '@/services/organizations'
 import { listCandidates, listBatches } from '@/services/candidates'
 import { listAssignments } from '@/services/assignments'
+import { requirePagePermission } from '@/lib/auth/page-guard'
+import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Assign Assessment — SelectIQ' }
 
@@ -16,6 +18,9 @@ export default async function AssignPage({
 }: {
   params: Promise<{ org: string; id: string }>
 }) {
+  // Managers only — [org]/layout proves membership, and students are members.
+  await requirePagePermission(PERMISSIONS.EDIT_ASSESSMENT)
+
   const { org: slug, id } = await params
   const org = await getOrgBySlug(slug)
   if (!org) notFound()
