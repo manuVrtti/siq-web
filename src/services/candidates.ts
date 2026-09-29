@@ -58,11 +58,32 @@ export function parseCandidateList(raw: string): {
 
 /* ---- listing ----------------------------------------------------------- */
 
+export const CANDIDATE_SORTS = ['createdAt', 'name', 'lastLoginAt'] as const
+export type CandidateSort = (typeof CANDIDATE_SORTS)[number]
+
 export type CandidateFilters = {
   search?: string
   batchId?: string
+  /** 'active' = has signed in at least once; 'pending' = invited, never claimed. */
+  status?: 'active' | 'pending'
   skip?: number
   take?: number
+  sort?: CandidateSort
+  dir?: 'asc' | 'desc'
+}
+
+/**
+ * `nulls: 'last'` is only valid on nullable columns — Prisma rejects it on
+ * createdAt at runtime. It keeps never-logged-in / unnamed candidates from
+ * floating to the top of a "last active" or name sort.
+ */
+function candidateOrderBy(
+  sort: CandidateSort,
+  dir: 'asc' | 'desc',
+): Prisma.UserOrderByWithRelationInput {
+  if (sort === 'name') return { name: { sort: dir, nulls: 'last' } }
+  if (sort === 'lastLoginAt') return { lastLoginAt: { sort: dir, nulls: 'last' } }
+  return { createdAt: dir }
 }
 
 /**
@@ -74,6 +95,8 @@ export async function listCandidates(orgId: string, filters: CandidateFilters = 
     role: 'STUDENT',
     memberships: { some: { orgId } },
     ...(filters.batchId && { batchMemberships: { some: { batchId: filters.batchId } } }),
+    ...(filters.status === 'pending' && { firebaseUid: { startsWith: 'pending:' } }),
+    ...(filters.status === 'active' && { NOT: { firebaseUid: { startsWith: 'pending:' } } }),
     ...(filters.search && {
       OR: [
         { email: { contains: filters.search, mode: 'insensitive' } },
@@ -86,7 +109,7 @@ export async function listCandidates(orgId: string, filters: CandidateFilters = 
   const [items, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [candidateOrderBy(filters.sort ?? 'createdAt', filters.dir ?? 'desc'), { id: 'asc' }],
       skip: filters.skip ?? 0,
       take: Math.min(filters.take ?? 50, 200),
       select: {
@@ -97,6 +120,13 @@ export async function listCandidates(orgId: string, filters: CandidateFilters = 
         firebaseUid: true,
         lastLoginAt: true,
         createdAt: true,
+        // Batches are org-scoped by construction; filter anyway so a student
+        // in two colleges never shows the other college's batch names.
+        batchMemberships: {
+          where: { batch: { orgId } },
+          select: { batch: { select: { id: true, name: true } } },
+        },
+        _count: { select: { assignments: { where: { assessment: { orgId } } } } },
       },
     }),
     prisma.user.count({ where }),

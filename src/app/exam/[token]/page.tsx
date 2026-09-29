@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
+import { BrandMark } from '@/components/brand/mark'
 import ExamEntryOpenInSeb from '@/components/exam/exam-entry-open-in-seb'
 import ExamEntryStart from '@/components/exam/exam-entry-start'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -73,23 +74,18 @@ export default async function ExamEntryPage({
           {a.description && <CardDescription>{a.description}</CardDescription>}
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-sm">
-          <dl className="grid grid-cols-2 gap-3">
-            <div>
-              <dt className="text-muted-foreground text-xs">Duration</dt>
-              <dd>{a.durationMinutes} minutes</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground text-xs">Sections</dt>
-              <dd>{a.totalSections}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground text-xs">Questions</dt>
-              <dd>{a.totalQuestions}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground text-xs">Status</dt>
-              <dd>{started ? 'In progress' : 'Ready to start'}</dd>
-            </div>
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { k: 'Duration', v: `${a.durationMinutes} min` },
+              { k: 'Sections', v: String(a.totalSections) },
+              { k: 'Questions', v: String(a.totalQuestions) },
+              { k: 'Status', v: started ? 'In progress' : 'Ready' },
+            ].map((f) => (
+              <div key={f.k} className="bg-muted/60 rounded-xl px-3 py-2.5">
+                <dt className="text-muted-foreground text-[11px]">{f.k}</dt>
+                <dd className="siq-numeric mt-0.5 text-sm font-semibold">{f.v}</dd>
+              </div>
+            ))}
           </dl>
 
           <div className="border-t pt-3">
@@ -138,11 +134,15 @@ function buildExamUrl(
 
 function ExamShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="bg-muted/30 flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-lg">
+    <main className="bg-background flex min-h-screen flex-col items-center justify-center gap-6 p-6">
+      <div className="flex items-center gap-2">
+        <BrandMark className="size-8" />
+        <span className="font-display text-base font-semibold tracking-tight">SelectIQ</span>
+      </div>
+      <div className="w-full max-w-lg [&>[data-slot=card]]:rounded-2xl [&>[data-slot=card]]:shadow-[var(--shadow-card)]">
         {children}
-        <p className="text-muted-foreground mt-4 text-center text-xs">
-          <Link href="/select-org" className="underline">
+        <p className="text-muted-foreground mt-5 text-center text-xs">
+          <Link href="/select-org" className="hover:text-foreground underline underline-offset-4">
             Back to your workspace
           </Link>
         </p>

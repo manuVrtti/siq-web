@@ -20,6 +20,9 @@ const questionInclude = {
   tags: { include: { tag: true } },
 } satisfies Prisma.QuestionInclude
 
+export const QUESTION_SORTS = ['createdAt', 'updatedAt', 'title', 'marks', 'difficulty'] as const
+export type QuestionSort = (typeof QUESTION_SORTS)[number]
+
 export type QuestionFilters = {
   type?: QuestionType
   difficulty?: Difficulty
@@ -27,6 +30,8 @@ export type QuestionFilters = {
   search?: string
   skip?: number
   take?: number
+  sort?: QuestionSort
+  dir?: 'asc' | 'desc'
 }
 
 export async function listQuestions(orgId: string, filters: QuestionFilters = {}) {
@@ -46,8 +51,14 @@ export async function listQuestions(orgId: string, filters: QuestionFilters = {}
   const [items, total] = await Promise.all([
     prisma.question.findMany({
       where,
-      include: questionInclude,
-      orderBy: { createdAt: 'desc' },
+      include: {
+        ...questionInclude,
+        // How many assessments place this question — shown as "Used in" so an
+        // admin can see which questions are safe to edit.
+        _count: { select: { assessmentQuestions: true } },
+      },
+      // Secondary sort on id keeps paging stable when the primary key ties.
+      orderBy: [{ [filters.sort ?? 'createdAt']: filters.dir ?? 'desc' }, { id: 'asc' }],
       skip: filters.skip ?? 0,
       take: Math.min(filters.take ?? 20, 100),
     }),
