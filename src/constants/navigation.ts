@@ -1,7 +1,9 @@
 import {
-  BarChart3,
   ClipboardCheck,
+  FileCheck2,
   LayoutDashboard,
+  LibraryBig,
+  LineChart,
   Settings,
   Shield,
   Users,
@@ -26,21 +28,17 @@ export type NavItem = {
   roles: 'ALL' | readonly UserRole[]
 }
 
+const MANAGERS = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
+
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: 'ALL' },
-  {
-    label: 'Assessments',
-    href: '/assessments',
-    icon: ClipboardCheck,
-    roles: ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'],
-  },
-  {
-    label: 'Candidates',
-    href: '/candidates',
-    icon: Users,
-    roles: ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'],
-  },
-  { label: 'Results', href: '/results', icon: BarChart3, roles: 'ALL' },
+  { label: 'Assessments', href: '/assessments', icon: ClipboardCheck, roles: MANAGERS },
+  { label: 'Question bank', href: '/questions', icon: LibraryBig, roles: MANAGERS },
+  { label: 'Candidates', href: '/candidates', icon: Users, roles: MANAGERS },
+  // Students see their own results on the dashboard and at /my-results; the
+  // org-wide results page is manager-only (Plan 016 gates it server-side).
+  { label: 'Results', href: '/results', icon: FileCheck2, roles: MANAGERS },
+  { label: 'Analytics', href: '/analytics', icon: LineChart, roles: MANAGERS },
   {
     label: 'Settings',
     href: '/settings',

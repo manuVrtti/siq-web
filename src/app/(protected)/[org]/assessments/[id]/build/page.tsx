@@ -45,6 +45,12 @@ export default async function BuildPage({
         >
           Results
         </Button>
+        <Button
+          variant="outline"
+          render={<Link href={`/${slug}/assessments/${id}/analytics`} />}
+        >
+          Analytics
+        </Button>
       </PageHeader>
       <AssessmentBuilder
         assessment={JSON.parse(JSON.stringify(assessment))}
