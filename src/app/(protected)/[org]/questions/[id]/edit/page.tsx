@@ -6,6 +6,8 @@ import PageHeader from '@/components/ui/page-header'
 import { prisma } from '@/lib/prisma'
 import { getQuestion } from '@/services/questions'
 import { getOrgBySlug } from '@/services/organizations'
+import { requirePagePermission } from '@/lib/auth/page-guard'
+import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Edit Question — SelectIQ' }
 
@@ -14,6 +16,9 @@ export default async function EditQuestionPage({
 }: {
   params: Promise<{ org: string; id: string }>
 }) {
+  // Managers only — [org]/layout proves membership, and students are members.
+  await requirePagePermission(PERMISSIONS.EDIT_ASSESSMENT)
+
   const { org: slug, id } = await params
   const org = await getOrgBySlug(slug)
   if (!org) notFound()

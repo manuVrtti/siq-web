@@ -262,7 +262,17 @@ async function assertBatchInOrg(orgId: string, batchId: string) {
   if (!b || b.orgId !== orgId) throw new NotFoundError('Batch not found')
 }
 
-export async function addToBatch(orgId: string, batchId: string, userIds: string[]) {
+/** Upper bound on one add-to-batch call — a whole roster page, with headroom. */
+export const MAX_BATCH_ADD = 1000
+
+export async function addToBatch(orgId: string, batchId: string, rawUserIds: string[]) {
+  // Dedupe first: the ownership check compares counts, so a repeated id
+  // would otherwise fail as "not a member of this organization".
+  const userIds = [...new Set(rawUserIds)]
+  if (userIds.length === 0) return
+  if (userIds.length > MAX_BATCH_ADD) {
+    throw new ValidationError(`Add at most ${MAX_BATCH_ADD} candidates at a time`)
+  }
   await assertBatchInOrg(orgId, batchId)
   // Every user must be a member of the org — no borrowing across tenants.
   const owned = await prisma.user.count({

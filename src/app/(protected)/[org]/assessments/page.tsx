@@ -23,6 +23,8 @@ import { shortDateTime } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { listAssessments } from '@/services/assessments'
 import { getOrgBySlug } from '@/services/organizations'
+import { requirePagePermission } from '@/lib/auth/page-guard'
+import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Assessments — SelectIQ' }
 
@@ -46,6 +48,9 @@ export default async function AssessmentsPage({
   params: Promise<{ org: string }>
   searchParams: Promise<SearchParams>
 }) {
+  // Managers only — [org]/layout proves membership, and students are members.
+  await requirePagePermission(PERMISSIONS.EDIT_ASSESSMENT)
+
   const { org: slug } = await params
   const org = await getOrgBySlug(slug)
   if (!org) notFound()
