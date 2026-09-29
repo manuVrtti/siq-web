@@ -1,5 +1,7 @@
 import 'server-only'
 
+import type { Prisma } from '@prisma/client'
+
 import { ForbiddenError, NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 
@@ -325,6 +327,91 @@ export async function listResultsForAssessment(orgId: string, assessmentId: stri
       user: { select: { id: true, name: true, email: true } },
     },
   })
+}
+
+export const RESULT_SORTS = ['percentage', 'createdAt', 'name'] as const
+export type ResultSort = (typeof RESULT_SORTS)[number]
+
+/**
+ * Plan 019 Phase 3 — filtered, sorted, paged results for the admin table.
+ * Filtering happens in the database so a 3,000-candidate drive stays fast;
+ * the unpaged `listResultsForAssessment` above is kept for the API.
+ *
+ * `outcome`: graded-and-passed, graded-and-not-passed, or awaiting review.
+ */
+export async function queryResultsForAssessment(
+  orgId: string,
+  assessmentId: string,
+  opts: {
+    search?: string
+    outcome?: 'passed' | 'failed' | 'pending'
+    sort?: ResultSort
+    dir?: 'asc' | 'desc'
+    skip?: number
+    take?: number
+  },
+) {
+  const a = await prisma.assessment.findFirst({
+    where: { id: assessmentId, orgId },
+    select: { id: true },
+  })
+  if (!a) throw new NotFoundError('Assessment not found')
+
+  const where: Prisma.ResultWhereInput = {
+    assessmentId,
+    ...(opts.outcome === 'pending' && { status: 'PENDING_REVIEW' }),
+    ...(opts.outcome === 'passed' && { status: 'GRADED', passed: true }),
+    ...(opts.outcome === 'failed' && { status: 'GRADED', passed: false }),
+    ...(opts.search && {
+      user: {
+        OR: [
+          { name: { contains: opts.search, mode: 'insensitive' } },
+          { email: { contains: opts.search, mode: 'insensitive' } },
+        ],
+      },
+    }),
+  }
+  const dir = opts.dir ?? 'desc'
+  const orderBy: Prisma.ResultOrderByWithRelationInput[] =
+    opts.sort === 'name'
+      ? [{ user: { name: { sort: dir, nulls: 'last' } } }]
+      : opts.sort === 'createdAt'
+        ? [{ createdAt: dir }]
+        : [{ percentage: dir }]
+  orderBy.push({ id: 'asc' })
+
+  const [items, total, agg, passed, decided, pending] = await Promise.all([
+    prisma.result.findMany({
+      where,
+      orderBy,
+      skip: opts.skip ?? 0,
+      take: Math.min(opts.take ?? 25, 200),
+      include: { user: { select: { id: true, name: true, email: true } } },
+    }),
+    prisma.result.count({ where }),
+    // Summary is over the whole assessment, not the filtered page.
+    prisma.result.aggregate({
+      where: { assessmentId, status: 'GRADED' },
+      _avg: { percentage: true },
+      _max: { percentage: true },
+      _count: { _all: true },
+    }),
+    prisma.result.count({ where: { assessmentId, status: 'GRADED', passed: true } }),
+    prisma.result.count({ where: { assessmentId, status: 'GRADED', passed: { not: null } } }),
+    prisma.result.count({ where: { assessmentId, status: 'PENDING_REVIEW' } }),
+  ])
+
+  return {
+    items,
+    total,
+    summary: {
+      graded: agg._count._all,
+      pending,
+      avgPercentage: agg._avg.percentage,
+      highestPercentage: agg._max.percentage,
+      passRate: decided > 0 ? (passed / decided) * 100 : null,
+    },
+  }
 }
 
 export async function listResultsForCandidate(userId: string) {
