@@ -28,8 +28,8 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Main">
-      {navItemsForRole(user.role).map(({ label, href, icon: Icon }) => {
-        const fullHref = `/${org.slug}${href}`
+      {navItemsForRole(user.role).map(({ label, href, icon: Icon, absolute }) => {
+        const fullHref = absolute ? href : `/${org.slug}${href}`
         // Exact match, or a nested route beneath it — so /questions/new
         // still highlights Questions, while /results does not match /r.
         const active = pathname === fullHref || pathname.startsWith(`${fullHref}/`)
