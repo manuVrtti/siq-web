@@ -37,7 +37,7 @@ function OrgLine() {
   const org = useActiveOrg()
   return (
     <div className="px-3 pb-3">
-      <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+      <p className="text-sidebar-muted text-[10px] font-medium uppercase tracking-wider">
         Workspace
       </p>
       <p className="text-sidebar-foreground truncate text-sm font-medium">{org.name}</p>
@@ -51,14 +51,14 @@ function SidebarFooter() {
 
   return (
     <div className="border-sidebar-border flex items-center gap-2.5 border-t px-3 py-3">
-      <div className="bg-sidebar-accent grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold uppercase">
+      <div className="bg-highlight text-highlight-foreground grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold uppercase">
         {(user.name?.[0] ?? user.email?.[0] ?? '?').toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sidebar-foreground truncate text-sm font-medium">
           {user.name ?? user.email}
         </p>
-        <p className="text-muted-foreground truncate text-[11px]">
+        <p className="text-sidebar-muted truncate text-[11px] capitalize">
           {user.role.replace(/_/g, ' ').toLowerCase()}
         </p>
       </div>
@@ -86,7 +86,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-border flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:px-6">
+        <header className="border-border bg-background/80 sticky top-0 z-30 flex h-14 backdrop-blur-md shrink-0 items-center justify-between gap-3 border-b px-4 md:px-6">
           <div className="flex items-center gap-2">
             {/* Mobile drawer trigger */}
             <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -97,7 +97,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               >
                 <Menu className="size-5" aria-hidden />
               </SheetTrigger>
-              <SheetContent side="left" className="bg-sidebar w-64 p-0">
+              <SheetContent side="left" className="bg-sidebar text-sidebar-foreground w-64 p-0">
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <div className="flex h-full flex-col justify-between pt-4">
                   <div className="flex flex-col gap-3">

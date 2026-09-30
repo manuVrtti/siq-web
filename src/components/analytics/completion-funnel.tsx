@@ -17,9 +17,9 @@ export function CompletionFunnel({
   inProgress: number
 }) {
   const rows = [
-    { label: 'Invited', value: invited, color: '#93c5fd' },
-    { label: 'Started', value: started, color: '#60a5fa' },
-    { label: 'Submitted', value: submitted, color: '#2563eb' },
+    { label: 'Invited', value: invited, color: 'var(--chart-5)' },
+    { label: 'Started', value: started, color: 'var(--chart-3)' },
+    { label: 'Submitted', value: submitted, color: 'var(--primary)' },
   ]
   const base = Math.max(invited, 1)
 

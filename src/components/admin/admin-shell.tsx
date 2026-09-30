@@ -37,7 +37,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
     <nav aria-label="Admin" className="flex flex-col gap-5">
       {GROUPS.map((g) => (
         <div key={g.label}>
-          <p className="siq-eyebrow mb-1.5 px-3">{g.label}</p>
+          <p className="text-sidebar-muted mb-1.5 px-3 text-[10.5px] font-medium tracking-[0.14em] uppercase">{g.label}</p>
           <div className="flex flex-col gap-0.5">
             {g.items.map(({ href, label, icon: Icon, ...rest }) => {
               const exact = 'exact' in rest && rest.exact
@@ -50,7 +50,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
                   aria-current={active ? 'page' : undefined}
                   className={cn('siq-nav-item', active ? 'siq-nav-active' : 'siq-nav-idle')}
                 >
-                  <Icon className={cn('size-4 shrink-0', active ? 'text-primary' : '')} aria-hidden />
+                  <Icon className="size-4 shrink-0" aria-hidden />
                   {label}
                 </Link>
               )
@@ -61,7 +61,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
       <Link
         href="/select-org"
         onClick={onNavigate}
-        className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-2 px-3 text-sm"
+        className="text-sidebar-muted hover:text-sidebar-foreground mt-2 inline-flex items-center gap-2 px-3 text-sm transition-colors"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to workspace
@@ -74,11 +74,11 @@ export function AdminShell({ children, userName }: { children: ReactNode; userNa
   const [open, setOpen] = useState(false)
   return (
     <div className="bg-background flex min-h-screen">
-      <aside className="bg-sidebar border-sidebar-border hidden w-60 shrink-0 flex-col border-r px-3 pt-4 md:flex">
+      <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col border-r px-3 pt-4 md:flex">
         <Link href="/admin" className="mb-6 flex items-center gap-2 px-2">
           <BrandMark className="size-7" />
           <span className="font-display text-sm font-semibold tracking-tight">SelectIQ</span>
-          <span className="bg-primary/10 text-primary rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase">Admin</span>
+          <span className="bg-highlight text-highlight-foreground rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase">Admin</span>
         </Link>
         <Nav />
       </aside>
@@ -90,7 +90,7 @@ export function AdminShell({ children, userName }: { children: ReactNode; userNa
               <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu" />}>
                 <Menu className="size-5" aria-hidden />
               </SheetTrigger>
-              <SheetContent side="left" className="bg-sidebar w-64 p-3 pt-6">
+              <SheetContent side="left" className="bg-sidebar text-sidebar-foreground w-64 p-3 pt-6">
                 <SheetTitle className="sr-only">Admin navigation</SheetTitle>
                 <Nav onNavigate={() => setOpen(false)} />
               </SheetContent>

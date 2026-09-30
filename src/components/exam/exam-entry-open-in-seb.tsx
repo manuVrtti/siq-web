@@ -91,7 +91,7 @@ export default function ExamEntryOpenInSeb({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+      <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
         <p className="font-medium">
           {timedOut ? 'Secure browser required' : 'Opening SelectIQ Secure Browser…'}
         </p>

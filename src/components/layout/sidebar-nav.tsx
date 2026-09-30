@@ -48,7 +48,7 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
               <span
                 className={cn(
                   'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                  active ? 'bg-white/20 text-white' : 'bg-accent text-primary',
+                  active ? 'bg-black/10' : 'bg-highlight/15 text-highlight',
                 )}
               >
                 {badge}

@@ -20,16 +20,16 @@ export function EmptyChart({ text }: { text: string }) {
   )
 }
 
-/** Monochromatic blue ramp, pale → deep. Mirrors --chart-5 … --chart-1. */
-export const BLUE_RAMP = [
-  '#bfdbfe',
-  '#bfdbfe',
-  '#93c5fd',
-  '#93c5fd',
-  '#60a5fa',
-  '#60a5fa',
-  '#3b82f6',
-  '#2563eb',
-  '#1d4ed8',
-  '#1e40af',
+/** Forest ramp, pale → deep (low scores → high). Mirrors --chart-5 … --chart-1. */
+export const SCORE_RAMP = [
+  '#d5ebe2',
+  '#d5ebe2',
+  '#a9d5c4',
+  '#a9d5c4',
+  '#74b9a0',
+  '#74b9a0',
+  '#3e977c',
+  '#1f7a62',
+  '#0f5b4a',
+  '#083a2f',
 ] as const

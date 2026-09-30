@@ -53,31 +53,31 @@ export default async function MockInterviewsPage({ params }: { params: Promise<{
           </div>
 
           {/* Sample of the feedback card — illustrative, not your data. */}
-          <div aria-hidden className="rounded-2xl bg-white p-5 text-slate-900 shadow-2xl shadow-blue-950/30">
+          <div aria-hidden className="rounded-2xl bg-white p-5 text-foreground shadow-2xl shadow-black/25">
             <div className="flex items-center gap-2">
-              <span className="grid size-8 place-items-center rounded-lg bg-blue-50 text-blue-700">
+              <span className="grid size-8 place-items-center rounded-lg bg-highlight-tint text-primary">
                 <Mic className="size-4" />
               </span>
               <div>
                 <p className="text-sm font-semibold">Explain a hash map</p>
-                <p className="text-[11px] text-slate-500">Technical · Question 3 of 8 · sample</p>
+                <p className="text-[11px] text-muted-foreground">Technical · Question 3 of 8 · sample</p>
               </div>
             </div>
             <div className="mt-4 flex flex-col gap-3">
               {FEEDBACK.map((f) => (
                 <div key={f.label}>
                   <div className="mb-1 flex justify-between text-xs">
-                    <span className="text-slate-600">{f.label}</span>
+                    <span className="text-muted-foreground">{f.label}</span>
                     <span className="font-semibold tabular-nums">{f.value}%</span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="siq-grow h-full rounded-full bg-blue-600" style={{ width: `${f.value}%` }} />
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className="siq-grow h-full rounded-full bg-primary" style={{ width: `${f.value}%` }} />
                   </div>
                 </div>
               ))}
             </div>
-            <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              <b className="text-slate-900">Tip:</b> mention collision handling and the average vs worst-case lookup time.
+            <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+              <b className="text-foreground">Tip:</b> mention collision handling and the average vs worst-case lookup time.
             </p>
           </div>
         </div>

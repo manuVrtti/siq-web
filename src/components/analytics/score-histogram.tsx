@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 
-import { BLUE_RAMP, ChartTooltip, EmptyChart } from '@/components/analytics/chart-parts'
+import { SCORE_RAMP, ChartTooltip, EmptyChart } from '@/components/analytics/chart-parts'
 
 /**
  * Plan 019 — score distribution over ten 10-point buckets. Bars step through
@@ -56,7 +56,7 @@ export function ScoreHistogram({ buckets }: { buckets: { label: string; count: n
           />
           <Bar dataKey="count" radius={[6, 6, 0, 0]}>
             {buckets.map((b, i) => (
-              <Cell key={b.label} fill={BLUE_RAMP[i] ?? '#3b82f6'} />
+              <Cell key={b.label} fill={SCORE_RAMP[i] ?? 'var(--chart-3)'} />
             ))}
           </Bar>
         </BarChart>

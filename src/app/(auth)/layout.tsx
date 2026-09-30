@@ -42,43 +42,43 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
           {/* Product glimpse */}
           <div className="relative mt-10 h-[300px]">
-            <div className="absolute top-0 left-0 w-[88%] rounded-2xl bg-white p-5 text-slate-900 shadow-2xl shadow-blue-950/30">
-              <p className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">Your next exam</p>
+            <div className="absolute top-0 left-0 w-[88%] rounded-2xl bg-white p-5 text-foreground shadow-2xl shadow-black/25">
+              <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Your next exam</p>
               <p className="mt-1 text-lg font-semibold">TCS NQT Mock — Round 1</p>
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
                   <Clock className="size-3" aria-hidden /> 90 min
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
                   <ListChecks className="size-3" aria-hidden /> 60 questions
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
                   <CalendarClock className="size-3" aria-hidden /> Opens in 1 day
                 </span>
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex gap-1.5">
                   {['01', '04', '32'].map((v, i) => (
-                    <span key={i} className="rounded-lg bg-blue-50 px-2 py-1 text-center text-sm font-semibold text-blue-700 tabular-nums">
+                    <span key={i} className="rounded-lg bg-highlight-tint px-2 py-1 text-center text-sm font-semibold text-primary tabular-nums">
                       {v}
                     </span>
                   ))}
                 </div>
-                <span className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">Start exam →</span>
+                <span className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white">Start exam →</span>
               </div>
             </div>
 
-            <div className="absolute right-0 bottom-10 w-[62%] rotate-[1.5deg] rounded-2xl bg-white p-4 text-slate-900 shadow-2xl shadow-blue-950/30">
+            <div className="absolute right-0 bottom-10 w-[62%] rotate-[1.5deg] rounded-2xl bg-white p-4 text-foreground shadow-2xl shadow-black/25">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 text-emerald-600" aria-hidden />
+                <CheckCircle2 className="size-4 text-success" aria-hidden />
                 <p className="text-sm font-semibold">Accenture Mock</p>
-                <span className="ml-auto rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">88% · passed</span>
+                <span className="ml-auto rounded-md bg-success/10 px-1.5 py-0.5 text-[11px] font-semibold text-success">88% · passed</span>
               </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-[92%] rounded-full bg-blue-600" />
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div className="h-full w-[92%] rounded-full bg-primary" />
               </div>
-              <p className="mt-1.5 text-[11px] text-slate-500">
-                Ahead of <b className="text-slate-900">92%</b> of 412 candidates
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                Ahead of <b className="text-foreground">92%</b> of 412 candidates
               </p>
             </div>
 

@@ -14,7 +14,7 @@ import { ChartTooltip, EmptyChart } from '@/components/analytics/chart-parts'
 
 /**
  * Plan 019 — average score over time (one point per exam, oldest → newest).
- * A blue-600 line over a pale blue fill that fades to transparent, so the
+ * A forest line over a pale green fill that fades to transparent, so the
  * chart never reads as a solid block.
  */
 export function TrendLine({
@@ -36,8 +36,8 @@ export function TrendLine({
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
           <defs>
             <linearGradient id="siq-trend-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.22} />
-              <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="var(--chart-3)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
@@ -72,12 +72,12 @@ export function TrendLine({
           <Area
             type="monotone"
             dataKey="value"
-            stroke="#2563eb"
-            strokeWidth={2}
+            stroke="var(--primary)"
+            strokeWidth={2.25}
             fill="url(#siq-trend-fill)"
             isAnimationActive={false}
-            dot={{ r: 3, fill: '#2563eb', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#2563eb', stroke: '#ffffff', strokeWidth: 2 }}
+            dot={{ r: 3.5, fill: 'var(--card)', stroke: 'var(--primary)', strokeWidth: 2 }}
+            activeDot={{ r: 6, fill: 'var(--highlight)', stroke: 'var(--card)', strokeWidth: 2 }}
           />
         </AreaChart>
       </ResponsiveContainer>

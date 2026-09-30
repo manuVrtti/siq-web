@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 
+import { CountUp } from '@/components/motion/animated'
 import { cn } from '@/lib/utils'
 
 /**
@@ -29,7 +30,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'siq-card flex min-w-0 flex-col gap-3 p-5',
+        'siq-card siq-rise flex min-w-0 flex-col gap-3 p-5',
         tone === 'attention' && 'border-warning/40',
       )}
     >
@@ -47,7 +48,7 @@ export function StatCard({
         ) : null}
       </div>
       <p className="font-display text-[28px] leading-none font-semibold tracking-tight">
-        {empty ? <span className="text-muted-foreground">—</span> : value}
+        {empty ? <span className="text-muted-foreground">—</span> : <Animated value={value} />}
         {!empty && suffix ? (
           <span className="text-muted-foreground ml-0.5 text-base font-medium">{suffix}</span>
         ) : null}
@@ -58,6 +59,14 @@ export function StatCard({
       </div>
     </div>
   )
+}
+
+/** Numbers (and "1,234"-style strings) count up once; anything else renders as is. */
+function Animated({ value }: { value: string | number }) {
+  const n = typeof value === 'number' ? value : /^[\d,]+(\.\d+)?$/.test(value) ? Number(value.replace(/,/g, '')) : NaN
+  if (!Number.isFinite(n)) return <>{value}</>
+  const decimals = typeof value === 'string' ? (value.split('.')[1]?.length ?? 0) : Number.isInteger(n) ? 0 : 1
+  return <CountUp value={n} decimals={decimals} />
 }
 
 function Delta({
