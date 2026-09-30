@@ -6,6 +6,7 @@ import { withRole } from '@/lib/auth/require-role'
 import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { deleteBatch } from '@/services/candidates'
+import { audit } from '@/services/audit'
 
 /**
  * Delete a batch. Only the grouping goes — candidates, their assignments and
@@ -23,6 +24,7 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     if (!batch) throw new NotFoundError('Batch not found')
     await requireOrgAccess(user, batch.orgId)
     await deleteBatch(batch.orgId, id)
+    await audit({ userId: user.id, action: 'batch.delete', entityType: 'Batch', entityId: id, metadata: { orgId: batch.orgId } })
     return successResponse({ deleted: true })
   } catch (error) {
     return errorResponse(error)

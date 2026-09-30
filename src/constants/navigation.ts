@@ -27,6 +27,8 @@ export type NavItem = {
   href: string
   icon: LucideIcon
   roles: 'ALL' | readonly UserRole[]
+  /** Absolute link, not prefixed with the active org (e.g. the platform console). */
+  absolute?: boolean
 }
 
 const MANAGERS = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
@@ -47,7 +49,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: Settings,
     roles: ['COLLEGE_ADMIN', 'SUPER_ADMIN'],
   },
-  { label: 'Admin', href: '/admin', icon: Shield, roles: ['SUPER_ADMIN'] },
+  { label: 'Platform console', href: '/admin', icon: Shield, roles: ['SUPER_ADMIN'], absolute: true },
 ]
 
 /** Nav items this role may see. */

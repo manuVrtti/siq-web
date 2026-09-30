@@ -7,6 +7,7 @@ import { getUserOrgs } from '@/lib/auth/org-access'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { ValidationError } from '@/lib/errors'
 import { createOrganization } from '@/services/organizations'
+import { audit } from '@/services/audit'
 
 /**
  * Plan T01 — organizations.
@@ -23,6 +24,8 @@ const createSchema = z.object({
   slug: z.string().trim().min(2).max(40),
   type: z.enum(['COLLEGE', 'COMPANY']),
   adminUserId: z.string().optional(),
+  /** Email domain for self sign-up matching, e.g. "abes.ac.in". */
+  domain: z.string().trim().max(120).optional(),
 })
 
 export async function GET() {
@@ -50,6 +53,14 @@ export async function POST(request: NextRequest) {
       slug: parsed.data.slug,
       type: parsed.data.type,
       adminUserId: parsed.data.adminUserId ?? user.id,
+      domain: parsed.data.domain,
+    })
+    await audit({
+      userId: user.id,
+      action: 'org.create',
+      entityType: 'Organization',
+      entityId: org.id,
+      metadata: { name: org.name, slug: org.slug, type: org.type },
     })
 
     return successResponse({ org }, 201)

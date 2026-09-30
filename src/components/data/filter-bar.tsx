@@ -25,8 +25,11 @@ export function FilterBar({
   searchPlaceholder = 'Search…',
   filters = [],
   children,
+  showSearch = true,
 }: {
   searchPlaceholder?: string
+  /** Hide the search box for lists that only filter (e.g. the audit log). */
+  showSearch?: boolean
   filters?: FilterDef[]
   /** Right-aligned extras (e.g. a primary action button). */
   children?: React.ReactNode
@@ -66,7 +69,7 @@ export function FilterBar({
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="relative min-w-0 flex-1 sm:max-w-sm">
+      <div className={cn('relative min-w-0 flex-1 sm:max-w-sm', !showSearch && 'hidden')}>
         <Search
           className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
           aria-hidden

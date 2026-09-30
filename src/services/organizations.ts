@@ -4,6 +4,7 @@ import { Prisma, type OrgType } from '@prisma/client'
 
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { normalizeDomain } from '@/services/admin'
 
 /**
  * Plan T01 — organization provisioning.
@@ -40,6 +41,7 @@ export async function createOrganization(params: {
   type: OrgType
   slug: string
   adminUserId: string
+  domain?: string | null
 }) {
   const slug = normalizeSlug(params.slug)
   const name = params.name.trim()
@@ -48,7 +50,7 @@ export async function createOrganization(params: {
   try {
     return await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
-        data: { name, type: params.type, slug },
+        data: { name, type: params.type, slug, domain: normalizeDomain(params.domain) },
       })
       await tx.organizationMember.create({
         data: { userId: params.adminUserId, orgId: org.id, role: 'ADMIN' },

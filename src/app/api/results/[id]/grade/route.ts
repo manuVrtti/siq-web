@@ -7,6 +7,7 @@ import { withRole } from '@/lib/auth/require-role'
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { gradeSubjective } from '@/services/grading'
+import { audit } from '@/services/audit'
 
 /**
  * Plan 016 — manual grading of subjective / coding QuestionResults.
@@ -71,6 +72,13 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       })
     }
 
+    await audit({
+      userId: user.id,
+      action: 'result.grade',
+      entityType: 'Result',
+      entityId: resultId,
+      metadata: { questions: parsed.data.grades.length },
+    })
     return successResponse({ result: updated })
   } catch (error) {
     return errorResponse(error)
