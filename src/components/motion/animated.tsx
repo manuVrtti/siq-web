@@ -15,7 +15,17 @@ function prefersReducedMotion() {
 }
 
 /** Counts from 0 to `value` once, on mount. */
-export function CountUp({ value, decimals = 0, duration = 900, suffix = '' }: { value: number; decimals?: number; duration?: number; suffix?: string }) {
+export function CountUp({
+  value,
+  decimals = 0,
+  duration = 900,
+  suffix = '',
+}: {
+  value: number
+  decimals?: number
+  duration?: number
+  suffix?: string
+}) {
   const [shown, setShown] = useState(value)
   const started = useRef(false)
   useEffect(() => {
@@ -34,7 +44,7 @@ export function CountUp({ value, decimals = 0, duration = 900, suffix = '' }: { 
   }, [value, duration])
   return (
     <>
-      {shown.toFixed(decimals)}
+      {shown.toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
       {suffix}
     </>
   )

@@ -6,25 +6,25 @@
 
 /*
  * ============================================================================
- * SelectIQ UI — Design System v1 (Plan 019 redesign)
+ * SelectIQ UI — Design System v2 "Forest & Marigold"
  * ============================================================================
  *
- * A LIGHT system built around a MONOCHROMATIC blue palette. No violet, no
- * gradients, no glow, no AI-startup neon. Every hue used decoratively lives
- * on a single blue ramp; the only non-blue colors are semantic
- * (success / warning / danger), which don't get a choice.
+ * A warm, light system. Deep forest green carries the brand and every
+ * primary action; marigold is the single warm highlight (active nav, the
+ * "one thing to notice" on a hero, live indicators). Paper-toned grounds
+ * instead of cold blue-white. No blue, no violet, no gradients-as-decoration.
  *
- *   Ground    #F7F9FC page · #FFFFFF card · #FFFFFF popover · #E2E8F0 border
- *   Primary   #2563EB blue-600 (CTA / active) · #1D4ED8 blue-700 (hover)
- *   Accent    #DBEAFE blue-100 (chip bg) · #1E3A8A blue-900 (chip text)
- *   Text      #0F172A slate-900 · #475569 slate-500 (muted)
- *   Semantic  #10B981 emerald · #F59E0B amber · #EF4444 red
- *   Charts    #1E40AF · #2563EB · #3B82F6 · #60A5FA · #93C5FD (blue-800→300)
+ *   Ground    #FAF8F3 paper · #FFFFFF card · #E8E3D8 border (warm)
+ *   Primary   #0F5B4A forest (CTA / hero) · #0B4A3C (hover)
+ *   Highlight #F2A93B marigold · #FDF1DC tint · #7A4D0A text-on-tint
+ *   Accent    #E3F0EA mint tint (chips) · #0B4A3C chip text
+ *   Sidebar   #10302A deep forest · marigold active tile
+ *   Text      #1C2321 ink · #6B6F68 muted (warm grey)
+ *   Semantic  #2E8B57 success · #D9822B warning · #C8453B danger
+ *   Charts    #083A2F · #0F5B4A · #3E977C · #74B9A0 · #A9D5C4 (deep → pale)
  *   Type      Outfit (display / headings 500-700) · Inter (body / UI 400-600)
- *   Radius    8 buttons/inputs · 12 cards · 16 hero containers
  *   Motion    dur-1 120ms · dur-2 200ms · dur-3 320ms · dur-4 480ms
  *             ease-spark cubic-bezier(0.22, 1, 0.36, 1)
- *   Density   32-36px table rows · 20-24px card padding · 8px column gap
  *
  * Grep signature: `siq-` prefixes every custom component class in this file.
  * ============================================================================
@@ -44,6 +44,7 @@
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar: var(--sidebar);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
@@ -56,6 +57,9 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-highlight-tint: var(--highlight-tint);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -97,64 +101,65 @@
    :root — LIGHT MODE (the theme that actually renders)
    --------------------------------------------------------------------------- */
 :root {
-  /* Page ground is a whisper off-white with a blue undertone. Pure white
-     reads as sterile against a blue primary; a hint of blue-50 warms it. */
-  --background: #f7f9fc;
-  --foreground: #0f172a;
+  --background: #faf8f3;
+  --foreground: #1c2321;
 
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #1c2321;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  --popover-foreground: #1c2321;
 
-  --primary: #2563eb;
+  --primary: #0f5b4a;
   --primary-foreground: #ffffff;
 
-  --secondary: #eef4fb;
-  --secondary-foreground: #0f172a;
+  --secondary: #f1ede3;
+  --secondary-foreground: #1c2321;
 
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted: #f3efe6;
+  --muted-foreground: #6b6f68;
 
-  /* Accent used for chip / badge backgrounds — pale blue with a strong
-     blue text foreground reads as "informational" at a glance. */
-  --accent: #dbeafe;
-  --accent-foreground: #1e3a8a;
+  /* Chip / badge ground: a mint tint with forest text. */
+  --accent: #e3f0ea;
+  --accent-foreground: #0b4a3c;
 
-  --destructive: #ef4444;
-  --success: #10b981;
-  --warning: #f59e0b;
+  /* Marigold — the one warm highlight. Ink text on it, never white. */
+  --highlight: #f2a93b;
+  --highlight-foreground: #1c2321;
+  --highlight-tint: #fdf1dc;
 
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #2563eb;
+  --destructive: #c8453b;
+  --success: #2e8b57;
+  --warning: #d9822b;
+
+  --border: #e8e3d8;
+  --input: #e2dccf;
+  --ring: #0f5b4a;
 
   --radius: 0.75rem;
 
-  /* Sidebar sits one step darker than the ground so it reads as a real
-     panel, not an extension of the page. */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #2563eb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef4fb;
-  --sidebar-accent-foreground: #1e40af;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #2563eb;
+  /* Deep-forest sidebar: the brand colour as a whole plane, so every role's
+     workspace is recognisably SelectIQ at a glance. */
+  --sidebar: #10302a;
+  --sidebar-foreground: #e6efe9;
+  --sidebar-muted: #9db3a9;
+  --sidebar-primary: #f2a93b;
+  --sidebar-primary-foreground: #1c2321;
+  --sidebar-accent: #1a3f37;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1d4038;
+  --sidebar-ring: #f2a93b;
 
-  --chart-1: #1e40af;
-  --chart-2: #2563eb;
-  --chart-3: #3b82f6;
-  --chart-4: #60a5fa;
-  --chart-5: #93c5fd;
+  --chart-1: #083a2f;
+  --chart-2: #0f5b4a;
+  --chart-3: #3e977c;
+  --chart-4: #74b9a0;
+  --chart-5: #a9d5c4;
 
-  /* Elevations tuned for a light ground — very subtle. */
-  --elevation-card: 0 1px 2px rgba(15, 23, 42, 0.04),
-    0 4px 12px rgba(15, 23, 42, 0.04);
-  --elevation-card-hover: 0 2px 4px rgba(15, 23, 42, 0.06),
-    0 12px 32px rgba(15, 23, 42, 0.08);
-  --elevation-primary: 0 4px 12px rgba(37, 99, 235, 0.26);
-  --elevation-pop: 0 12px 32px rgba(15, 23, 42, 0.12);
+  /* Warm-tinted shadows (ink, not black) so cards sit softly on paper. */
+  --elevation-card: 0 1px 2px rgba(28, 35, 33, 0.04), 0 4px 12px rgba(28, 35, 33, 0.04);
+  --elevation-card-hover: 0 2px 4px rgba(28, 35, 33, 0.06), 0 14px 32px rgba(28, 35, 33, 0.09);
+  --elevation-primary: 0 8px 24px rgba(15, 91, 74, 0.28);
+  --elevation-pop: 0 12px 32px rgba(28, 35, 33, 0.14);
 }
 
 /* ---------------------------------------------------------------------------
@@ -163,59 +168,46 @@
    value is dark-adapted; edit here if the toggle ships. Same blue family.
    --------------------------------------------------------------------------- */
 .dark {
-  --background: #0a1226;
-  --foreground: #e2e8f0;
-  --card: #101a33;
-  --card-foreground: #e2e8f0;
-  --popover: #162041;
-  --popover-foreground: #e2e8f0;
-
-  /* Primary = blue-500. Bright enough to signal action on a navy ground,
-     restrained enough not to read as an "AI accent". */
-  --primary: #3b82f6;
+  --background: #0e1614;
+  --foreground: #e6efe9;
+  --card: #15201d;
+  --card-foreground: #e6efe9;
+  --popover: #1a2724;
+  --popover-foreground: #e6efe9;
+  --primary: #3e977c;
   --primary-foreground: #ffffff;
-
-  --secondary: #162041;
-  --secondary-foreground: #e2e8f0;
-
-  --muted: #101a33;
-  --muted-foreground: #94a3b8;
-
-  --accent: #1c2a52;
-  --accent-foreground: #e2e8f0;
-
-  --destructive: #ef4444;
-  --success: #10b981;
-  --warning: #f59e0b;
-
-  --border: #1f2a4a;
-  --input: #1f2a4a;
-  --ring: #3b82f6;
-
-  /* Monochromatic blue ramp — chart-1 deep to chart-5 pale. Read as
-     ordinal progression when used together (e.g. score histogram). */
-  --chart-1: #1e40af;
-  --chart-2: #2563eb;
-  --chart-3: #3b82f6;
-  --chart-4: #60a5fa;
-  --chart-5: #93c5fd;
-
-  /* Sidebar sits slightly darker than the main ground so content reads
-     as "elevated" without a shadow. */
-  --sidebar: #08101f;
-  --sidebar-foreground: #cbd5e1;
-  --sidebar-primary: #3b82f6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #162041;
+  --secondary: #1a2724;
+  --secondary-foreground: #e6efe9;
+  --muted: #15201d;
+  --muted-foreground: #9db3a9;
+  --accent: #1d3a33;
+  --accent-foreground: #e6efe9;
+  --highlight: #f2a93b;
+  --highlight-foreground: #1c2321;
+  --highlight-tint: #3a2c14;
+  --destructive: #e0645a;
+  --success: #4fb07a;
+  --warning: #e89a4a;
+  --border: #22322e;
+  --input: #22322e;
+  --ring: #3e977c;
+  --chart-1: #a9d5c4;
+  --chart-2: #74b9a0;
+  --chart-3: #3e977c;
+  --chart-4: #1f7a62;
+  --chart-5: #0f5b4a;
+  --sidebar: #0a1210;
+  --sidebar-foreground: #e6efe9;
+  --sidebar-muted: #9db3a9;
+  --sidebar-primary: #f2a93b;
+  --sidebar-primary-foreground: #1c2321;
+  --sidebar-accent: #15201d;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #172244;
-  --sidebar-ring: #3b82f6;
-
-  /* Dark-mode elevations: quieter than light-mode. Pure black on a navy
-     ground reads as depth without a visible blob. */
+  --sidebar-border: #1a2724;
+  --sidebar-ring: #f2a93b;
   --elevation-card: 0 1px 0 rgba(255, 255, 255, 0.02), 0 8px 24px rgba(0, 0, 0, 0.32);
   --elevation-card-hover: 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 40px rgba(0, 0, 0, 0.42);
-  --elevation-primary: 0 6px 18px rgba(59, 130, 246, 0.4);
+  --elevation-primary: 0 6px 18px rgba(62, 151, 124, 0.35);
   --elevation-pop: 0 20px 44px rgba(0, 0, 0, 0.5);
 }
 
@@ -295,22 +287,30 @@
       color var(--dur-2) var(--ease-spark);
   }
 
+  .siq-nav-item svg {
+    transition: transform var(--dur-2) var(--ease-spark);
+  }
+
   .siq-nav-idle {
-    color: var(--muted-foreground);
+    color: var(--sidebar-muted);
   }
 
   .siq-nav-idle:hover {
     background: var(--sidebar-accent);
     color: var(--sidebar-foreground);
   }
+  .siq-nav-idle:hover svg {
+    transform: translateX(2px);
+  }
 
-  /* Active row: a solid brand tile with a soft inner shade, so it reads as
-     pressed-in rather than merely highlighted. */
+  /* Active row: a marigold tile with ink text — the one warm spot on the
+     forest sidebar, so "where am I" is answered from across the room. */
   .siq-nav-active {
-    background: var(--primary);
-    color: var(--primary-foreground);
+    background: var(--sidebar-primary);
+    color: var(--sidebar-primary-foreground);
     font-weight: 600;
-    box-shadow: inset 0 -4px 12px rgba(0, 0, 0, 0.18), 0 2px 6px color-mix(in oklab, var(--primary) 35%, transparent);
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12), 0 4px 14px rgba(242, 169, 59, 0.25);
+    animation: siq-pop var(--dur-3) var(--ease-spark-out);
   }
   .siq-nav-active:active {
     transform: translateY(1px);
@@ -338,6 +338,13 @@
   .siq-rise {
     animation: siq-rise var(--dur-4) var(--ease-spark) both;
   }
+  /* Siblings stagger automatically; an inline animationDelay still wins. */
+  .siq-rise:nth-child(2) { animation-delay: 50ms; }
+  .siq-rise:nth-child(3) { animation-delay: 100ms; }
+  .siq-rise:nth-child(4) { animation-delay: 150ms; }
+  .siq-rise:nth-child(5) { animation-delay: 200ms; }
+  .siq-rise:nth-child(6) { animation-delay: 250ms; }
+  .siq-rise:nth-child(n + 7) { animation-delay: 300ms; }
 
   /* ------ Bars grow in; rings sweep in (final value is the resting state) */
   .siq-grow {
@@ -361,6 +368,56 @@
   }
   .siq-lift:active {
     transform: translateY(0);
+  }
+
+  /* ------ Page enter: every route change fades up once ------------------- */
+  .siq-page {
+    animation: siq-page var(--dur-3) var(--ease-spark) both;
+  }
+
+  /* ------ Live dot: marigold with a soft expanding ring ------------------ */
+  .siq-live {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--highlight);
+  }
+  .siq-live::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--highlight);
+    animation: siq-ping 1.6s var(--ease-spark) infinite;
+  }
+
+  /* ------ Hero sheen: a slow light sweep on hover, for primary surfaces -- */
+  .siq-sheen {
+    position: relative;
+    isolation: isolate;
+  }
+  .siq-sheen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.09) 50%, transparent 65%);
+    transform: translateX(-100%);
+    transition: transform 1100ms var(--ease-spark);
+  }
+  .siq-sheen:hover::before {
+    transform: translateX(100%);
+  }
+
+  /* ------ Table rows / list rows: gentle hover wash ---------------------- */
+  .siq-row {
+    transition: background-color var(--dur-1) var(--ease-spark);
+  }
+  .siq-row:hover {
+    background: color-mix(in oklab, var(--accent) 45%, transparent);
   }
 
   /* ------ Faint dot grid for solid-colour hero surfaces ----------------- */
@@ -426,6 +483,31 @@
 @keyframes siq-sweep {
   from {
     stroke-dashoffset: var(--siq-c);
+  }
+}
+
+@keyframes siq-page {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes siq-pop {
+  from {
+    transform: scale(0.96);
+  }
+}
+
+@keyframes siq-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
   }
 }
 

@@ -122,7 +122,7 @@ export default function AssignmentManager({
   return (
     <div className="flex flex-col gap-6">
       {msg && (
-        <p role="status" className={msg.kind === 'ok' ? 'text-sm text-green-600' : 'text-destructive text-sm'}>
+        <p role="status" className={msg.kind === 'ok' ? 'text-sm text-success' : 'text-destructive text-sm'}>
           {msg.text}
         </p>
       )}
@@ -207,7 +207,7 @@ export default function AssignmentManager({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn('text-xs', copiedToken === a.token && 'text-green-600')}
+                  className={cn('text-xs', copiedToken === a.token && 'text-success')}
                   onClick={() => copyLink(a.token)}
                 >
                   {copiedToken === a.token ? 'Copied' : 'Copy link'}

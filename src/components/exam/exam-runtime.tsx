@@ -325,7 +325,7 @@ function ExamShell({
 
           <Button onClick={onSubmitClick}>Submit</Button>
         </div>
-        {/* Answered progress — a thin blue rule under the header. */}
+        {/* Answered progress — a thin brand rule under the header. */}
         <div className="bg-muted h-0.5 w-full" aria-hidden>
           <div className="bg-primary h-full transition-[width] duration-300" style={{ width: `${progress}%` }} />
         </div>
@@ -543,7 +543,7 @@ function ConfirmSubmit({
       role="dialog"
       aria-modal
       aria-labelledby="submit-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-sm"
       onClick={busy ? undefined : onCancel}
     >
       <div

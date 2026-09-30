@@ -308,7 +308,7 @@ export default function ProctoringMonitor({
         className={
           'rounded-full px-2 py-0.5 text-[10px] font-medium ' +
           (status.kind === 'monitoring'
-            ? 'bg-emerald-500/10 text-emerald-600'
+            ? 'bg-success/10 text-success'
             : status.kind === 'denied' || status.kind === 'error'
               ? 'bg-destructive/10 text-destructive'
               : 'bg-muted text-muted-foreground')

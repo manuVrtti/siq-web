@@ -98,7 +98,7 @@ export default function ProfileForm() {
       {status && (
         <p
           role="status"
-          className={status.kind === 'ok' ? 'text-sm text-green-600' : 'text-destructive text-sm'}
+          className={status.kind === 'ok' ? 'text-sm text-success' : 'text-destructive text-sm'}
         >
           {status.msg}
         </p>

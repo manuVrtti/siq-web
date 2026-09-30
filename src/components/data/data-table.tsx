@@ -59,8 +59,8 @@ export function TRow({
   return (
     <tr
       className={cn(
-        'border-b transition-colors last:border-0',
-        href && 'hover:bg-muted/40',
+        'siq-row border-b last:border-0',
+        href && 'cursor-pointer',
         className,
       )}
     >

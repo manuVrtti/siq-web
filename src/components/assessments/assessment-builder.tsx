@@ -156,7 +156,7 @@ export default function AssessmentBuilder({
       </div>
 
       {msg && (
-        <p role="status" className={msg.kind === 'ok' ? 'text-sm text-green-600' : 'text-destructive text-sm'}>
+        <p role="status" className={msg.kind === 'ok' ? 'text-sm text-success' : 'text-destructive text-sm'}>
           {msg.text}
         </p>
       )}

@@ -231,7 +231,7 @@ export default function ManualGradingPanel({
                   <span
                     className={
                       q.isCorrect === true
-                        ? 'text-xs text-emerald-600'
+                        ? 'text-xs text-success'
                         : q.isCorrect === false
                           ? 'text-xs text-destructive'
                           : 'text-muted-foreground text-xs'

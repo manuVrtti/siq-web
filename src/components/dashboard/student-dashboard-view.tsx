@@ -84,13 +84,14 @@ export function StudentDashboardView({ data: d }: { data: StudentDashboardData }
           {...rise(0)}
           className={cn(
             rise(0).className,
-            'bg-primary text-primary-foreground relative overflow-hidden rounded-3xl p-6 shadow-[var(--shadow-primary)] sm:p-8',
+            'bg-primary text-primary-foreground siq-sheen relative overflow-hidden rounded-3xl p-6 shadow-[var(--shadow-primary)] sm:p-8',
           )}
           aria-label={next ? 'Your next exam' : 'Welcome'}
         >
           <div className="siq-dots pointer-events-none absolute inset-0 opacity-60" aria-hidden />
           <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-white/10" aria-hidden />
-          <div className="relative flex h-full flex-col">
+          <div className="bg-highlight/25 pointer-events-none absolute -bottom-20 -left-10 size-56 rounded-full blur-3xl" aria-hidden />
+          <div className="relative z-10 flex h-full flex-col">
             <p className="text-sm text-white/80">
               {d.greeting}
               {d.firstName ? `, ${d.firstName}` : ''}
@@ -116,13 +117,13 @@ export function StudentDashboardView({ data: d }: { data: StudentDashboardData }
                     </div>
                   ) : (
                     <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium">
-                      <span className="size-2 animate-pulse rounded-full bg-emerald-300" />
+                      <span className="siq-live" />
                       Open now
                     </span>
                   )}
                   <Link
                     href={`/exam/${next.token}`}
-                    className="text-primary group inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold shadow-sm transition-transform hover:-translate-y-0.5 active:translate-y-0"
+                    className="bg-highlight text-highlight-foreground group inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold shadow-[0_6px_20px_rgba(242,169,59,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(242,169,59,0.45)] active:translate-y-0 active:scale-[0.98]"
                   >
                     {next.status === 'STARTED' ? 'Resume exam' : 'Start exam'}
                     <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -141,7 +142,7 @@ export function StudentDashboardView({ data: d }: { data: StudentDashboardData }
                 <div className="mt-auto pt-8">
                   <Link
                     href={`/${d.slug}/profile`}
-                    className="text-primary group inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold shadow-sm transition-transform hover:-translate-y-0.5"
+                    className="bg-highlight text-highlight-foreground group inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold shadow-sm transition-all hover:-translate-y-0.5 active:scale-[0.98]"
                   >
                     Strengthen your profile
                     <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden />

@@ -253,7 +253,7 @@ export default async function AssessmentAnalyticsPage({
                                   className="h-full rounded-full"
                                   style={{
                                     width: `${pct}%`,
-                                    background: o.isCorrect ? 'var(--success)' : '#93c5fd',
+                                    background: o.isCorrect ? 'var(--success)' : 'var(--chart-5)',
                                   }}
                                 />
                               </div>

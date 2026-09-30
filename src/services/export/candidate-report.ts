@@ -18,11 +18,11 @@ import { prisma } from '@/lib/prisma'
  * Devanagari — to "?" instead of letting pdf-lib throw mid-render.
  */
 
-const BLUE = rgb(0.145, 0.388, 0.922) // #2563eb
-const INK = rgb(0.059, 0.09, 0.165) // #0f172a
-const MUTED = rgb(0.392, 0.455, 0.545) // #64748b
-const RULE = rgb(0.886, 0.91, 0.941) // #e2e8f0
-const TINT = rgb(0.937, 0.957, 0.984) // #eff4fb
+const BRAND = rgb(0.059, 0.357, 0.29) // #0f5b4a forest
+const INK = rgb(0.11, 0.137, 0.129) // #1c2321
+const MUTED = rgb(0.42, 0.435, 0.408) // #6b6f68
+const RULE = rgb(0.91, 0.89, 0.847) // #e8e3d8
+const TINT = rgb(0.89, 0.941, 0.918) // #e3f0ea
 
 const A4 = { w: 595.28, h: 841.89 }
 const M = 48
@@ -113,8 +113,8 @@ export async function renderCandidateReport(
     page = pdf.addPage([A4.w, A4.h])
     y = A4.h - M
     // Brand strip
-    page.drawRectangle({ x: 0, y: A4.h - 6, width: A4.w, height: 6, color: BLUE })
-    page.drawText('SelectIQ', { x: M, y: A4.h - 32, size: 11, font: bold, color: BLUE })
+    page.drawRectangle({ x: 0, y: A4.h - 6, width: A4.w, height: 6, color: BRAND })
+    page.drawText('SelectIQ', { x: M, y: A4.h - 32, size: 11, font: bold, color: BRAND })
     const org = safe(data.assessment.org.name)
     page.drawText(org, {
       x: A4.w - M - font.widthOfTextAtSize(org, 9),
@@ -253,7 +253,7 @@ export async function renderCandidateReport(
     const bx = M + 230
     const bw = A4.w - M - 70 - bx
     page.drawRectangle({ x: bx, y: y + 1, width: bw, height: 6, color: RULE })
-    page.drawRectangle({ x: bx, y: y + 1, width: bw * pct, height: 6, color: BLUE })
+    page.drawRectangle({ x: bx, y: y + 1, width: bw * pct, height: 6, color: BRAND })
     y -= 20
   }
 
