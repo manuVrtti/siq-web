@@ -1,10 +1,11 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 import AppShell from '@/components/layout/app-shell'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { belongsToOrg } from '@/lib/auth/org-access'
 import { OrgProvider } from '@/lib/org-context'
 import { getOrgBySlug } from '@/services/organizations'
+import { isRegistered } from '@/services/profile'
 
 /**
  * Plan T02 — the tenant boundary.
@@ -29,6 +30,10 @@ export default async function OrgLayout({
 
   const allowed = user.role === 'SUPER_ADMIN' || (await belongsToOrg(user.id, org.id))
   if (!allowed) notFound()
+
+  // Registration gate (students only). Exam pages live outside this layout,
+  // so an unregistered student can always still sit an assigned exam.
+  if (user.role === 'STUDENT' && !(await isRegistered(user.id))) redirect('/register')
 
   return (
     <OrgProvider org={{ id: org.id, slug: org.slug, name: org.name }}>

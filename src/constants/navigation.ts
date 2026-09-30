@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   LibraryBig,
   LineChart,
+  UserRound,
   Settings,
   Shield,
   Users,
@@ -32,6 +33,7 @@ const MANAGERS = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: 'ALL' },
+  { label: 'My profile', href: '/profile', icon: UserRound, roles: ['STUDENT'] },
   { label: 'Assessments', href: '/assessments', icon: ClipboardCheck, roles: MANAGERS },
   { label: 'Question bank', href: '/questions', icon: LibraryBig, roles: MANAGERS },
   { label: 'Candidates', href: '/candidates', icon: Users, roles: MANAGERS },

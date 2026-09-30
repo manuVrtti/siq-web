@@ -104,7 +104,9 @@ export async function POST(request: NextRequest) {
         data: {
           lastLoginAt: new Date(),
           email: decoded.email ?? user.email,
-          name: decoded.name ?? user.name,
+          // Only fill a missing name: once the student sets their name on
+          // the profile, a Google display name must not overwrite it.
+          name: user.name ?? decoded.name ?? null,
           avatarUrl: decoded.picture ?? user.avatarUrl,
         },
       })
