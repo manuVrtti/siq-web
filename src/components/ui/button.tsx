@@ -52,6 +52,10 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      // A Button rendered as something else (render={<Link />} / <a>) is not
+      // a native <button>; telling Base UI so keeps correct link semantics
+      // and silences its dev warning. Callers can still override.
+      nativeButton={props.nativeButton ?? !props.render}
       {...props}
     />
   )

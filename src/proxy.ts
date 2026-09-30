@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { DEV_USER_COOKIE, devBypassEnabled, isLocalHost } from '@/lib/auth/dev-bypass'
 import { SESSION_COOKIE_NAME } from '@/lib/auth/session-constants'
 import { isSecureExamBrowserRequest } from '@/lib/seb'
 
@@ -74,6 +75,8 @@ function isSebVerifyRoute(pathname: string): boolean {
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true
+  // Dev-login route (itself 404s outside `next dev` on localhost).
+  if (devBypassEnabled() && (pathname === '/api/dev/login' || pathname.startsWith('/dev/'))) return true
   if (isHealthRoute(pathname)) return true
   if (isSebVerifyRoute(pathname)) return true
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true
@@ -87,7 +90,12 @@ export default function proxy(request: NextRequest) {
 
   if (isPublic(pathname)) return NextResponse.next()
 
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value)
+  // LOCAL DEV ONLY: the dev-login cookie counts as a session (lib/auth/dev-bypass.ts).
+  const devSession =
+    devBypassEnabled() &&
+    isLocalHost(request.headers.get('host')) &&
+    Boolean(request.cookies.get(DEV_USER_COOKIE)?.value)
+  const hasSession = devSession || Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value)
 
   if (!hasSession) {
     // API callers get JSON; a redirect would be unparseable to fetch().

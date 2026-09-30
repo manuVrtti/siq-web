@@ -13,7 +13,6 @@ import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { hasPermission } from '@/lib/auth/permissions'
 import { firstName, greeting, longDate } from '@/lib/format'
 import { getOrgBySlug } from '@/services/organizations'
-import { getStudentOverview } from '@/services/analytics/candidate-analytics'
 
 export const metadata: Metadata = { title: 'Dashboard — SelectIQ' }
 
@@ -35,14 +34,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
   const name = firstName(user.name)
   const title = name ? `${greeting()}, ${name}` : greeting()
 
-  let subtitle = `Here's what's happening at ${org.name}.`
   if (!isManager) {
-    const s = await getStudentOverview(org.id, user.id)
-    subtitle =
-      s.open.length === 0
-        ? `No exams waiting for you at ${org.name}.`
-        : `You have ${s.open.length} exam${s.open.length === 1 ? '' : 's'} waiting at ${org.name}.`
+    // Students: the dashboard view carries its own greeting + next-exam hero.
+    return (
+      <StudentDashboard orgId={org.id} orgName={org.name} userId={user.id} userName={user.name} slug={slug} />
+    )
   }
+  const subtitle = `Here's what's happening at ${org.name}.`
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -51,8 +49,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
         title={title}
         subtitle={subtitle}
         actions={
-          isManager ? (
-            <>
+          <>
               <Button variant="outline" render={<Link href={`/${slug}/candidates`} />}>
                 <UserPlus className="size-4" aria-hidden />
                 Add candidates
@@ -61,18 +58,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
                 <Plus className="size-4" aria-hidden />
                 New assessment
               </Button>
-            </>
-          ) : null
+          </>
         }
       />
 
       {user.role === 'SUPER_ADMIN' ? <PlatformStrip /> : null}
 
-      {isManager ? (
-        <ManagerDashboard orgId={org.id} slug={slug} />
-      ) : (
-        <StudentDashboard orgId={org.id} userId={user.id} slug={slug} />
-      )}
+      <ManagerDashboard orgId={org.id} slug={slug} />
     </div>
   )
 }

@@ -266,20 +266,20 @@ export type CompletenessItem = { key: string; label: string; done: boolean; weig
 export function computeCompleteness(p: FullProfile): { percent: number; items: CompletenessItem[] } {
   const pr = p.profile
   const items: CompletenessItem[] = [
-    { key: 'name', label: 'Full name', done: Boolean(p.user.name), weight: 5, section: 'basics' },
-    { key: 'phone', label: 'Phone number', done: Boolean(p.user.phone), weight: 5, section: 'basics' },
-    { key: 'headline', label: 'Headline', done: Boolean(pr?.headline), weight: 5, section: 'basics' },
-    { key: 'about', label: 'About you', done: Boolean(pr?.about), weight: 5, section: 'basics' },
-    { key: 'academics', label: 'Degree, branch and graduation year', done: Boolean(pr?.degree && pr.branch && pr.graduationYear), weight: 10, section: 'academics' },
-    { key: 'cgpa', label: 'CGPA', done: pr?.cgpa != null, weight: 10, section: 'academics' },
-    { key: 'school', label: '10th and 12th scores', done: pr?.tenthPercent != null && pr.twelfthPercent != null, weight: 5, section: 'academics' },
-    { key: 'education', label: 'Education history', done: (pr?.education.length ?? 0) > 0, weight: 5, section: 'education' },
-    { key: 'skills', label: 'At least 5 skills', done: (pr?.skills.length ?? 0) >= 5, weight: 10, section: 'skills' },
-    { key: 'projects', label: 'A project', done: (pr?.projects.length ?? 0) > 0, weight: 10, section: 'projects' },
-    { key: 'experience', label: 'Internship or work experience', done: (pr?.experience.length ?? 0) > 0, weight: 5, section: 'experience' },
-    { key: 'links', label: 'LinkedIn or GitHub', done: Boolean(pr?.linkedinUrl || pr?.githubUrl), weight: 5, section: 'links' },
-    { key: 'resume', label: 'Résumé (PDF)', done: Boolean(pr?.resumePath), weight: 15, section: 'links' },
-    { key: 'preferences', label: 'Preferred roles', done: (pr?.preferredRoles.length ?? 0) > 0, weight: 5, section: 'preferences' },
+    { key: 'name', label: 'Add your full name', done: Boolean(p.user.name), weight: 5, section: 'basics' },
+    { key: 'phone', label: 'Add your phone number', done: Boolean(p.user.phone), weight: 5, section: 'basics' },
+    { key: 'headline', label: 'Write a headline', done: Boolean(pr?.headline), weight: 5, section: 'basics' },
+    { key: 'about', label: 'Write a short intro', done: Boolean(pr?.about), weight: 5, section: 'basics' },
+    { key: 'academics', label: 'Add your degree and branch', done: Boolean(pr?.degree && pr.branch && pr.graduationYear), weight: 10, section: 'academics' },
+    { key: 'cgpa', label: 'Add your CGPA', done: pr?.cgpa != null, weight: 10, section: 'academics' },
+    { key: 'school', label: 'Add 10th & 12th scores', done: pr?.tenthPercent != null && pr.twelfthPercent != null, weight: 5, section: 'academics' },
+    { key: 'education', label: 'Add your education', done: (pr?.education.length ?? 0) > 0, weight: 5, section: 'education' },
+    { key: 'skills', label: 'Add 5 skills', done: (pr?.skills.length ?? 0) >= 5, weight: 10, section: 'skills' },
+    { key: 'projects', label: 'Add a project', done: (pr?.projects.length ?? 0) > 0, weight: 10, section: 'projects' },
+    { key: 'experience', label: 'Add an internship', done: (pr?.experience.length ?? 0) > 0, weight: 5, section: 'experience' },
+    { key: 'links', label: 'Link LinkedIn or GitHub', done: Boolean(pr?.linkedinUrl || pr?.githubUrl), weight: 5, section: 'links' },
+    { key: 'resume', label: 'Upload your résumé', done: Boolean(pr?.resumePath), weight: 15, section: 'links' },
+    { key: 'preferences', label: 'Pick roles you want', done: (pr?.preferredRoles.length ?? 0) > 0, weight: 5, section: 'preferences' },
   ]
   const total = items.reduce((n, i) => n + i.weight, 0)
   const got = items.reduce((n, i) => n + (i.done ? i.weight : 0), 0)

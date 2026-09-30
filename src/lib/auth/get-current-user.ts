@@ -1,7 +1,9 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { cookies, headers } from 'next/headers'
 
+import { DEV_USER_COOKIE, devBypassEnabled, isLocalHost } from '@/lib/auth/dev-bypass'
 import { getSessionCookie, verifySessionCookie } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import type { CurrentUser } from '@/types/auth'
@@ -22,6 +24,17 @@ import type { CurrentUser } from '@/types/auth'
  * try/catch. Use `requireAuth()` in API routes where null should be a 401.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  // LOCAL DEV ONLY — see lib/auth/dev-bypass.ts. Inert in production builds.
+  if (devBypassEnabled()) {
+    const devId = (await cookies()).get(DEV_USER_COOKIE)?.value
+    if (devId && isLocalHost((await headers()).get('host'))) {
+      const u = await prisma.user.findUnique({ where: { id: devId } })
+      if (u) {
+        return { id: u.id, email: u.email, phone: u.phone, name: u.name, avatarUrl: u.avatarUrl, role: u.role, firebaseUid: u.firebaseUid }
+      }
+    }
+  }
+
   const cookie = await getSessionCookie()
   if (!cookie) return null
 
