@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   LibraryBig,
   LineChart,
+  MessagesSquare,
   UserRound,
   Settings,
   Shield,
@@ -29,12 +30,19 @@ export type NavItem = {
   roles: 'ALL' | readonly UserRole[]
   /** Absolute link, not prefixed with the active org (e.g. the platform console). */
   absolute?: boolean
+  /** Small tag after the label, e.g. "Soon" for a feature that isn't live yet. */
+  badge?: string
 }
 
 const MANAGERS = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: 'ALL' },
+  // Student tabs. Their own routes (my-*) rather than the manager pages, which
+  // are permission-gated and show org-wide data.
+  { label: 'Assessments', href: '/my-assessments', icon: ClipboardCheck, roles: ['STUDENT'] },
+  { label: 'Mock interviews', href: '/mock-interviews', icon: MessagesSquare, roles: ['STUDENT'], badge: 'Soon' },
+  { label: 'Analytics', href: '/my-analytics', icon: LineChart, roles: ['STUDENT'] },
   { label: 'My results', href: '/my-results', icon: FileCheck2, roles: ['STUDENT'], absolute: true },
   { label: 'My profile', href: '/profile', icon: UserRound, roles: ['STUDENT'] },
   { label: 'Assessments', href: '/assessments', icon: ClipboardCheck, roles: MANAGERS },
