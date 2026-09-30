@@ -177,7 +177,12 @@ export default async function CandidatesPage({
                   <div className="flex items-center gap-3">
                     <Initials name={c.name} email={c.email} />
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{c.name ?? c.email ?? c.phone}</p>
+                      <Link
+                        href={`${pathname}/${c.id}`}
+                        className="hover:text-primary block truncate font-medium transition-colors"
+                      >
+                        {c.name ?? c.email ?? c.phone}
+                      </Link>
                       <p className="text-muted-foreground truncate text-xs">
                         {[c.email, c.phone].filter(Boolean).join(' · ')}
                       </p>

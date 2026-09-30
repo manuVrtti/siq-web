@@ -20,9 +20,10 @@ export default function LoginPage() {
       <div className="mb-8 flex flex-col gap-3">
         <BrandMark className="size-10 lg:hidden" />
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Sign in or create your account</h1>
           <p className="text-muted-foreground text-sm">
-            Sign in with the account your college or employer registered.
+            Students: use your college email. New here? Signing in creates your account — we&apos;ll
+            ask a few details next.
           </p>
         </div>
       </div>

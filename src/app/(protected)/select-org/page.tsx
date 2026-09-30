@@ -5,6 +5,7 @@ import { Building2 } from 'lucide-react'
 
 import EmptyState from '@/components/ui/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { isRegistered } from '@/services/profile'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { getUserOrgs } from '@/lib/auth/org-access'
 
@@ -19,6 +20,8 @@ export const metadata: Metadata = { title: 'Choose organization — SelectIQ' }
  */
 export default async function SelectOrgPage() {
   const user = (await getCurrentUser())!
+  // Registration gate: students finish the registration step once, first.
+  if (user.role === 'STUDENT' && !(await isRegistered(user.id))) redirect('/register')
   const orgs = await getUserOrgs(user.id)
 
   if (orgs.length === 1) redirect(`/${orgs[0].slug}/dashboard`)
@@ -28,8 +31,8 @@ export default async function SelectOrgPage() {
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
         <EmptyState
           icon={Building2}
-          title="No organization yet"
-          description="Your access is granted by your college or employer. Once you're added, your workspace appears here."
+          title="You're not linked to a college yet"
+          description="We couldn't match your email to a college on SelectIQ. Ask your placement cell to add you — sign in with your college email if you have one. Your profile is saved and waiting."
         />
       </main>
     )
