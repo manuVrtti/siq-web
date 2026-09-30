@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Target, Trophy, Users } from 'lucide-react'
+import { Download, Target, Trophy, Users } from 'lucide-react'
 
 import { StatCard } from '@/components/analytics/stat-card'
 import { DeleteBatchButton, RemoveMemberButton } from '@/components/candidates/batch-actions'
@@ -60,6 +60,10 @@ export default async function BatchDetailPage({
           <>
             <Button variant="outline" render={<Link href={`${base}?batch=${id}`} />}>
               Open in Candidates
+            </Button>
+            <Button variant="outline" render={<a href={`/api/export/batches/${id}/results`} download />}>
+              <Download className="size-4" aria-hidden />
+              Export
             </Button>
             <DeleteBatchButton batchId={id} name={perf.name} redirectTo={`${base}/batches`} />
           </>

@@ -100,6 +100,13 @@ export default async function GradeResultPage({
         >
           ← All results
         </Link>
+        <a
+          href={`/api/export/candidates/${result.user.id}/report?assessmentId=${id}`}
+          download
+          className="text-primary text-sm font-medium hover:underline"
+        >
+          Download PDF report
+        </a>
       </PageHeader>
 
       <ManualGradingPanel

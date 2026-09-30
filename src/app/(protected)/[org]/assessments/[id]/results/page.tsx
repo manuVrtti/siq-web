@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { BarChart3, FileCheck2, FileText, Hourglass, Target, Trophy } from 'lucide-react'
+import { BarChart3, Download, FileCheck2, FileText, Hourglass, Target, Trophy } from 'lucide-react'
 
 import { StatCard } from '@/components/analytics/stat-card'
 import { Initials, StatusPill } from '@/components/dashboard/bits'
@@ -88,6 +88,12 @@ export default async function AssessmentResultsPage({
             <Button variant="outline" render={<Link href={`${base}/build`} />}>
               Edit assessment
             </Button>
+            {!nothingYet ? (
+              <Button variant="outline" render={<a href={`/api/export/assessments/${id}/results`} download />}>
+                <Download className="size-4" aria-hidden />
+                Export Excel
+              </Button>
+            ) : null}
             <Button render={<Link href={`${base}/analytics`} />}>
               <BarChart3 className="size-4" aria-hidden />
               Analytics

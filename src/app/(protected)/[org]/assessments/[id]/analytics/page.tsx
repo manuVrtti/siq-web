@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Clock, FileCheck2, ListChecks, ShieldAlert, Target, Users } from 'lucide-react'
+import { Clock, Download, FileCheck2, ListChecks, ShieldAlert, Target, Users } from 'lucide-react'
 
 import { CompletionFunnel } from '@/components/analytics/completion-funnel'
 import { Panel } from '@/components/analytics/panel'
@@ -90,6 +90,10 @@ export default async function AssessmentAnalyticsPage({
         <div className="flex shrink-0 gap-2">
           <Button variant="outline" render={<Link href={`/${slug}/assessments/${id}/build`} />}>
             Edit
+          </Button>
+          <Button variant="outline" render={<a href={`/api/export/assessments/${id}/analytics`} download />}>
+            <Download className="size-4" aria-hidden />
+            Export
           </Button>
           <Button render={<Link href={`/${slug}/assessments/${id}/results`} />}>
             View results

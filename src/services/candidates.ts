@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client'
 
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { normalizeEmail, normalizePhone } from '@/lib/validators/contact'
 
 /**
  * Plan 013 — candidates + batches.
@@ -17,12 +18,6 @@ import { prisma } from '@/lib/prisma'
 
 /* ---- parsing ----------------------------------------------------------- */
 
-// Deliberately generous — colleges' rosters use varied formats. Real
-// validation happens at rendering time (Firebase, MSG91).
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-// E.164 in the loose sense; accept Indian 10-digit as +91 prefix if bare.
-const PHONE_RE = /^\+?[1-9]\d{9,14}$/
-
 /** Splits a pasted list into deduped, normalised email/phone entries. */
 export function parseCandidateList(raw: string): {
   emails: string[]
@@ -33,23 +28,19 @@ export function parseCandidateList(raw: string): {
   const phones = new Set<string>()
   const invalid: string[] = []
 
-  for (const line of raw.split(/[\s,;]+/)) {
-    const v = line.trim()
+  for (const token of raw.split(/[\s,;]+/)) {
+    const v = token.trim()
     if (!v) continue
-
-    if (EMAIL_RE.test(v)) {
-      emails.add(v.toLowerCase())
+    const email = normalizeEmail(v)
+    if (email) {
+      emails.add(email)
       continue
     }
-
-    // Bare 10-digit → assume +91 (India).
-    const bare = v.replace(/[\s-]/g, '')
-    const candidate = /^\d{10}$/.test(bare) ? `+91${bare}` : bare
-    if (PHONE_RE.test(candidate)) {
-      phones.add(candidate)
+    const phone = normalizePhone(v)
+    if (phone) {
+      phones.add(phone)
       continue
     }
-
     invalid.push(v)
   }
 

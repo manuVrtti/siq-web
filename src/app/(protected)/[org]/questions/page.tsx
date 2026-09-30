@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { FileQuestion, Plus } from 'lucide-react'
+import { FileQuestion, Plus, Upload } from 'lucide-react'
 
 import { Pill } from '@/components/dashboard/bits'
 import {
@@ -87,10 +87,16 @@ export default async function QuestionsPage({
         title="Question bank"
         description={`${bankSize.toLocaleString('en-IN')} question${bankSize === 1 ? '' : 's'} · reusable across every assessment`}
         actions={
-          <Button render={<Link href={`${pathname}/new`} />}>
-            <Plus className="size-4" aria-hidden />
-            New question
-          </Button>
+          <>
+            <Button variant="outline" render={<Link href={`${pathname}/import`} />}>
+              <Upload className="size-4" aria-hidden />
+              Import
+            </Button>
+            <Button render={<Link href={`${pathname}/new`} />}>
+              <Plus className="size-4" aria-hidden />
+              New question
+            </Button>
+          </>
         }
       />
 
