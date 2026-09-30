@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronDown, FolderKanban, UserPlus, Users } from 'lucide-react'
+import { FolderKanban, UserPlus, Users } from 'lucide-react'
 
-import CandidateImport from '@/components/candidates/candidate-import'
 import {
   BulkBar,
   HeaderCheckbox,
@@ -100,34 +99,19 @@ export default async function CandidatesPage({
           </>
         }
         actions={
-          <Button variant="outline" render={<Link href={`${pathname}/batches`} />}>
-            <FolderKanban className="size-4" aria-hidden />
-            Manage batches
-          </Button>
+          <>
+            <Button variant="outline" render={<Link href={`${pathname}/batches`} />}>
+              <FolderKanban className="size-4" aria-hidden />
+              Manage batches
+            </Button>
+            <Button render={<Link href={`${pathname}/import`} />}>
+              <UserPlus className="size-4" aria-hidden />
+              Import candidates
+            </Button>
+          </>
         }
       />
 
-      <details className="siq-card group" open={rosterSize === 0}>
-        <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
-          <span className="bg-accent text-primary grid size-9 place-items-center rounded-lg">
-            <UserPlus className="size-4" aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Import candidates</p>
-            <p className="text-muted-foreground text-xs">
-              Paste emails or phone numbers. Candidates sign in with the same email to claim their
-              account.
-            </p>
-          </div>
-          <ChevronDown
-            className="text-muted-foreground size-4 transition-transform group-open:rotate-180"
-            aria-hidden
-          />
-        </summary>
-        <div className="border-t px-5 py-5">
-          <CandidateImport />
-        </div>
-      </details>
 
       <FilterBar
         searchPlaceholder="Search name, email or phone…"
@@ -161,7 +145,12 @@ export default async function CandidatesPage({
           clearHref={pathname}
           icon={<Users className="size-5" aria-hidden />}
           title="No candidates yet"
-          body="Use Import candidates above to add your college's roster."
+          body="Import your college's roster from a spreadsheet to get started."
+          action={
+            <Button size="sm" render={<Link href={`${pathname}/import`} />}>
+              Import candidates
+            </Button>
+          }
         />
       ) : (
         // key = current query, so paging / filtering resets the selection.

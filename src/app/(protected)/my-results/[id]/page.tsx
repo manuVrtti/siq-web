@@ -63,6 +63,13 @@ export default async function MyResultDetailPage({
         >
           ← All results
         </Link>
+        <a
+          href={`/api/export/candidates/${user.id}/report?assessmentId=${result.assessment.id}`}
+          download
+          className="text-primary text-sm font-medium hover:underline"
+        >
+          Download PDF
+        </a>
       </PageHeader>
 
       <Card>
