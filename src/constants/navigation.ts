@@ -35,6 +35,7 @@ const MANAGERS = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: 'ALL' },
+  { label: 'My results', href: '/my-results', icon: FileCheck2, roles: ['STUDENT'], absolute: true },
   { label: 'My profile', href: '/profile', icon: UserRound, roles: ['STUDENT'] },
   { label: 'Assessments', href: '/assessments', icon: ClipboardCheck, roles: MANAGERS },
   { label: 'Question bank', href: '/questions', icon: LibraryBig, roles: MANAGERS },

@@ -304,23 +304,16 @@
     color: var(--sidebar-foreground);
   }
 
+  /* Active row: a solid brand tile with a soft inner shade, so it reads as
+     pressed-in rather than merely highlighted. */
   .siq-nav-active {
-    position: relative;
-    background: color-mix(in oklab, var(--primary) 14%, transparent);
-    color: var(--sidebar-foreground);
-    font-weight: 600;
-  }
-
-  /* Left marker on the active row. Absolute so it never shifts layout. */
-  .siq-nav-active::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 8px;
-    bottom: 8px;
-    width: 3px;
     background: var(--primary);
-    border-radius: 2px;
+    color: var(--primary-foreground);
+    font-weight: 600;
+    box-shadow: inset 0 -4px 12px rgba(0, 0, 0, 0.18), 0 2px 6px color-mix(in oklab, var(--primary) 35%, transparent);
+  }
+  .siq-nav-active:active {
+    transform: translateY(1px);
   }
 
   /* ------ Editorial small-caps label ------------------------------------ */
@@ -334,10 +327,46 @@
   }
 
   /* ------ Data density: numeric ---------------------------------------- */
+  /* Aligned digits in the UI font. (A monospace face here made every
+     score, pill and stat read like terminal output.) */
   .siq-numeric {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+  }
+
+  /* ------ Motion: rise-in on mount (stagger with style animationDelay) --- */
+  .siq-rise {
+    animation: siq-rise var(--dur-4) var(--ease-spark) both;
+  }
+
+  /* ------ Bars grow in; rings sweep in (final value is the resting state) */
+  .siq-grow {
+    animation: siq-grow 800ms var(--ease-spark) both;
+  }
+  .siq-sweep {
+    animation: siq-sweep 1000ms var(--ease-spark) both;
+  }
+
+  /* ------ Interactive card: lifts on hover, presses on click ------------- */
+  .siq-lift {
+    transition:
+      transform var(--dur-2) var(--ease-spark),
+      box-shadow var(--dur-2) var(--ease-spark),
+      border-color var(--dur-2) var(--ease-spark);
+  }
+  .siq-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+    border-color: color-mix(in oklab, var(--primary) 28%, var(--border));
+  }
+  .siq-lift:active {
+    transform: translateY(0);
+  }
+
+  /* ------ Faint dot grid for solid-colour hero surfaces ----------------- */
+  .siq-dots {
+    background-image: radial-gradient(color-mix(in oklab, #ffffff 22%, transparent) 1px, transparent 1px);
+    background-size: 18px 18px;
   }
 
   /* ------ Focus ring — used by any interactive element without shadcn --- */
@@ -385,6 +414,29 @@
 
   h3, h4 {
     font-weight: 600;
+  }
+}
+
+@keyframes siq-grow {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes siq-sweep {
+  from {
+    stroke-dashoffset: var(--siq-c);
+  }
+}
+
+@keyframes siq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

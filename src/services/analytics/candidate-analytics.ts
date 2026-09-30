@@ -28,7 +28,14 @@ export const getStudentOverview = cache(async (orgId: string, userId: string) =>
         invitedAt: true,
         submittedAt: true,
         assessment: {
-          select: { id: true, title: true, durationMinutes: true, startAt: true, endAt: true },
+          select: {
+            id: true,
+            title: true,
+            durationMinutes: true,
+            startAt: true,
+            endAt: true,
+            sections: { select: { _count: { select: { questions: true } } } },
+          },
         },
       },
     }),
@@ -48,11 +55,19 @@ export const getStudentOverview = cache(async (orgId: string, userId: string) =>
 
   // An exam is "open" if the candidate can still act on it: not submitted,
   // and its window hasn't closed.
-  const open = assignments.filter(
-    (a) =>
-      (a.status === 'INVITED' || a.status === 'STARTED') &&
-      (!a.assessment.endAt || a.assessment.endAt > now),
-  )
+  const open = assignments
+    .filter(
+      (a) =>
+        (a.status === 'INVITED' || a.status === 'STARTED') &&
+        (!a.assessment.endAt || a.assessment.endAt > now),
+    )
+    // In-progress first, then whatever opens or closes soonest.
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'STARTED' ? -1 : 1
+      const key = (x: typeof a) =>
+        (x.assessment.startAt ?? x.assessment.endAt ?? new Date(8.64e15)).getTime()
+      return key(a) - key(b)
+    })
   const graded = results.filter((r) => r.status === 'GRADED')
   const decided = graded.filter((r) => r.passed !== null)
 

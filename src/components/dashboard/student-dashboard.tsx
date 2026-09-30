@@ -1,29 +1,24 @@
-import Link from 'next/link'
-import { Award, BookOpenCheck, ClipboardList, FileClock, GraduationCap, Target } from 'lucide-react'
-
-import { Panel } from '@/components/analytics/panel'
-import { StatCard } from '@/components/analytics/stat-card'
-import { TrendLine } from '@/components/analytics/trend-line'
-import { PanelEmpty, Pill, StatusPill } from '@/components/dashboard/bits'
-import { Button } from '@/components/ui/button'
-import { shortDateTime, timeAgo } from '@/lib/format'
-import { ProfileNudge, StandingPanel, TopicsPanel } from '@/components/dashboard/student-insights'
+import { StudentDashboardView, type StudentDashboardData } from '@/components/dashboard/student-dashboard-view'
+import { firstName, greeting } from '@/lib/format'
 import { getStudentInsights, getStudentOverview } from '@/services/analytics/candidate-analytics'
 import { computeCompleteness, getProfile } from '@/services/profile'
 
 /**
- * Plan 019 — the student's dashboard. The first job is "what do I need to
- * take", so open exams lead, each with a single Start/Resume action. Scores
- * come second. Copy is direct and calm — this is often opened minutes before
- * an exam.
+ * Student dashboard — loader. Fetches, shapes plain JSON, and hands it to
+ * the pure StudentDashboardView (which is also rendered with sample data at
+ * /dev/student for design review).
  */
 export async function StudentDashboard({
   orgId,
+  orgName,
   userId,
+  userName,
   slug,
 }: {
   orgId: string
+  orgName: string
   userId: string
+  userName: string | null
   slug: string
 }) {
   const [s, insights, profile] = await Promise.all([
@@ -32,126 +27,50 @@ export async function StudentDashboard({
     getProfile(userId),
   ])
   const completeness = computeCompleteness(profile)
-  const nextSteps = completeness.items
-    .filter((i) => !i.done)
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 3)
 
-  return (
-    <>
-      {completeness.percent < 100 ? (
-        <ProfileNudge percent={completeness.percent} next={nextSteps} href={`/${slug}/profile`} />
-      ) : null}
+  const data: StudentDashboardData = {
+    firstName: firstName(userName),
+    orgName,
+    slug,
+    nowIso: new Date().toISOString(),
+    greeting: greeting(),
+    open: s.open.map((a) => ({
+      id: a.id,
+      token: a.token,
+      status: a.status,
+      title: a.assessment.title,
+      durationMinutes: a.assessment.durationMinutes,
+      questions: a.assessment.sections.reduce((n, sec) => n + sec._count.questions, 0),
+      startAt: a.assessment.startAt?.toISOString() ?? null,
+      endAt: a.assessment.endAt?.toISOString() ?? null,
+    })),
+    completed: s.completed,
+    pendingReview: s.pendingReview,
+    avgPercentage: s.avgPercentage,
+    bestPercentage: s.bestPercentage,
+    passed: s.passed,
+    decided: s.decided,
+    trend: s.trend.map((t) => ({ title: t.title, percentage: t.percentage })),
+    recent: s.recent.map((r) => ({
+      id: r.id,
+      title: r.assessment.title,
+      status: r.status,
+      percentage: r.percentage,
+      passed: r.passed,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    standing: insights.standing,
+    strengths: insights.strengths,
+    focus: insights.focus,
+    profile: {
+      percent: completeness.percent,
+      next: completeness.items
+        .filter((i) => !i.done)
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 3)
+        .map((i) => ({ key: i.key, label: i.label, section: i.section })),
+    },
+  }
 
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <StatCard
-          label="Exams to take"
-          value={s.open.length}
-          hint={s.open.length === 0 ? 'Nothing assigned right now' : 'Assigned by your college'}
-          icon={ClipboardList}
-          tone={s.open.length > 0 ? 'attention' : 'default'}
-        />
-        <StatCard
-          label="Completed"
-          value={s.completed}
-          hint={s.pendingReview > 0 ? `${s.pendingReview} awaiting grading` : undefined}
-          icon={BookOpenCheck}
-        />
-        <StatCard
-          label="Average score"
-          value={s.avgPercentage}
-          suffix={s.avgPercentage === null ? undefined : '%'}
-          hint={s.decided > 0 ? `Passed ${s.passed} of ${s.decided}` : undefined}
-          icon={Target}
-        />
-        <StatCard
-          label="Best score"
-          value={s.bestPercentage}
-          suffix={s.bestPercentage === null ? undefined : '%'}
-          icon={Award}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Panel eyebrow="Up next" title="Your exams" bodyClassName="px-3 pb-3">
-          {s.open.length === 0 ? (
-            <PanelEmpty
-              icon={GraduationCap}
-              title="No exams assigned"
-              body="When your placement cell assigns an exam, it will appear here with a Start button."
-            />
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {s.open.map((a) => (
-                <li
-                  key={a.id}
-                  className="hover:bg-muted/50 flex flex-col gap-3 rounded-xl px-3 py-3 transition-colors sm:flex-row sm:items-center"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold">{a.assessment.title}</p>
-                      {a.status === 'STARTED' ? <Pill tone="warning">In progress</Pill> : null}
-                    </div>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {a.assessment.durationMinutes} min
-                      {a.assessment.startAt ? ` · opens ${shortDateTime(a.assessment.startAt)}` : ''}
-                      {a.assessment.endAt ? ` · closes ${shortDateTime(a.assessment.endAt)}` : ''}
-                    </p>
-                  </div>
-                  <Button size="sm" render={<Link href={`/exam/${a.token}`} />}>
-                    {a.status === 'STARTED' ? 'Resume' : 'Start'}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        <Panel
-          eyebrow="History"
-          title="Recent results"
-          action={
-            <Link href="/my-results" className="text-primary text-xs font-medium hover:underline">
-              View all
-            </Link>
-          }
-          bodyClassName="px-3 pb-3"
-        >
-          {s.recent.length === 0 ? (
-            <PanelEmpty icon={FileClock} title="No results yet" body="Finished exams appear here." />
-          ) : (
-            <ul className="flex flex-col">
-              {s.recent.map((r) => (
-                <li key={r.id}>
-                  <Link
-                    href={`/my-results/${r.id}`}
-                    className="hover:bg-muted/60 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{r.assessment.title}</p>
-                      <p className="text-muted-foreground text-xs">{timeAgo(r.createdAt)}</p>
-                    </div>
-                    <StatusPill status={r.status} percentage={r.percentage} passed={r.passed} />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <StandingPanel standing={insights.standing} />
-        <TopicsPanel strengths={insights.strengths} focus={insights.focus} />
-      </div>
-
-      <Panel eyebrow="Progress" title="Your scores over time">
-        <TrendLine
-          points={s.trend.map((t) => ({ title: t.title, value: t.percentage }))}
-          emptyText="Your progress chart starts after your first graded exam."
-          valueLabel="score"
-        />
-      </Panel>
-    </>
-  )
+  return <StudentDashboardView data={data} />
 }

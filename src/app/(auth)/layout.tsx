@@ -1,73 +1,97 @@
 import { redirect } from 'next/navigation'
+import { CalendarClock, CheckCircle2, Clock, ListChecks, ShieldCheck, TrendingUp } from 'lucide-react'
 
 import { BrandMark } from '@/components/brand/mark'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 
 /**
- * Plan 004/008 — layout for unauthenticated pages, redesigned in plan 019.
+ * Auth layout — form on the left, a brand panel on the right that shows the
+ * actual product (a next-exam card, a result, a standing bar) rather than
+ * decorative blobs, so the first screen says what SelectIQ is.
+ * The panel is hidden on phones; the form takes the whole screen there.
  *
- * Two-column on desktop: form on the left, a quiet "brand" panel on the
- * right so the first thing anyone sees is intentional, not just a card on
- * a gray field. Stacks to a single column on phones.
- *
- * Anyone already signed in is bounced to /select-org, so a valid session
- * never renders this layout.
+ * Anyone already signed in is bounced to /select-org.
  */
-export default async function AuthLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
   if (user) redirect('/select-org')
 
   return (
-    <main className="grid min-h-screen grid-cols-1 lg:grid-cols-2">
-      {/* Form column */}
-      <div className="bg-background flex items-center justify-center p-6 sm:p-10">
-        {children}
+    <main className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="bg-background flex flex-col px-6 py-8 sm:px-12">
+        <div className="flex items-center gap-2">
+          <BrandMark className="size-8" />
+          <span className="font-display text-base font-semibold tracking-tight">SelectIQ</span>
+        </div>
+        <div className="flex flex-1 items-center justify-center py-10">{children}</div>
+        <p className="text-muted-foreground text-xs">© {new Date().getFullYear()} SelectIQ · Assessment platform for engineering colleges</p>
       </div>
 
-      {/*
-        Brand column — hidden on phones (form takes the whole screen).
-        Uses only the tokens defined in globals.css so it re-themes in one
-        place. Never a gradient bath; the depth comes from the border
-        between --sidebar and --background.
-      */}
-      <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border relative hidden overflow-hidden border-l lg:flex lg:flex-col lg:justify-between lg:p-12">
-        {/* subtle radial highlight in the top-right, sized so it never
-            reads as a "gradient hero" — just a hint of depth */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-40 -right-40 size-[520px] rounded-full opacity-40"
-          style={{
-            background:
-              'radial-gradient(circle at center, color-mix(in oklab, var(--primary) 30%, transparent) 0%, transparent 60%)',
-          }}
-        />
-
-        <div className="relative flex items-center gap-2.5">
-          <BrandMark />
-          <span className="text-base font-semibold tracking-tight">SelectIQ</span>
-        </div>
-
-        <div className="relative flex flex-col gap-4">
-          <h1 className="max-w-md text-3xl font-semibold leading-tight tracking-tight">
-            Campus assessments,
+      <aside className="bg-primary text-primary-foreground relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-center lg:px-14 lg:py-12">
+        <div className="siq-dots pointer-events-none absolute inset-0 opacity-50" aria-hidden />
+        <div className="relative mx-auto w-full max-w-md">
+          <h2 className="text-[34px] leading-[1.1] font-semibold tracking-tight">
+            Every placement test,
             <br />
-            proctored and graded end to end.
-          </h1>
-          <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
-            SelectIQ is the assessment platform for Indian engineering
-            colleges. Question bank, secure browser, live proctoring and
-            grading — one system for placement cells, HODs and students.
+            one calm place.
+          </h2>
+          <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-white/80">
+            See what&apos;s next, take it in the secure browser, and know exactly where you stand — for
+            students, HODs and placement cells.
           </p>
-        </div>
 
-        <div className="relative flex items-center gap-4 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} SelectIQ</span>
-          <span className="text-border">·</span>
-          <span>Assessment platform for engineering colleges</span>
+          {/* Product glimpse */}
+          <div className="relative mt-10 h-[300px]">
+            <div className="absolute top-0 left-0 w-[88%] rounded-2xl bg-white p-5 text-slate-900 shadow-2xl shadow-blue-950/30">
+              <p className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">Your next exam</p>
+              <p className="mt-1 text-lg font-semibold">TCS NQT Mock — Round 1</p>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                  <Clock className="size-3" aria-hidden /> 90 min
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                  <ListChecks className="size-3" aria-hidden /> 60 questions
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                  <CalendarClock className="size-3" aria-hidden /> Opens in 1 day
+                </span>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex gap-1.5">
+                  {['01', '04', '32'].map((v, i) => (
+                    <span key={i} className="rounded-lg bg-blue-50 px-2 py-1 text-center text-sm font-semibold text-blue-700 tabular-nums">
+                      {v}
+                    </span>
+                  ))}
+                </div>
+                <span className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">Start exam →</span>
+              </div>
+            </div>
+
+            <div className="absolute right-0 bottom-10 w-[62%] rotate-[1.5deg] rounded-2xl bg-white p-4 text-slate-900 shadow-2xl shadow-blue-950/30">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-emerald-600" aria-hidden />
+                <p className="text-sm font-semibold">Accenture Mock</p>
+                <span className="ml-auto rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">88% · passed</span>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full w-[92%] rounded-full bg-blue-600" />
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Ahead of <b className="text-slate-900">92%</b> of 412 candidates
+              </p>
+            </div>
+
+            <div className="absolute bottom-0 left-6 flex items-center gap-2 rounded-xl bg-white/15 px-3 py-2 text-xs backdrop-blur-sm">
+              <TrendingUp className="size-4" aria-hidden />
+              Strongest: Quantitative Aptitude · 91%
+            </div>
+          </div>
+
+          <div className="mt-10 flex items-center gap-2 text-xs text-white/75">
+            <ShieldCheck className="size-4" aria-hidden />
+            Proctored in a secure browser · results only your college can see
+          </div>
         </div>
       </aside>
     </main>

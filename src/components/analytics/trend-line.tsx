@@ -75,6 +75,7 @@ export function TrendLine({
             stroke="#2563eb"
             strokeWidth={2}
             fill="url(#siq-trend-fill)"
+            isAnimationActive={false}
             dot={{ r: 3, fill: '#2563eb', strokeWidth: 0 }}
             activeDot={{ r: 5, fill: '#2563eb', stroke: '#ffffff', strokeWidth: 2 }}
           />

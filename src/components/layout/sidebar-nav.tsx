@@ -40,26 +40,9 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
             href={fullHref}
             onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
-            className={cn(
-              'group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              active
-                ? 'bg-primary/12 text-sidebar-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
-            )}
+            className={cn('siq-nav-item', active ? 'siq-nav-active' : 'siq-nav-idle')}
           >
-            {active ? (
-              <span
-                aria-hidden
-                className="bg-primary absolute inset-y-1.5 left-0 w-[3px] rounded-full"
-              />
-            ) : null}
-            <Icon
-              className={cn(
-                'size-4 shrink-0 transition-colors',
-                active ? 'text-primary' : 'text-muted-foreground group-hover:text-sidebar-foreground',
-              )}
-              aria-hidden
-            />
+            <Icon className="size-4 shrink-0" aria-hidden />
             <span className="truncate">{label}</span>
           </Link>
         )
