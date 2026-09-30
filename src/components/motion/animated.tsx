@@ -104,7 +104,18 @@ export function Bar({ percent, className, barClassName = 'bg-primary' }: { perce
  * Renders a static value on the server (computed from `nowIso`) so the
  * first paint matches, then takes over on the client.
  */
-export function Countdown({ to, nowIso, onDoneLabel = 'Open now' }: { to: string; nowIso: string; onDoneLabel?: string }) {
+export function Countdown({
+  to,
+  nowIso,
+  onDoneLabel = 'Open now',
+  variant = 'brand',
+}: {
+  to: string
+  nowIso: string
+  onDoneLabel?: string
+  /** 'brand' = translucent boxes on the primary surface; 'card' = muted boxes on a white card. */
+  variant?: 'brand' | 'card'
+}) {
   const target = new Date(to).getTime()
   const [now, setNow] = useState(() => new Date(nowIso).getTime())
   useEffect(() => {
@@ -123,8 +134,16 @@ export function Countdown({ to, nowIso, onDoneLabel = 'Open now' }: { to: string
   return (
     <div className="flex gap-2" role="timer" aria-label="Time until the exam opens">
       {parts.map((x) => (
-        <div key={x.l} className="min-w-[52px] rounded-xl bg-white/15 px-2.5 py-2 text-center backdrop-blur-sm">
-          <div className="siq-numeric text-xl leading-none font-semibold">{String(x.v).padStart(2, '0')}</div>
+        <div
+          key={x.l}
+          className={cn(
+            'rounded-xl text-center',
+            variant === 'brand' ? 'min-w-[52px] bg-white/15 px-2.5 py-2 backdrop-blur-sm' : 'bg-muted min-w-[42px] px-2 py-1.5',
+          )}
+        >
+          <div className={cn('siq-numeric leading-none font-semibold', variant === 'brand' ? 'text-xl' : 'text-base')}>
+            {String(x.v).padStart(2, '0')}
+          </div>
           <div className="mt-1 text-[10px] tracking-wide uppercase opacity-80">{x.l}</div>
         </div>
       ))}

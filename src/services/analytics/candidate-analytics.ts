@@ -169,6 +169,87 @@ export const getStudentInsights = cache(async (orgId: string, userId: string) =>
     // Weakest three, excluding anything already listed as a strength.
     focus: topics.length > 3 ? topics.slice(-3).reverse().filter((t) => !topics.slice(0, 3).includes(t)) : [],
     topicCount: topics.length,
+    /** Every topic with enough answers, best first — the Analytics tab shows them all. */
+    topics,
+  }
+})
+
+/**
+ * Every exam assigned to the student in this org, bucketed for the
+ * Assessments tab:
+ *   inProgress — started, window still open
+ *   open       — can start now
+ *   upcoming   — window hasn't opened yet
+ *   done       — submitted (links to the result when one exists)
+ *   missed     — expired, or the window closed before they submitted
+ */
+export const getStudentAssessments = cache(async (orgId: string, userId: string) => {
+  const now = new Date()
+  const rows = await prisma.assessmentAssignment.findMany({
+    where: { userId, assessment: { orgId, status: { in: ['PUBLISHED', 'ARCHIVED'] } } },
+    orderBy: { invitedAt: 'desc' },
+    select: {
+      id: true,
+      token: true,
+      status: true,
+      invitedAt: true,
+      submittedAt: true,
+      assessment: {
+        select: {
+          title: true,
+          description: true,
+          durationMinutes: true,
+          startAt: true,
+          endAt: true,
+          status: true,
+          sections: { select: { _count: { select: { questions: true } } } },
+        },
+      },
+      attempt: { select: { result: { select: { id: true, status: true, percentage: true, passed: true } } } },
+    },
+  })
+
+  const items = rows.map((r) => {
+    const a = r.assessment
+    const closed = (a.endAt !== null && a.endAt <= now) || a.status === 'ARCHIVED'
+    const bucket: 'inProgress' | 'open' | 'upcoming' | 'done' | 'missed' =
+      r.status === 'SUBMITTED'
+        ? 'done'
+        : r.status === 'EXPIRED' || closed
+          ? 'missed'
+          : r.status === 'STARTED'
+            ? 'inProgress'
+            : a.startAt && a.startAt > now
+              ? 'upcoming'
+              : 'open'
+    return {
+      id: r.id,
+      token: r.token,
+      bucket,
+      title: a.title,
+      description: a.description,
+      durationMinutes: a.durationMinutes,
+      questions: a.sections.reduce((n, s) => n + s._count.questions, 0),
+      startAt: a.startAt,
+      endAt: a.endAt,
+      invitedAt: r.invitedAt,
+      submittedAt: r.submittedAt,
+      result: r.attempt?.result ?? null,
+    }
+  })
+
+  const soonest = (x: (typeof items)[number]) => (x.startAt ?? x.endAt ?? new Date(8.64e15)).getTime()
+  const latest = (x: (typeof items)[number]) => -(x.submittedAt ?? x.endAt ?? x.invitedAt).getTime()
+  const pick = (b: (typeof items)[number]['bucket'], key: typeof soonest) =>
+    items.filter((i) => i.bucket === b).sort((x, y) => key(x) - key(y))
+
+  return {
+    inProgress: pick('inProgress', soonest),
+    open: pick('open', soonest),
+    upcoming: pick('upcoming', soonest),
+    done: pick('done', latest),
+    missed: pick('missed', latest),
+    total: items.length,
   }
 })
 

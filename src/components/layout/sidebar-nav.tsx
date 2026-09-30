@@ -28,7 +28,7 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
 
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Main">
-      {navItemsForRole(user.role).map(({ label, href, icon: Icon, absolute }) => {
+      {navItemsForRole(user.role).map(({ label, href, icon: Icon, absolute, badge }) => {
         const fullHref = absolute ? href : `/${org.slug}${href}`
         // Exact match, or a nested route beneath it — so /questions/new
         // still highlights Questions, while /results does not match /r.
@@ -44,6 +44,16 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
           >
             <Icon className="size-4 shrink-0" aria-hidden />
             <span className="truncate">{label}</span>
+            {badge ? (
+              <span
+                className={cn(
+                  'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                  active ? 'bg-white/20 text-white' : 'bg-accent text-primary',
+                )}
+              >
+                {badge}
+              </span>
+            ) : null}
           </Link>
         )
       })}
