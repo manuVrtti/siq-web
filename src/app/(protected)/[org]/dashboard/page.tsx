@@ -71,7 +71,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
       {isManager ? (
         <ManagerDashboard orgId={org.id} slug={slug} />
       ) : (
-        <StudentDashboard orgId={org.id} userId={user.id} />
+        <StudentDashboard orgId={org.id} userId={user.id} slug={slug} />
       )}
     </div>
   )

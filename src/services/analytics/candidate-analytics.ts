@@ -74,6 +74,89 @@ export const getStudentOverview = cache(async (orgId: string, userId: string) =>
   }
 })
 
+/**
+ * Student insights for the dashboard (plan 027 territory, ABtalks-inspired):
+ *
+ *   standing — for the 5 most recent graded exams, the share of the cohort
+ *              that scored below the student. Cohort = everyone graded on
+ *              that assessment; hidden below 5 graded candidates, where a
+ *              percentile says more about the sample than the student.
+ *   topics   — mean marks ratio per question tag across all graded answers.
+ *              Needs ≥3 answered questions per tag before it's shown, so
+ *              one lucky guess isn't reported as a strength.
+ */
+const MIN_COHORT = 5
+const MIN_PER_TAG = 3
+
+export const getStudentInsights = cache(async (orgId: string, userId: string) => {
+  const recent = await prisma.result.findMany({
+    where: { userId, status: 'GRADED', assessment: { orgId } },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    select: { id: true, percentage: true, assessmentId: true, assessment: { select: { title: true } } },
+  })
+
+  const standing = (
+    await Promise.all(
+      recent.map(async (r) => {
+        const [below, total] = await Promise.all([
+          prisma.result.count({
+            where: { assessmentId: r.assessmentId, status: 'GRADED', percentage: { lt: r.percentage } },
+          }),
+          prisma.result.count({ where: { assessmentId: r.assessmentId, status: 'GRADED' } }),
+        ])
+        if (total < MIN_COHORT) return null
+        return {
+          resultId: r.id,
+          title: r.assessment.title,
+          percentage: round(r.percentage) ?? 0,
+          betterThan: Math.round((below / (total - 1 || 1)) * 100),
+          cohort: total,
+        }
+      }),
+    )
+  ).filter((s): s is NonNullable<typeof s> => s !== null)
+
+  // Topic performance from tagged questions.
+  const answers = await prisma.questionResult.findMany({
+    where: { needsReview: false, result: { userId, status: 'GRADED', assessment: { orgId } } },
+    select: { questionId: true, scoreAwarded: true, maxMarks: true },
+  })
+  const tagRows = answers.length
+    ? await prisma.questionTag.findMany({
+        where: { questionId: { in: [...new Set(answers.map((a) => a.questionId))] } },
+        select: { questionId: true, tag: { select: { name: true } } },
+      })
+    : []
+  const tagsByQuestion = new Map<string, string[]>()
+  for (const t of tagRows) {
+    const list = tagsByQuestion.get(t.questionId) ?? []
+    list.push(t.tag.name)
+    tagsByQuestion.set(t.questionId, list)
+  }
+  const byTag = new Map<string, number[]>()
+  for (const a of answers) {
+    const ratio = a.maxMarks > 0 ? Math.min(1, Math.max(0, a.scoreAwarded / a.maxMarks)) : 0
+    for (const tag of tagsByQuestion.get(a.questionId) ?? []) {
+      const list = byTag.get(tag) ?? []
+      list.push(ratio)
+      byTag.set(tag, list)
+    }
+  }
+  const topics = [...byTag.entries()]
+    .filter(([, v]) => v.length >= MIN_PER_TAG)
+    .map(([tag, v]) => ({ tag, percentage: Math.round((mean(v) ?? 0) * 100), questions: v.length }))
+    .sort((a, b) => b.percentage - a.percentage)
+
+  return {
+    standing,
+    strengths: topics.slice(0, 3),
+    // Weakest three, excluding anything already listed as a strength.
+    focus: topics.length > 3 ? topics.slice(-3).reverse().filter((t) => !topics.slice(0, 3).includes(t)) : [],
+    topicCount: topics.length,
+  }
+})
+
 /** Aggregate graded performance of a batch's members on this org's exams. */
 export async function getBatchPerformance(orgId: string, batchId: string) {
   const batch = await prisma.batch.findFirst({
