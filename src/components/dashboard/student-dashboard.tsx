@@ -7,7 +7,9 @@ import { TrendLine } from '@/components/analytics/trend-line'
 import { PanelEmpty, Pill, StatusPill } from '@/components/dashboard/bits'
 import { Button } from '@/components/ui/button'
 import { shortDateTime, timeAgo } from '@/lib/format'
-import { getStudentOverview } from '@/services/analytics/candidate-analytics'
+import { ProfileNudge, StandingPanel, TopicsPanel } from '@/components/dashboard/student-insights'
+import { getStudentInsights, getStudentOverview } from '@/services/analytics/candidate-analytics'
+import { computeCompleteness, getProfile } from '@/services/profile'
 
 /**
  * Plan 019 — the student's dashboard. The first job is "what do I need to
@@ -15,11 +17,32 @@ import { getStudentOverview } from '@/services/analytics/candidate-analytics'
  * come second. Copy is direct and calm — this is often opened minutes before
  * an exam.
  */
-export async function StudentDashboard({ orgId, userId }: { orgId: string; userId: string }) {
-  const s = await getStudentOverview(orgId, userId)
+export async function StudentDashboard({
+  orgId,
+  userId,
+  slug,
+}: {
+  orgId: string
+  userId: string
+  slug: string
+}) {
+  const [s, insights, profile] = await Promise.all([
+    getStudentOverview(orgId, userId),
+    getStudentInsights(orgId, userId),
+    getProfile(userId),
+  ])
+  const completeness = computeCompleteness(profile)
+  const nextSteps = completeness.items
+    .filter((i) => !i.done)
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 3)
 
   return (
     <>
+      {completeness.percent < 100 ? (
+        <ProfileNudge percent={completeness.percent} next={nextSteps} href={`/${slug}/profile`} />
+      ) : null}
+
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard
           label="Exams to take"
@@ -115,6 +138,11 @@ export async function StudentDashboard({ orgId, userId }: { orgId: string; userI
             </ul>
           )}
         </Panel>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <StandingPanel standing={insights.standing} />
+        <TopicsPanel strengths={insights.strengths} focus={insights.focus} />
       </div>
 
       <Panel eyebrow="Progress" title="Your scores over time">
