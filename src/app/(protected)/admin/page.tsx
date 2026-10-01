@@ -15,52 +15,42 @@ import {
 
 import { Sparkline } from '@/components/admin/sparkline'
 import { CountUp } from '@/components/motion/animated'
-import { ROLE_LABEL } from '@/constants/labels'
+import { AUDIT_ACTION_LABEL, ROLE_LABEL } from '@/constants/labels'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { firstName, greeting, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { getOrgDirectoryRows } from '@/services/console'
 import { getPlatformDashboard } from '@/services/platform'
 
 export const metadata: Metadata = { title: 'Platform console — SelectIQ' }
 
-const ACTION: Record<string, string> = {
-  'org.create': 'created an organization',
-  'org.update': 'updated an organization',
-  'user.role.change': 'changed a role',
-  'user.suspend': 'suspended an account',
-  'user.reactivate': 'reactivated an account',
-  'superadmin.grant': 'granted Super Admin',
-  'staff.add': 'added college staff',
-  'staff.update': 'changed college staff',
-  'staff.remove': 'removed college staff',
-  'department.create': 'created a department',
-  'department.update': 'renamed a department',
-  'department.delete': 'deleted a department',
-  'department.heads': 'changed a department’s HODs',
-  'assessment.publish': 'published a test',
-  'result.grade': 'graded a result',
-  'import.candidates': 'imported candidates',
-  'import.questions': 'imported questions',
-  'batch.delete': 'deleted a batch',
-  'candidate.update': 'edited a candidate',
-  'candidate.remove': 'removed candidates',
-  'candidate.credentials': 'set up password sign-in',
-  'candidate.department': 'moved students between departments',
-}
 
 /** Super Admin overview — ABtalks-style console: KPIs, trends, attention, activity. */
 export default async function AdminOverviewPage() {
   const user = (await getCurrentUser())!
-  const d = await getPlatformDashboard()
+  const [d, orgs] = await Promise.all([getPlatformDashboard(), getOrgDirectoryRows()])
+  const mostActive = [...orgs].filter((o) => o.submissions7d > 0).sort((a, b) => b.submissions7d - a.submissions7d).slice(0, 5)
+  const recent = [...orgs].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5)
+  const health = { noAdmin: orgs.filter((o) => o.health === 'no-admin').length, noDepts: orgs.filter((o) => o.health === 'no-departments').length, inactive: orgs.filter((o) => o.health === 'inactive').length }
   const name = firstName(user.name)
   const staff = (d.roles.COLLEGE_ADMIN ?? 0) + (d.roles.COLLEGE_HOD ?? 0)
 
   const attention = [
-    ...d.attention.collegesNoAdmin.map((c) => ({
-      text: `${c.name} has no active College Admin`,
-      href: `/admin/organizations/${c.id}?tab=people`,
-      cta: 'Add one',
-    })),
+    health.noAdmin > 0 && {
+      text: `${health.noAdmin} college${health.noAdmin === 1 ? ' has' : 's have'} no active College Admin`,
+      href: '/admin/organizations?health=no-admin',
+      cta: 'Review',
+    },
+    health.noDepts > 0 && {
+      text: `${health.noDepts} college${health.noDepts === 1 ? ' has' : 's have'} no departments`,
+      href: '/admin/organizations?health=no-departments',
+      cta: 'Review',
+    },
+    health.inactive > 0 && {
+      text: `${health.inactive} organization${health.inactive === 1 ? '' : 's'} inactive for 30 days`,
+      href: '/admin/organizations?health=inactive',
+      cta: 'Review',
+    },
     d.attention.hodsNoDept > 0 && { text: `${d.attention.hodsNoDept} HOD${d.attention.hodsNoDept === 1 ? '' : 's'} with no department`, href: '/admin/users?role=COLLEGE_HOD', cta: 'Review' },
     d.attention.pendingStaff > 0 && { text: `${d.attention.pendingStaff} staff invite${d.attention.pendingStaff === 1 ? '' : 's'} not accepted yet`, href: '/admin/users?status=invited', cta: 'Review' },
     ...d.attention.suspended.map((u) => ({ text: `${u.name ?? u.email} is suspended`, href: `/admin/users/${u.id}`, cta: 'Open' })),
@@ -68,10 +58,18 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <div className="siq-rise">
-        <p className="text-muted-foreground text-sm">{greeting()}{name ? `, ${name}` : ''}</p>
-        <h1 className="mt-1 text-[28px] leading-tight font-semibold tracking-tight">Platform console</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Every college, every person on SelectIQ — and what needs you.</p>
+      <div className="siq-rise flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-muted-foreground text-sm">{greeting()}{name ? `, ${name}` : ''}</p>
+          <h1 className="mt-1 text-[28px] leading-tight font-semibold tracking-tight">Platform console</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Every college, every person on SelectIQ — and what needs you.</p>
+        </div>
+        <Link
+          href="/admin/organizations/new"
+          className="bg-primary text-primary-foreground inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-primary)]"
+        >
+          <Building2 className="size-4" aria-hidden /> Onboard a college
+        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -153,7 +151,7 @@ export default async function AdminOverviewPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm">
                       <span className="font-medium">{a.user.name ?? a.user.email}</span>{' '}
-                      <span className="text-muted-foreground">{ACTION[a.action] ?? a.action}</span>
+                      <span className="text-muted-foreground">{AUDIT_ACTION_LABEL[a.action] ?? a.action}</span>
                     </p>
                     <p className="text-muted-foreground text-xs">{timeAgo(a.createdAt)}</p>
                   </div>
@@ -163,7 +161,43 @@ export default async function AdminOverviewPage() {
           )}
         </section>
       </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <OrgList title="Most active this week" empty="No submissions this week." rows={mostActive.map((o) => ({ id: o.id, name: o.name, meta: `${o.submissions7d} submissions · ${o.students} students` }))} />
+        <OrgList title="Recently onboarded" empty="No organizations yet." rows={recent.map((o) => ({ id: o.id, name: o.name, meta: `${timeAgo(o.createdAt)} · ${o.admins} admin${o.admins === 1 ? '' : 's'} · ${o.departments} departments` }))} />
+      </div>
     </div>
+  )
+}
+
+function OrgList({ title, empty, rows }: { title: string; empty: string; rows: { id: string; name: string; meta: string }[] }) {
+  return (
+    <section className="siq-card siq-rise overflow-hidden">
+      <div className="flex items-center justify-between border-b px-5 py-4">
+        <h2 className="text-[15px] font-semibold">{title}</h2>
+        <Link href="/admin/organizations" className="text-primary text-xs font-semibold hover:underline">
+          Directory
+        </Link>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground px-5 py-6 text-sm">{empty}</p>
+      ) : (
+        <ul className="divide-y">
+          {rows.map((r) => (
+            <li key={r.id}>
+              <Link href={`/admin/organizations/${r.id}`} className="siq-row flex items-center gap-3 px-5 py-3">
+                <Building2 className="text-muted-foreground size-4" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{r.name}</span>
+                  <span className="text-muted-foreground block text-xs">{r.meta}</span>
+                </span>
+                <ArrowRight className="text-muted-foreground size-4" aria-hidden />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 

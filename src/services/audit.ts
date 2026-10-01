@@ -38,6 +38,8 @@ export type AuditAction =
   | 'user.suspend'
   | 'user.reactivate'
   | 'superadmin.grant'
+  | 'org.suspend'
+  | 'org.reactivate'
 
 export async function audit(entry: {
   userId: string
@@ -61,8 +63,12 @@ export async function audit(entry: {
   }
 }
 
-export async function listAudit(opts: { action?: string; skip?: number; take?: number }) {
-  const where: Prisma.AuditLogWhereInput = opts.action ? { action: opts.action } : {}
+export async function listAudit(opts: { action?: string; orgId?: string; skip?: number; take?: number }) {
+  const where: Prisma.AuditLogWhereInput = {
+    ...(opts.action && { action: opts.action }),
+    // Entries about the org itself, or anything done inside it (metadata.orgId).
+    ...(opts.orgId && { OR: [{ entityId: opts.orgId }, { metadata: { path: ['orgId'], equals: opts.orgId } }] }),
+  }
   const [items, total] = await Promise.all([
     prisma.auditLog.findMany({
       where,

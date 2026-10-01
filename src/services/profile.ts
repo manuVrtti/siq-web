@@ -229,7 +229,7 @@ export async function canViewProfile(viewer: CurrentUser, candidateId: string): 
   if (viewer.role === 'SUPER_ADMIN') return true
   if (viewer.role === 'COLLEGE_HOD') {
     const inDept = await prisma.organizationMember.count({
-      where: { userId: candidateId, department: { heads: { some: { userId: viewer.id } } } },
+      where: { userId: candidateId, org: { status: 'ACTIVE' }, department: { heads: { some: { userId: viewer.id } } } },
     })
     return inDept > 0
   }
@@ -237,7 +237,7 @@ export async function canViewProfile(viewer: CurrentUser, candidateId: string): 
   const shared = await prisma.organizationMember.count({
     where: {
       userId: candidateId,
-      org: { members: { some: { userId: viewer.id } } },
+      org: { status: 'ACTIVE', members: { some: { userId: viewer.id } } },
     },
   })
   return shared > 0

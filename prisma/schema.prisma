@@ -40,6 +40,14 @@ enum OrgType {
   COMPANY
 }
 
+/// Platform-level state of an organization (Super Admin only).
+/// SUSPENDED pauses every member's access (contract ended, payment due…);
+/// nothing is deleted and reactivating restores it.
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum OrgMemberRole {
   ADMIN
   MEMBER
@@ -48,25 +56,25 @@ enum OrgMemberRole {
 /// Mirror of a Firebase Auth user plus SelectIQ app-level data.
 /// `firebaseUid` is the join key between the Firebase session and this table.
 model User {
-  id          String    @id @default(cuid())
+  id              String    @id @default(cuid())
   /// Null for phone-OTP-only accounts (MSG91 → Firebase custom token).
-  email       String?   @unique
+  email           String?   @unique
   /// Null for OAuth-only accounts. E.164 format.
-  phone       String?   @unique
-  name        String?
-  avatarUrl   String?
-  role        UserRole  @default(STUDENT)
-  firebaseUid String    @unique
-  lastLoginAt DateTime?
+  phone           String?   @unique
+  name            String?
+  avatarUrl       String?
+  role            UserRole  @default(STUDENT)
+  firebaseUid     String    @unique
+  lastLoginAt     DateTime?
   /// When the user finished (or skipped) their role's welcome journey.
   /// Null = show /[org]/welcome on their next dashboard visit.
-  onboardedAt DateTime?
+  onboardedAt     DateTime?
   /// Super Admin suspension. While set: no sign-in, every session rejected,
   /// and the Firebase account is disabled. Data is kept; reactivating clears it.
   suspendedAt     DateTime?
   suspendedReason String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   memberships        OrganizationMember[]
   auditLogs          AuditLog[]
@@ -85,24 +93,30 @@ model User {
 
 /// A college or a hiring company. Users join via OrganizationMember.
 model Organization {
-  id                     String   @id @default(cuid())
+  id                     String    @id @default(cuid())
   name                   String
   type                   OrgType
   /// URL-safe tenant identifier: "abes" in selectsiq.in/abes/... (and later
   /// abes.selectsiq.in). Lowercase letters, digits and hyphens only. Required
   /// and permanent — it is the routing key, and changing it breaks every saved
   /// link. (Plan T01 — was nullable before any org existed.)
-  slug                   String   @unique
+  slug                   String    @unique
   /// Email domain used to match students to their college, e.g. "abes.ac.in".
   /// Distinct from `slug`: a college may have several email domains but only
   /// one URL, and dots are not valid in a subdomain label.
   domain                 String?
   logoUrl                String?
+  /// Where the college is — lets the console segment hundreds of colleges.
+  city                   String?
+  state                  String?
+  status                 OrgStatus @default(ACTIVE)
+  suspendedAt            DateTime?
+  suspendedReason        String?
   /// Departments: when true, students choose their department at registration
   /// (admins/HODs can still move them); when false, only the college assigns it.
-  studentsPickDepartment Boolean  @default(true)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  studentsPickDepartment Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   members     OrganizationMember[]
   departments Department[]
@@ -112,6 +126,7 @@ model Organization {
   batches     Batch[]
 
   @@index([type])
+  @@index([status])
 }
 
 /// Join table between User and Organization, carrying the org-scoped role.

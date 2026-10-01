@@ -38,9 +38,10 @@ const STAFF: readonly UserRole[] = ['COLLEGE_ADMIN', 'COLLEGE_HOD']
 
 /** Super Admin, or a College Admin who is a member of this college. */
 export async function assertCollegeAdminOf(actor: CurrentUser, orgId: string) {
-  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { type: true } })
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { type: true, status: true } })
   if (!org) throw new NotFoundError('Organization not found')
   if (actor.role === 'SUPER_ADMIN') return
+  if (org.status === 'SUSPENDED') throw new ForbiddenError('This organization’s access is paused. Contact SelectIQ support.')
   if (actor.role !== 'COLLEGE_ADMIN') throw new ForbiddenError('Only College Admins can manage people here')
   const member = await prisma.organizationMember.count({ where: { orgId, userId: actor.id } })
   if (!member) throw new ForbiddenError('You do not have access to this organization')

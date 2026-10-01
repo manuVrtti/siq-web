@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
-import { Field, SelectInput, TextInput } from '@/components/profile/fields'
+import { Field, TextInput } from '@/components/profile/fields'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 /**
  * Admin console actions. Each calls a SUPER_ADMIN-only, audited API and
@@ -43,86 +44,102 @@ function useAction() {
   return { busy, error, run }
 }
 
-export function CreateOrgForm() {
-  const router = useRouter()
-  const [v, setV] = useState({ name: '', slug: '', type: 'COLLEGE', domain: '' })
-  const { busy, error, run } = useAction()
-  const set = (k: keyof typeof v) => (x: string) =>
-    setV((p) => ({
-      ...p,
-      [k]: x,
-      // Suggest a slug from the name until the admin edits the slug.
-      ...(k === 'name' && (!p.slug || p.slug === slugify(p.name)) ? { slug: slugify(x) } : {}),
-    }))
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        void run(
-          () => call('/api/orgs', 'POST', { ...v, domain: v.domain || undefined }),
-          (d) => router.push(`/admin/organizations/${(d as { org: { id: string } }).org.id}`),
-        )
-      }}
-      className="grid gap-4 sm:grid-cols-2"
-    >
-      <Field label="Name" required>
-        <TextInput value={v.name} onChange={set('name')} placeholder="ABES Engineering College" maxLength={200} />
-      </Field>
-      <Field label="URL slug" hint={`selectiq…/${v.slug || 'slug'}`} required>
-        <TextInput value={v.slug} onChange={set('slug')} placeholder="abes" maxLength={40} />
-      </Field>
-      <Field label="Type">
-        <SelectInput value={v.type} onChange={set('type')} options={[{ value: 'COLLEGE', label: 'College' }, { value: 'COMPANY', label: 'Company' }]} />
-      </Field>
-      <Field label="Student email domain" hint="self sign-up matching">
-        <TextInput value={v.domain} onChange={set('domain')} placeholder="abes.ac.in" maxLength={120} />
-      </Field>
-      <div className="flex items-center gap-3 sm:col-span-2">
-        <Button type="submit" disabled={busy || !v.name.trim() || !v.slug.trim()}>
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />}
-          Create organization
-        </Button>
-        <p className="text-muted-foreground text-xs">You become its first admin. The slug can&apos;t be changed later.</p>
-      </div>
-      {error ? <p role="alert" className="text-destructive text-sm sm:col-span-2">{error}</p> : null}
-    </form>
-  )
-}
-
-function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-}
-
-export function EditOrgForm({ id, name, domain }: { id: string; name: string; domain: string | null }) {
-  const [v, setV] = useState({ name, domain: domain ?? '' })
+export function EditOrgForm({
+  id,
+  name,
+  domain,
+  city,
+  state,
+}: {
+  id: string
+  name: string
+  domain: string | null
+  city: string | null
+  state: string | null
+}) {
+  const [v, setV] = useState({ name, domain: domain ?? '', city: city ?? '', state: state ?? '' })
   const [saved, setSaved] = useState(false)
   const { busy, error, run } = useAction()
+  const set = (k: keyof typeof v) => (x: string) => setV((p) => ({ ...p, [k]: x }))
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
         setSaved(false)
-        void run(() => call(`/api/admin/organizations/${id}`, 'PATCH', { name: v.name, domain: v.domain || null }), () => setSaved(true))
+        void run(
+          () => call(`/api/admin/organizations/${id}`, 'PATCH', { name: v.name, domain: v.domain || null, city: v.city || null, state: v.state || null }),
+          () => setSaved(true),
+        )
       }}
-      className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+      className="grid gap-4 sm:grid-cols-2"
     >
       <Field label="Name">
-        <TextInput value={v.name} onChange={(x) => setV((p) => ({ ...p, name: x }))} maxLength={200} />
+        <TextInput value={v.name} onChange={set('name')} maxLength={200} />
       </Field>
-      <Field label="Student email domain" hint="blank = no self sign-up">
-        <TextInput value={v.domain} onChange={(x) => setV((p) => ({ ...p, domain: x }))} placeholder="abes.ac.in" maxLength={120} />
+      <Field label="Student email domain" hint="blank = students join only by import">
+        <TextInput value={v.domain} onChange={set('domain')} placeholder="abes.ac.in" maxLength={120} />
       </Field>
-      <Button type="submit" disabled={busy}>
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-        Save
-      </Button>
-      {error ? <p role="alert" className="text-destructive text-sm sm:col-span-3">{error}</p> : null}
-      {saved && !error ? <p role="status" className="text-success text-sm sm:col-span-3">Saved</p> : null}
+      <Field label="City">
+        <TextInput value={v.city} onChange={set('city')} maxLength={80} />
+      </Field>
+      <Field label="State">
+        <TextInput value={v.state} onChange={set('state')} maxLength={80} />
+      </Field>
+      <div className="flex items-center gap-3 sm:col-span-2">
+        <Button type="submit" disabled={busy}>
+          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+          Save
+        </Button>
+        {error ? <p role="alert" className="text-destructive text-sm">{error}</p> : null}
+        {saved && !error ? <p role="status" className="text-success text-sm">Saved</p> : null}
+      </div>
     </form>
+  )
+}
+
+/** Suspend (pause every member's access) / reactivate an organization. */
+export function OrgStatusControl({ id, name, suspended }: { id: string; name: string; suspended: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const { busy, error, run } = useAction()
+  if (suspended) {
+    return (
+      <Button variant="outline" disabled={busy} onClick={() => void run(() => call(`/api/admin/organizations/${id}/status`, 'DELETE'))}>
+        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+        Reactivate
+      </Button>
+    )
+  }
+  return (
+    <>
+      <Button variant="destructive" onClick={() => setOpen(true)}>
+        Suspend
+      </Button>
+      <ConfirmDialog
+        open={open}
+        title={`Suspend ${name}?`}
+        busy={busy}
+        error={error}
+        confirmLabel="Suspend organization"
+        onCancel={() => setOpen(false)}
+        onConfirm={() => void run(() => call(`/api/admin/organizations/${id}/status`, 'POST', { reason }), () => setOpen(false))}
+        body={
+          <div className="flex flex-col gap-3">
+            <ul className="list-disc space-y-1 pl-4">
+              <li>Every member — admins, HODs, students — loses access straight away, including starting exams.</li>
+              <li>Nothing is deleted. Reactivate any time and everything is back.</li>
+            </ul>
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={300}
+              placeholder="Reason (kept in the record), e.g. contract ended"
+              className="border-input bg-card text-foreground h-10 rounded-lg border px-3 text-sm outline-none"
+            />
+          </div>
+        }
+      />
+    </>
   )
 }
 

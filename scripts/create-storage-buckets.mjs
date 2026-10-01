@@ -54,6 +54,13 @@ const BUCKETS = [
     file_size_limit: 5 * 1024 * 1024,
     allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
   },
+  {
+    // Private: students' résumés, served only through short-lived signed URLs.
+    id: 'resumes',
+    public: false,
+    file_size_limit: 5 * 1024 * 1024,
+    allowed_mime_types: ['application/pdf'],
+  },
   // 'assessments' (private, signed URLs) is a Sprint 2 concern — created then.
 ]
 

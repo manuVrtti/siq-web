@@ -1,10 +1,7 @@
 import 'server-only'
 
-import { Prisma, type OrgType } from '@prisma/client'
-
 import { ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
-import { normalizeDomain } from '@/services/admin'
 
 /**
  * Plan T01 — organization provisioning.
@@ -31,41 +28,6 @@ export function normalizeSlug(input: string): string {
   return slug
 }
 
-/**
- * Create an organization and seat its first admin, atomically.
- *
- * @param adminUserId the user who becomes the org's ADMIN member.
- */
-export async function createOrganization(params: {
-  name: string
-  type: OrgType
-  slug: string
-  adminUserId: string
-  domain?: string | null
-}) {
-  const slug = normalizeSlug(params.slug)
-  const name = params.name.trim()
-  if (!name) throw new ValidationError('Name is required')
-
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({
-        data: { name, type: params.type, slug, domain: normalizeDomain(params.domain) },
-      })
-      await tx.organizationMember.create({
-        data: { userId: params.adminUserId, orgId: org.id, role: 'ADMIN' },
-      })
-      return org
-    })
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      throw new ValidationError(`An organization with slug "${slug}" already exists`)
-    }
-    throw e
-  }
-}
-
-/** Add an existing user (looked up by email) to an org. */
 export async function getOrgBySlug(slug: string) {
   return prisma.organization.findUnique({ where: { slug } })
 }

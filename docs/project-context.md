@@ -143,7 +143,9 @@ All implementation plans live in `docs/plans/` as three-digit files (`001-…` t
 - Student experience: dashboard, Assessments, Analytics, My results, profile; Mock interviews marked "Soon".
 - Forest & Marigold design system with motion.
 
-**In progress:** admin panels for each role. Platform console (Super Admin), College admin panel, My department (HOD), account suspension, and Platform admins. See `roles-and-permissions.md`.
+**Admin panels (live):** Platform console for Super Admin, built to run hundreds of colleges (directory with health/filters/export, onboarding wizard, college suspension, global search); College admin panel; My department (HOD). See `roles-and-permissions.md`.
+
+**Next infrastructure step:** separate development from production. See [`environments.md`](environments.md) (`npm run db:which`, `npm run db:setup-dev`).
 
 **People:** SG's `contactsuyashgupta@gmail.com` is the Super Admin. `suyash.22b0131169@abes.ac.in` is College Admin of ABES (test college).
 

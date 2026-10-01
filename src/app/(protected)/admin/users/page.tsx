@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Users } from 'lucide-react'
+import { Download, Users } from 'lucide-react'
 
 import { RoleSelect } from '@/components/admin/admin-actions'
 import { Initials, Pill } from '@/components/dashboard/bits'
@@ -11,6 +11,8 @@ import { parseTableParams, type SearchParams } from '@/components/data/table-par
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { ROLE_LABEL } from '@/constants/labels'
 import { timeAgo } from '@/lib/format'
+import { Button } from '@/components/ui/button'
+import { prisma } from '@/lib/prisma'
 import { listUsers } from '@/services/admin'
 
 export const metadata: Metadata = { title: 'Users — Admin — SelectIQ' }
@@ -24,14 +26,22 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const role = ROLES.find((r) => r === p.get('role'))
   const status = STATUSES.find((s) => s === p.get('status'))
   const orgId = p.get('org') || undefined
-  const { items, total } = await listUsers({ q: p.q || undefined, role, status, orgId, skip: p.skip, take: p.pageSize })
+  const [{ items, total }, orgName] = await Promise.all([
+    listUsers({ q: p.q || undefined, role, status, orgId, skip: p.skip, take: p.pageSize }),
+    orgId ? prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }).then((o) => o?.name ?? null) : Promise.resolve(null),
+  ])
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
       <ListHeader
         eyebrow="Platform"
         title="All people"
-        description="Everyone on SelectIQ — students, HODs, College Admins, recruiters and Super Admins. Every change is audited."
+        description={`${total.toLocaleString('en-IN')} shown${orgName ? ` in ${orgName}` : ''} · every change is audited`}
+        actions={
+          <Button variant="outline" render={<a href={`/api/admin/export/users?${new URLSearchParams(p.raw).toString()}`} />}>
+            <Download className="size-4" aria-hidden /> Export
+          </Button>
+        }
       />
       <FilterBar
         searchPlaceholder="Search name, email or phone…"

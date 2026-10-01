@@ -41,6 +41,13 @@ export async function belongsToOrg(userId: string, orgId: string): Promise<boole
 export async function requireOrgAccess(user: CurrentUser, orgId: string): Promise<void> {
   if (user.role === 'SUPER_ADMIN') return
 
+  // A suspended organization is paused for every member (Super Admin only
+  // can still act on it, above).
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { status: true } })
+  if (org?.status === 'SUSPENDED') {
+    throw new ForbiddenError('This organization’s access is paused. Contact SelectIQ support.')
+  }
+
   if (!(await belongsToOrg(user.id, orgId))) {
     // Deliberately vague: confirming an org exists but is off-limits leaks
     // which organizations are on the platform.
