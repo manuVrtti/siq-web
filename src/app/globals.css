@@ -420,6 +420,25 @@
     background: color-mix(in oklab, var(--accent) 45%, transparent);
   }
 
+  /* ------ Story / illustration motion ------------------------------------
+     One-shot entrances read their delay from --d so scenes can choreograph
+     with style={{ '--d': '300ms' }}. Scenes re-mount per chapter, so the
+     choreography replays every time a chapter is shown. */
+  .siq-in-up { animation: siq-in-up 600ms var(--ease-spark) var(--d, 0ms) both; }
+  .siq-in-right { animation: siq-in-right 700ms var(--ease-spark) var(--d, 0ms) both; }
+  .siq-in-left { animation: siq-in-left 700ms var(--ease-spark) var(--d, 0ms) both; }
+  .siq-in-scale { animation: siq-in-scale 520ms var(--ease-spark-out) var(--d, 0ms) both; }
+  .siq-in-fade { animation: siq-in-fade 500ms ease var(--d, 0ms) both; }
+  .siq-float { animation: siq-float 5s ease-in-out var(--d, 0ms) infinite; }
+  .siq-blink { animation: siq-blink 1s steps(1) infinite; }
+  .siq-draw {
+    stroke-dasharray: var(--len, 300);
+    animation: siq-draw 900ms var(--ease-spark) var(--d, 0ms) both;
+  }
+  .siq-grow-w { animation: siq-grow 900ms var(--ease-spark) var(--d, 0ms) both; }
+  .siq-scan { animation: siq-scan 2.4s ease-in-out infinite; }
+  .siq-story-fill { animation: siq-story-fill var(--dur, 6000ms) linear both; transform-origin: left; }
+
   /* ------ Faint dot grid for solid-colour hero surfaces ----------------- */
   .siq-dots {
     background-image: radial-gradient(color-mix(in oklab, #ffffff 22%, transparent) 1px, transparent 1px);
@@ -509,6 +528,42 @@
     transform: scale(2.6);
     opacity: 0;
   }
+}
+
+@keyframes siq-in-up {
+  from { opacity: 0; transform: translateY(14px); }
+}
+@keyframes siq-in-right {
+  from { opacity: 0; transform: translateX(28px); }
+}
+@keyframes siq-in-left {
+  from { opacity: 0; transform: translateX(-28px); }
+}
+@keyframes siq-in-scale {
+  from { opacity: 0; transform: scale(0.6); }
+}
+@keyframes siq-in-fade {
+  from { opacity: 0; }
+}
+@keyframes siq-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes siq-blink {
+  50% { opacity: 0.25; }
+}
+/* Ends at the element's own stroke-dashoffset (0 = fully drawn). */
+@keyframes siq-draw {
+  from { stroke-dashoffset: var(--len, 300); }
+}
+@keyframes siq-scan {
+  0%, 100% { transform: translateY(0); opacity: 0; }
+  10%, 90% { opacity: 1; }
+  50% { transform: translateY(var(--scan, 120px)); }
+}
+@keyframes siq-story-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 @keyframes siq-rise {

@@ -30,7 +30,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     if (devId && isLocalHost((await headers()).get('host'))) {
       const u = await prisma.user.findUnique({ where: { id: devId } })
       if (u) {
-        return { id: u.id, email: u.email, phone: u.phone, name: u.name, avatarUrl: u.avatarUrl, role: u.role, firebaseUid: u.firebaseUid }
+        return { id: u.id, email: u.email, phone: u.phone, name: u.name, avatarUrl: u.avatarUrl, role: u.role, firebaseUid: u.firebaseUid, onboarded: u.onboardedAt !== null }
       }
     }
   }
@@ -58,6 +58,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       role: user.role,
       firebaseUid: user.firebaseUid,
       mustChangePassword: decoded.mustChangePassword === true,
+      onboarded: user.onboardedAt !== null,
     }
   } catch {
     // Expired, revoked or malformed cookie — indistinguishable from signed out.

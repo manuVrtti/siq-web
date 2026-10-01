@@ -23,4 +23,6 @@ export interface CurrentUser {
   firebaseUid: string
   /** Signed in with a college-issued temporary password that must be replaced first. */
   mustChangePassword?: boolean
+  /** Finished or skipped the welcome journey (User.onboardedAt set). */
+  onboarded?: boolean
 }
