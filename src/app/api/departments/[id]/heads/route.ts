@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const { user, orgId } = await authorize(id)
     const body = await request.json().catch(() => null)
     if (typeof body?.email !== 'string') throw new ValidationError('email is required')
-    const res = await assignHead(orgId, id, body.email)
+    const res = await assignHead(user, orgId, id, body.email)
     await audit({ userId: user.id, action: 'department.heads', entityType: 'Department', entityId: id, metadata: { orgId, added: res.userId } })
     return successResponse(res, 201)
   } catch (error) {

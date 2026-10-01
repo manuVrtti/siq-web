@@ -32,7 +32,14 @@ export async function listOrganizations(opts: { q?: string; type?: 'COLLEGE' | '
       type: true,
       domain: true,
       createdAt: true,
-      _count: { select: { members: true, assessments: true } },
+      _count: {
+        select: {
+          assessments: true,
+          departments: true,
+          members: { where: { user: { role: 'STUDENT' } } },
+        },
+      },
+      members: { where: { user: { role: 'COLLEGE_ADMIN', suspendedAt: null } }, select: { userId: true } },
     },
   })
 }
@@ -82,13 +89,20 @@ export async function updateOrganization(id: string, data: { name?: string; doma
   })
 }
 
-export async function removeMember(orgId: string, userId: string) {
-  await prisma.organizationMember.deleteMany({ where: { orgId, userId } })
-}
-
-export async function listUsers(opts: { q?: string; role?: UserRole; skip?: number; take?: number }) {
+export async function listUsers(opts: {
+  q?: string
+  role?: UserRole
+  status?: 'active' | 'invited' | 'suspended'
+  orgId?: string
+  skip?: number
+  take?: number
+}) {
   const where: Prisma.UserWhereInput = {
     ...(opts.role && { role: opts.role }),
+    ...(opts.orgId && { memberships: { some: { orgId: opts.orgId } } }),
+    ...(opts.status === 'suspended' && { suspendedAt: { not: null } }),
+    ...(opts.status === 'invited' && { firebaseUid: { startsWith: 'pending:' }, suspendedAt: null }),
+    ...(opts.status === 'active' && { NOT: { firebaseUid: { startsWith: 'pending:' } }, suspendedAt: null }),
     ...(opts.q && {
       OR: [
         { name: { contains: opts.q, mode: 'insensitive' } },
@@ -112,6 +126,7 @@ export async function listUsers(opts: { q?: string; role?: UserRole; skip?: numb
         firebaseUid: true,
         lastLoginAt: true,
         createdAt: true,
+        suspendedAt: true,
         memberships: { select: { org: { select: { id: true, name: true, slug: true } } }, take: 3 },
         _count: { select: { memberships: true } },
       },
@@ -122,24 +137,6 @@ export async function listUsers(opts: { q?: string; role?: UserRole; skip?: numb
     items: items.map((u) => ({ ...u, claimed: !u.firebaseUid.startsWith('pending:'), firebaseUid: undefined })),
     total,
   }
-}
-
-/**
- * Change a user's global role. Guards: you can't change your own role (no
- * accidental self-lockout), and the platform can never lose its last
- * SUPER_ADMIN.
- */
-export async function setUserRole(actorId: string, userId: string, role: UserRole) {
-  if (actorId === userId) throw new ValidationError("You can't change your own role")
-  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
-  if (!target) throw new NotFoundError('User not found')
-  if (target.role === role) return { from: role, to: role }
-  if (target.role === 'SUPER_ADMIN') {
-    const supers = await prisma.user.count({ where: { role: 'SUPER_ADMIN' } })
-    if (supers <= 1) throw new ValidationError('The platform needs at least one super admin')
-  }
-  await prisma.user.update({ where: { id: userId }, data: { role } })
-  return { from: target.role, to: role }
 }
 
 export async function getConsoleOverview() {

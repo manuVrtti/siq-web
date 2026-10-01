@@ -7,6 +7,8 @@ import { Prisma } from '@prisma/client'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { normalizeEmail } from '@/lib/validators/contact'
+import { assertSoleOrg } from '@/services/people'
+import type { CurrentUser } from '@/types/auth'
 
 /**
  * Departments + HOD assignment — College Admin (MANAGE_OWN_ORG) only.
@@ -85,7 +87,7 @@ export async function setStudentsPickDepartment(orgId: string, value: boolean) {
  * other staff roles are refused rather than silently changed. New address:
  * a pending HOD account the person claims on first sign-in.
  */
-export async function assignHead(orgId: string, departmentId: string, rawEmail: string) {
+export async function assignHead(actor: CurrentUser, orgId: string, departmentId: string, rawEmail: string) {
   await assertDept(orgId, departmentId)
   const email = normalizeEmail(rawEmail)
   if (!email) throw new ValidationError('Enter a valid email address')
@@ -93,6 +95,12 @@ export async function assignHead(orgId: string, departmentId: string, rawEmail: 
   let user = await prisma.user.findUnique({ where: { email }, select: { id: true, role: true } })
   if (user && user.role !== 'STUDENT' && user.role !== 'COLLEGE_HOD') {
     throw new ForbiddenError('That account already has a staff role — it can’t also be made an HOD here')
+  }
+  if (user) {
+    if (user.id === actor.id) throw new ValidationError('You can’t make yourself an HOD')
+    // A role is global: a College Admin can't change an account that also
+    // belongs to another organization (services/people.ts).
+    await assertSoleOrg(actor, orgId, user.id)
   }
   if (!user) {
     user = await prisma.user.create({

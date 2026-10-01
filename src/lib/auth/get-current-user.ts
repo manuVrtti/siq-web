@@ -29,7 +29,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     const devId = (await cookies()).get(DEV_USER_COOKIE)?.value
     if (devId && isLocalHost((await headers()).get('host'))) {
       const u = await prisma.user.findUnique({ where: { id: devId } })
-      if (u) {
+      if (u && !u.suspendedAt) {
         return { id: u.id, email: u.email, phone: u.phone, name: u.name, avatarUrl: u.avatarUrl, role: u.role, firebaseUid: u.firebaseUid, onboarded: u.onboardedAt !== null }
       }
     }
@@ -48,6 +48,9 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     // A valid cookie with no row means the user was deleted from Postgres
     // while their session was still live. Treat as signed out.
     if (!user) return null
+    // Suspended by a Super Admin: every request is signed-out, immediately,
+    // even if a session cookie is still alive somewhere.
+    if (user.suspendedAt) return null
 
     return {
       id: user.id,

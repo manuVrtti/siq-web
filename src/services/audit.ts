@@ -32,6 +32,12 @@ export type AuditAction =
   | 'department.update'
   | 'department.delete'
   | 'department.heads'
+  | 'staff.add'
+  | 'staff.update'
+  | 'staff.remove'
+  | 'user.suspend'
+  | 'user.reactivate'
+  | 'superadmin.grant'
 
 export async function audit(entry: {
   userId: string

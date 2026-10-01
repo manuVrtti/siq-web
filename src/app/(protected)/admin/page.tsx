@@ -1,26 +1,43 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Activity, Building2, FileCheck2, GraduationCap, ScrollText, UserPlus, Users } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  Building2,
+  FileCheck2,
+  GraduationCap,
+  ShieldCheck,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 
-import { Panel } from '@/components/analytics/panel'
-import { StatCard } from '@/components/analytics/stat-card'
-import { Initials, PanelEmpty, Pill } from '@/components/dashboard/bits'
-import { DashboardHero } from '@/components/dashboard/bits'
-import { firstName, greeting, longDate, timeAgo } from '@/lib/format'
+import { Sparkline } from '@/components/admin/sparkline'
+import { CountUp } from '@/components/motion/animated'
+import { ROLE_LABEL } from '@/constants/labels'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
-import { getConsoleOverview } from '@/services/admin'
-import { getPlatformOverview } from '@/services/analytics/org-analytics'
-import { listAudit } from '@/services/audit'
+import { firstName, greeting, timeAgo } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { getPlatformDashboard } from '@/services/platform'
 
-export const metadata: Metadata = { title: 'Admin — SelectIQ' }
+export const metadata: Metadata = { title: 'Platform console — SelectIQ' }
 
-const ACTION_LABEL: Record<string, string> = {
+const ACTION: Record<string, string> = {
   'org.create': 'created an organization',
   'org.update': 'updated an organization',
-  'org.member.add': 'added an org member',
-  'org.member.remove': 'removed an org member',
-  'user.role.change': 'changed a user role',
-  'assessment.publish': 'published an assessment',
+  'user.role.change': 'changed a role',
+  'user.suspend': 'suspended an account',
+  'user.reactivate': 'reactivated an account',
+  'superadmin.grant': 'granted Super Admin',
+  'staff.add': 'added college staff',
+  'staff.update': 'changed college staff',
+  'staff.remove': 'removed college staff',
+  'department.create': 'created a department',
+  'department.update': 'renamed a department',
+  'department.delete': 'deleted a department',
+  'department.heads': 'changed a department’s HODs',
+  'assessment.publish': 'published a test',
   'result.grade': 'graded a result',
   'import.candidates': 'imported candidates',
   'import.questions': 'imported questions',
@@ -28,148 +45,181 @@ const ACTION_LABEL: Record<string, string> = {
   'candidate.update': 'edited a candidate',
   'candidate.remove': 'removed candidates',
   'candidate.credentials': 'set up password sign-in',
+  'candidate.department': 'moved students between departments',
 }
 
-/** Console overview — platform KPIs, activity, and who just joined. */
+/** Super Admin overview — ABtalks-style console: KPIs, trends, attention, activity. */
 export default async function AdminOverviewPage() {
   const user = (await getCurrentUser())!
-  const [platform, overview, audit] = await Promise.all([
-    getPlatformOverview(),
-    getConsoleOverview(),
-    listAudit({ take: 8 }),
-  ])
+  const d = await getPlatformDashboard()
   const name = firstName(user.name)
+  const staff = (d.roles.COLLEGE_ADMIN ?? 0) + (d.roles.COLLEGE_HOD ?? 0)
+
+  const attention = [
+    ...d.attention.collegesNoAdmin.map((c) => ({
+      text: `${c.name} has no active College Admin`,
+      href: `/admin/organizations/${c.id}?tab=people`,
+      cta: 'Add one',
+    })),
+    d.attention.hodsNoDept > 0 && { text: `${d.attention.hodsNoDept} HOD${d.attention.hodsNoDept === 1 ? '' : 's'} with no department`, href: '/admin/users?role=COLLEGE_HOD', cta: 'Review' },
+    d.attention.pendingStaff > 0 && { text: `${d.attention.pendingStaff} staff invite${d.attention.pendingStaff === 1 ? '' : 's'} not accepted yet`, href: '/admin/users?status=invited', cta: 'Review' },
+    ...d.attention.suspended.map((u) => ({ text: `${u.name ?? u.email} is suspended`, href: `/admin/users/${u.id}`, cta: 'Open' })),
+  ].filter(Boolean) as { text: string; href: string; cta: string }[]
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <DashboardHero
-        eyebrow={longDate()}
-        title={name ? `${greeting()}, ${name}` : greeting()}
-        subtitle="Everything across every college and company on SelectIQ."
-      />
+      <div className="siq-rise">
+        <p className="text-muted-foreground text-sm">{greeting()}{name ? `, ${name}` : ''}</p>
+        <h1 className="mt-1 text-[28px] leading-tight font-semibold tracking-tight">Platform console</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Every college, every person on SelectIQ — and what needs you.</p>
+      </div>
 
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <StatCard label="Organizations" value={platform.orgs} icon={Building2} />
-        <StatCard
-          label="Users"
-          value={platform.totalUsers.toLocaleString('en-IN')}
-          hint={`${overview.newUsers7d} new this week`}
-          icon={Users}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Colleges" value={d.colleges} hint={`${d.companies} compan${d.companies === 1 ? 'y' : 'ies'}`} icon={Building2} href="/admin/organizations" />
+        <Kpi label="Students" value={d.roles.STUDENT ?? 0} hint={`${d.users} accounts in all`} icon={GraduationCap} href="/admin/users?role=STUDENT" />
+        <Kpi
+          label="New sign-ups"
+          value={d.signups.thisWeek}
+          delta={d.signups.thisWeek - d.signups.lastWeek}
+          hint="this week"
+          series={d.signups.series}
+          icon={UserPlus}
+          href="/admin/users"
         />
-        <StatCard
-          label="Active this week"
-          value={overview.activeUsers7d.toLocaleString('en-IN')}
-          hint="Signed in in the last 7 days"
-          icon={Activity}
-        />
-        <StatCard
-          label="Submissions (7d)"
-          value={platform.submittedThisWeek}
-          hint={`${platform.graded.toLocaleString('en-IN')} graded all-time`}
+        <Kpi
+          label="Submissions"
+          value={d.submissions.thisWeek}
+          delta={d.submissions.thisWeek - d.submissions.lastWeek}
+          hint="this week"
+          series={d.submissions.series}
           icon={FileCheck2}
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Panel
-          eyebrow="Governance"
-          title="Recent admin actions"
-          action={
-            <Link href="/admin/audit" className="text-primary text-xs font-medium hover:underline">
-              Audit log
-            </Link>
-          }
-          bodyClassName="px-3 pb-3"
-        >
-          {audit.items.length === 0 ? (
-            <PanelEmpty icon={ScrollText} title="Nothing recorded yet" body="Role changes, org edits, imports, publishing and grading appear here." />
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <section className="siq-card siq-rise overflow-hidden">
+          <div className="flex items-center gap-2 border-b px-5 py-4">
+            <AlertTriangle className={cn('size-4', attention.length ? 'text-warning' : 'text-success')} aria-hidden />
+            <h2 className="text-[15px] font-semibold">Needs attention</h2>
+            <span className="text-muted-foreground ml-auto text-xs">{attention.length || 'All clear'}</span>
+          </div>
+          {attention.length === 0 ? (
+            <p className="text-muted-foreground px-5 py-8 text-center text-sm">Every college has an admin, every HOD has a department, nobody is suspended.</p>
           ) : (
-            <ul className="flex flex-col">
-              {audit.items.map((a) => (
-                <li key={a.id} className="flex items-center gap-3 rounded-lg px-2 py-2.5">
-                  <Initials name={a.user.name} email={a.user.email} />
-                  <p className="min-w-0 flex-1 truncate text-sm">
-                    <span className="font-medium">{a.user.name ?? a.user.email}</span>{' '}
-                    <span className="text-muted-foreground">{ACTION_LABEL[a.action] ?? a.action}</span>
-                  </p>
-                  <span className="text-muted-foreground shrink-0 text-xs">{timeAgo(a.createdAt)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        <Panel eyebrow="Busiest" title="Most active organizations" bodyClassName="px-3 pb-3">
-          {overview.activeOrgs.length === 0 ? (
-            <PanelEmpty icon={Building2} title="No submissions this week" />
-          ) : (
-            <ul className="flex flex-col">
-              {overview.activeOrgs.map((o) => (
-                <li key={o.id}>
-                  <Link href={`/admin/organizations/${o.id}`} className="hover:bg-muted/60 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{o.name}</span>
-                    <Pill tone="info">{o.submissions} submissions</Pill>
+            <ul className="divide-y">
+              {attention.slice(0, 8).map((a) => (
+                <li key={a.text} className="siq-row flex items-center gap-3 px-5 py-3">
+                  <p className="min-w-0 flex-1 truncate text-sm">{a.text}</p>
+                  <Link href={a.href} className="text-primary group inline-flex shrink-0 items-center gap-1 text-sm font-semibold hover:underline">
+                    {a.cta} <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-        </Panel>
-      </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Panel
-          eyebrow="Growth"
-          title="Newest users"
-          action={
-            <Link href="/admin/users" className="text-primary text-xs font-medium hover:underline">
-              All users
+          <div className="border-t px-5 py-4">
+            <p className="text-muted-foreground mb-3 text-xs font-medium">People by role</p>
+            <div className="grid grid-cols-5 gap-2">
+              {(['SUPER_ADMIN', 'COLLEGE_ADMIN', 'COLLEGE_HOD', 'RECRUITER', 'STUDENT'] as const).map((r) => (
+                <Link key={r} href={`/admin/users?role=${r}`} className="hover:bg-muted rounded-xl p-2 text-center transition-colors">
+                  <p className="font-display text-xl font-semibold">{(d.roles[r] ?? 0).toLocaleString('en-IN')}</p>
+                  <p className="text-muted-foreground text-[11px] leading-tight">{ROLE_LABEL[r]}</p>
+                </Link>
+              ))}
+            </div>
+            <p className="text-muted-foreground mt-3 text-xs">
+              <ShieldCheck className="mr-1 inline size-3.5" aria-hidden />
+              {staff} college staff across {d.colleges} college{d.colleges === 1 ? '' : 's'}
+            </p>
+          </div>
+        </section>
+
+        <section className="siq-card siq-rise overflow-hidden">
+          <div className="flex items-center justify-between border-b px-5 py-4">
+            <h2 className="text-[15px] font-semibold">Recent activity</h2>
+            <Link href="/admin/audit" className="text-primary text-xs font-semibold hover:underline">
+              Audit log
             </Link>
-          }
-          bodyClassName="px-3 pb-3"
-        >
-          {overview.recentUsers.length === 0 ? (
-            <PanelEmpty icon={UserPlus} title="No users yet" />
+          </div>
+          {d.recentAudit.length === 0 ? (
+            <p className="text-muted-foreground px-5 py-8 text-center text-sm">Nothing recorded yet.</p>
           ) : (
-            <ul className="flex flex-col">
-              {overview.recentUsers.map((u) => (
-                <li key={u.id} className="flex items-center gap-3 rounded-lg px-2 py-2.5">
-                  <Initials name={u.name} email={u.email} />
+            <ol className="px-5 py-4">
+              {d.recentAudit.map((a, i) => (
+                <li key={a.id} className="siq-in-up relative flex gap-3 pb-4 last:pb-0" style={{ '--d': `${i * 50}ms` } as React.CSSProperties}>
+                  {i < d.recentAudit.length - 1 ? <span className="bg-border absolute top-4 bottom-0 left-[5px] w-px" aria-hidden /> : null}
+                  <span className="bg-primary relative mt-1.5 size-[11px] shrink-0 rounded-full ring-4 ring-[var(--card)]" aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{u.name ?? u.email}</p>
-                    <p className="text-muted-foreground truncate text-xs">{u.email}</p>
+                    <p className="text-sm">
+                      <span className="font-medium">{a.user.name ?? a.user.email}</span>{' '}
+                      <span className="text-muted-foreground">{ACTION[a.action] ?? a.action}</span>
+                    </p>
+                    <p className="text-muted-foreground text-xs">{timeAgo(a.createdAt)}</p>
                   </div>
-                  <Pill tone="muted">{u.role.replace('_', ' ').toLowerCase()}</Pill>
-                  <span className="text-muted-foreground w-16 text-right text-xs">{timeAgo(u.createdAt)}</span>
                 </li>
               ))}
-            </ul>
+            </ol>
           )}
-        </Panel>
-
-        <Panel eyebrow="Mix" title="Users by role">
-          <ul className="flex flex-col gap-3">
-            {(['STUDENT', 'COLLEGE_HOD', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const).map((r) => {
-              const n = platform.users[r] ?? 0
-              const pct = platform.totalUsers ? (n / platform.totalUsers) * 100 : 0
-              return (
-                <li key={r} className="flex flex-col gap-1">
-                  <div className="flex justify-between text-sm">
-                    <Link href={`/admin/users?role=${r}`} className="hover:text-primary inline-flex items-center gap-1.5">
-                      {r === 'STUDENT' ? <GraduationCap className="size-3.5" aria-hidden /> : null}
-                      {r.replace('_', ' ').toLowerCase()}
-                    </Link>
-                    <span className="siq-numeric">{n.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-                    <div className="bg-primary h-full rounded-full" style={{ width: `${pct}%` }} />
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </Panel>
+        </section>
       </div>
     </div>
+  )
+}
+
+function Kpi({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  delta,
+  series,
+  href,
+}: {
+  label: string
+  value: number
+  hint: string
+  icon: typeof Users
+  delta?: number
+  series?: number[]
+  href?: string
+}) {
+  const body = (
+    <>
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-[13px] font-medium">{label}</p>
+        <span className="bg-accent text-primary grid size-8 place-items-center rounded-lg">
+          <Icon className="size-4" aria-hidden />
+        </span>
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <p className="font-display text-[30px] leading-none font-semibold">
+          <CountUp value={value} />
+        </p>
+        {series ? <Sparkline values={series} className="h-9 w-28" /> : null}
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-xs">
+        {delta !== undefined ? (
+          <span
+            className={cn(
+              'inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium',
+              delta > 0 ? 'bg-success/10 text-success' : delta < 0 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground',
+            )}
+          >
+            {delta > 0 ? <ArrowUpRight className="size-3" aria-hidden /> : delta < 0 ? <ArrowDownRight className="size-3" aria-hidden /> : null}
+            {delta > 0 ? '+' : ''}
+            {delta} vs last week
+          </span>
+        ) : null}
+        <span className="text-muted-foreground">{hint}</span>
+      </div>
+    </>
+  )
+  return href ? (
+    <Link href={href} className="siq-card siq-lift siq-rise block p-5">
+      {body}
+    </Link>
+  ) : (
+    <div className="siq-card siq-rise p-5">{body}</div>
   )
 }

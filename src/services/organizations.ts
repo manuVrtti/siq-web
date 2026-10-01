@@ -2,7 +2,7 @@ import 'server-only'
 
 import { Prisma, type OrgType } from '@prisma/client'
 
-import { NotFoundError, ValidationError } from '@/lib/errors'
+import { ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { normalizeDomain } from '@/services/admin'
 
@@ -66,22 +66,6 @@ export async function createOrganization(params: {
 }
 
 /** Add an existing user (looked up by email) to an org. */
-export async function addMemberByEmail(orgId: string, email: string, role: 'ADMIN' | 'MEMBER') {
-  const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } })
-  if (!user) throw new NotFoundError('No user with that email has signed in yet')
-
-  try {
-    return await prisma.organizationMember.create({
-      data: { userId: user.id, orgId, role },
-    })
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      throw new ValidationError('That user is already a member of this organization')
-    }
-    throw e
-  }
-}
-
 export async function getOrgBySlug(slug: string) {
   return prisma.organization.findUnique({ where: { slug } })
 }
