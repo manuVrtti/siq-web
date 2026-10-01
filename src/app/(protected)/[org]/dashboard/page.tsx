@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { Plus, UserPlus } from 'lucide-react'
 
 import { DashboardHero } from '@/components/dashboard/bits'
 import { ManagerDashboard } from '@/components/dashboard/manager-dashboard'
 import { getScope, listScopeDepartments } from '@/lib/auth/scope'
+import { SetupCard } from '@/components/dashboard/setup-card'
+import { managerChecklist } from '@/services/onboarding'
 import { PlatformStrip } from '@/components/dashboard/platform-strip'
 import { StudentDashboard } from '@/components/dashboard/student-dashboard'
 import { Button } from '@/components/ui/button'
@@ -31,6 +33,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
   const org = await getOrgBySlug(slug)
   if (!org) notFound()
 
+  // First visit: the role's welcome journey (story + checklist) comes first.
+  if (!user.onboarded) redirect(`/${slug}/welcome`)
+
   const isManager = hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)
   const name = firstName(user.name)
   const title = name ? `${greeting()}, ${name}` : greeting()
@@ -42,7 +47,11 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
     )
   }
   const scope = await getScope(user, org.id)
-  const depts = scope.all ? [] : await listScopeDepartments(scope)
+  const [depts, steps] = await Promise.all([
+    scope.all ? Promise.resolve([]) : listScopeDepartments(scope),
+    managerChecklist(user, scope, slug),
+  ])
+  const stepsDone = steps.filter((s) => s.done).length
   const subtitle = scope.all
     ? `Here's what's happening at ${org.name}.`
     : depts.length
@@ -68,6 +77,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
           </>
         }
       />
+
+      {stepsDone < steps.length ? <SetupCard slug={slug} done={stepsDone} total={steps.length} next={steps.find((s) => !s.done)!} /> : null}
 
       {user.role === 'SUPER_ADMIN' ? <PlatformStrip /> : null}
 
