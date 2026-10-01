@@ -26,6 +26,7 @@ export type AuditAction =
   | 'batch.delete'
   | 'candidate.update'
   | 'candidate.remove'
+  | 'candidate.credentials'
 
 export async function audit(entry: {
   userId: string

@@ -27,6 +27,7 @@ const ACTION_LABEL: Record<string, string> = {
   'batch.delete': 'deleted a batch',
   'candidate.update': 'edited a candidate',
   'candidate.remove': 'removed candidates',
+  'candidate.credentials': 'set up password sign-in',
 }
 
 /** Console overview — platform KPIs, activity, and who just joined. */

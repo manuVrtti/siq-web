@@ -24,6 +24,7 @@ const ACTIONS = [
   'batch.delete',
   'candidate.update',
   'candidate.remove',
+  'candidate.credentials',
 ] as const
 
 /** Who did what, newest first. Read-only; entries are never edited or deleted. */

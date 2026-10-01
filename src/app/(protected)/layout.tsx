@@ -14,6 +14,8 @@ import { UserProvider } from '@/lib/auth/user-context'
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
+  // A college-issued temporary password must be replaced before anything else.
+  if (user.mustChangePassword) redirect('/set-password')
 
   return <UserProvider user={user}>{children}</UserProvider>
 }

@@ -2,7 +2,8 @@
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signInWithPopup, type AuthProvider } from 'firebase/auth'
+import { sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, type AuthProvider, type User } from 'firebase/auth'
+import { Eye, EyeOff, Loader2, Mail } from 'lucide-react'
 import { FirebaseError } from 'firebase/app'
 
 import { getFirebaseAuth, githubProvider, googleProvider } from '@/lib/firebase-client'
@@ -15,7 +16,7 @@ import { getFirebaseAuth, githubProvider, googleProvider } from '@/lib/firebase-
  * is never stored client-side.
  */
 
-type Pending = 'google' | 'github' | null
+type Pending = 'google' | 'github' | 'password' | null
 
 /** Turns Firebase error codes into something a candidate can act on. */
 function describeAuthError(error: unknown): string {
@@ -33,6 +34,16 @@ function describeAuthError(error: unknown): string {
       return 'That email is already registered with a different sign-in method. Use the provider you signed up with.'
     case 'auth/network-request-failed':
       return 'Network error. Check your connection and try again.'
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'That email and password don’t match. Check both, or use “Forgot password”.'
+    case 'auth/invalid-email':
+      return 'Enter a valid email address.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Wait a few minutes, or reset your password.'
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Contact your placement cell.'
     case 'auth/unauthorized-domain':
       return 'This domain is not authorised in Firebase. Add it under Authentication → Settings → Authorized domains.'
     default:
@@ -45,37 +56,80 @@ export default function LoginForm() {
   const [pending, setPending] = useState<Pending>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const finish = useCallback(
+    async (fbUser: User) => {
+      const idToken = await fbUser.getIdToken()
+      const response = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      })
+      if (!response.ok) throw new Error('Could not establish a session. Please try again.')
+      // refresh() re-runs the server components so the new cookie is picked up.
+      // A temporary-password session is forwarded on to /set-password.
+      router.replace('/select-org')
+      router.refresh()
+    },
+    [router],
+  )
+
+  const fail = useCallback((err: unknown) => {
+    setError(err instanceof Error && !(err instanceof FirebaseError) ? err.message : describeAuthError(err))
+    setPending(null)
+  }, [])
+
   const signIn = useCallback(
     async (which: Exclude<Pending, null>, provider: AuthProvider) => {
       setPending(which)
       setError(null)
-
+      setNotice(null)
       try {
         const credential = await signInWithPopup(getFirebaseAuth(), provider)
-        const idToken = await credential.user.getIdToken()
-
-        const response = await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Could not establish a session. Please try again.')
-        }
-
-        // refresh() re-runs the server components so the new cookie is picked up.
-        router.replace('/select-org')
-        router.refresh()
+        await finish(credential.user)
       } catch (err) {
-        setError(err instanceof Error && !(err instanceof FirebaseError)
-          ? err.message
-          : describeAuthError(err))
-        setPending(null)
+        fail(err)
       }
     },
-    [router],
+    [finish, fail],
   )
+
+  async function signInWithPassword(e: React.FormEvent) {
+    e.preventDefault()
+    setPending('password')
+    setError(null)
+    setNotice(null)
+    try {
+      const cred = await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
+      await finish(cred.user)
+    } catch (err) {
+      fail(err)
+    }
+  }
+
+  async function forgotPassword() {
+    setError(null)
+    setNotice(null)
+    const address = email.trim()
+    if (!address) {
+      setError('Type your email above first, then tap “Forgot password”.')
+      return
+    }
+    try {
+      await sendPasswordResetEmail(getFirebaseAuth(), address, { url: `${window.location.origin}/login` })
+    } catch (err) {
+      // Never reveal whether an address exists; only surface real input errors.
+      if (err instanceof FirebaseError && err.code === 'auth/invalid-email') {
+        fail(err)
+        return
+      }
+    }
+    setNotice(`If ${address} has a SelectIQ password, a reset link is on its way. Check spam too.`)
+  }
 
   const busy = pending !== null
 
@@ -100,6 +154,73 @@ export default function LoginForm() {
         <GitHubLogo />
         {pending === 'github' ? 'Opening GitHub…' : 'Continue with GitHub'}
       </button>
+
+      <div className="text-muted-foreground my-2 flex items-center gap-3 text-xs">
+        <span className="bg-border h-px flex-1" />
+        or with your college email
+        <span className="bg-border h-px flex-1" />
+      </div>
+
+      <form onSubmit={signInWithPassword} className="flex flex-col gap-2.5">
+        <label className="sr-only" htmlFor="login-email">
+          Email
+        </label>
+        <div className="relative">
+          <Mail className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2" aria-hidden />
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@college.edu.in"
+            className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/40 h-12 w-full rounded-xl border pr-3 pl-10 text-sm transition-shadow outline-none focus-visible:ring-3"
+          />
+        </div>
+        <label className="sr-only" htmlFor="login-password">
+          Password
+        </label>
+        <div className="relative">
+          <input
+            id="login-password"
+            type={showPw ? 'text' : 'password'}
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/40 h-12 w-full rounded-xl border pr-11 pl-3.5 text-sm transition-shadow outline-none focus-visible:ring-3"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 grid w-11 place-items-center"
+            aria-label={showPw ? 'Hide password' : 'Show password'}
+          >
+            {showPw ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+          </button>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={forgotPassword} className="text-primary text-xs font-medium hover:underline">
+            Forgot password?
+          </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className="siq-focus bg-primary text-primary-foreground inline-flex h-11 items-center gap-2 rounded-xl px-6 text-sm font-semibold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-primary)] active:translate-y-0 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+          >
+            {pending === 'password' ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            Sign in
+          </button>
+        </div>
+      </form>
+
+      {notice ? (
+        <p role="status" className="bg-success/10 text-success rounded-lg px-3 py-2 text-sm">
+          {notice}
+        </p>
+      ) : null}
 
       {error && (
         <p role="alert" className="bg-destructive/5 text-destructive rounded-lg px-3 py-2 text-sm">

@@ -2,9 +2,10 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, FolderPlus, Loader2, Trash2, X } from 'lucide-react'
+import { Check, FolderPlus, KeyRound, Loader2, Trash2, X } from 'lucide-react'
 
 import { RemoveDialog } from '@/components/candidates/candidate-row-actions'
+import { CredentialsDialog } from '@/components/candidates/credentials-dialog'
 
 import { Button } from '@/components/ui/button'
 import { useActiveOrg } from '@/lib/org-context'
@@ -103,6 +104,7 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [creds, setCreds] = useState(false)
 
   if (selected.size === 0 && !msg) return null
 
@@ -210,6 +212,11 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
             </Button>
           </div>
 
+          <Button size="sm" variant="outline" onClick={() => setCreds(true)}>
+            <KeyRound className="size-4" aria-hidden />
+            Password sign-in
+          </Button>
+
           <Button
             size="sm"
             variant="destructive"
@@ -244,6 +251,8 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
           {msg.text}
         </p>
       ) : null}
+
+      {creds ? <CredentialsDialog ids={[...selected]} onClose={() => setCreds(false)} /> : null}
 
       <RemoveDialog
         open={removing}

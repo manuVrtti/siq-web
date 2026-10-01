@@ -46,6 +46,7 @@ export default async function ExamEntryPage({
   // the `next` query so the candidate can bookmark the invite link and land
   // in the exam automatically.)
   if (!user) redirect('/login')
+  if (user.mustChangePassword) redirect('/set-password')
 
   const result = await validateToken(token, user.id)
 
