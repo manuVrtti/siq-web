@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, FolderPlus, Loader2, X } from 'lucide-react'
+import { Check, FolderPlus, Loader2, Trash2, X } from 'lucide-react'
+
+import { RemoveDialog } from '@/components/candidates/candidate-row-actions'
 
 import { Button } from '@/components/ui/button'
 import { useActiveOrg } from '@/lib/org-context'
@@ -100,6 +102,7 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
   const [newName, setNewName] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [removing, setRemoving] = useState(false)
 
   if (selected.size === 0 && !msg) return null
 
@@ -207,6 +210,16 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
             </Button>
           </div>
 
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setRemoving(true)}
+            aria-label={`Remove ${selected.size} selected from college`}
+          >
+            <Trash2 className="size-4" aria-hidden />
+            Remove
+          </Button>
+
           <button
             type="button"
             onClick={clear}
@@ -231,6 +244,19 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
           {msg.text}
         </p>
       ) : null}
+
+      <RemoveDialog
+        open={removing}
+        ids={[...selected]}
+        title={`Remove ${selected.size} candidate${selected.size === 1 ? '' : 's'}?`}
+        onCancel={() => setRemoving(false)}
+        onDone={(n) => {
+          setRemoving(false)
+          clear()
+          setMsg({ ok: true, text: `Removed ${n} from the roster` })
+          setTimeout(() => setMsg(null), 3000)
+        }}
+      />
     </div>
   )
 }

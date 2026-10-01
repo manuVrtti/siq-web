@@ -9,6 +9,7 @@ import {
   RowCheckbox,
   SelectionProvider,
 } from '@/components/candidates/candidate-selection'
+import { CandidateRowActions } from '@/components/candidates/candidate-row-actions'
 import { Initials, Pill } from '@/components/dashboard/bits'
 import {
   DataTable,
@@ -166,6 +167,9 @@ export default async function CandidatesPage({
             <th className={TH}>Status</th>
             <SortHeader label="Last active" field="lastLoginAt" pathname={pathname} params={p} align="right" />
             <SortHeader label="Added" field="createdAt" pathname={pathname} params={p} align="right" />
+            <th className={`${TH} w-12`}>
+              <span className="sr-only">Actions</span>
+            </th>
           </THead>
           <tbody>
             {items.map((c) => (
@@ -218,6 +222,12 @@ export default async function CandidatesPage({
                 </td>
                 <td className={`${TD} text-muted-foreground text-right text-xs whitespace-nowrap`}>
                   {timeAgo(c.createdAt)}
+                </td>
+                <td className={`${TD} w-12 pl-0 text-right`}>
+                  <CandidateRowActions
+                    profileHref={`${pathname}/${c.id}`}
+                    candidate={{ id: c.id, name: c.name, email: c.email, phone: c.phone, editable: c.editable, claimed: c.claimed }}
+                  />
                 </td>
               </TRow>
             ))}

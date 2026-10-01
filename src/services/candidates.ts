@@ -117,7 +117,7 @@ export async function listCandidates(orgId: string, filters: CandidateFilters = 
           where: { batch: { orgId } },
           select: { batch: { select: { id: true, name: true } } },
         },
-        _count: { select: { assignments: { where: { assessment: { orgId } } } } },
+        _count: { select: { memberships: true, assignments: { where: { assessment: { orgId } } } } },
       },
     }),
     prisma.user.count({ where }),
@@ -125,7 +125,11 @@ export async function listCandidates(orgId: string, filters: CandidateFilters = 
 
   // A row whose firebaseUid still starts with `pending:` has never been claimed.
   return {
-    items: items.map((u) => ({ ...u, claimed: !u.firebaseUid.startsWith('pending:') })),
+    items: items.map((u) => {
+      const claimed = !u.firebaseUid.startsWith('pending:')
+      // Same rule as candidateEditability — kept in sync so the menu never offers an edit the API refuses.
+      return { ...u, claimed, editable: !claimed && u._count.memberships === 1 }
+    }),
     total,
   }
 }
@@ -286,4 +290,128 @@ export async function removeFromBatch(orgId: string, batchId: string, userId: st
 export async function deleteBatch(orgId: string, batchId: string) {
   await assertBatchInOrg(orgId, batchId)
   await prisma.batch.delete({ where: { id: batchId } })
+}
+
+/* ---- edit + remove ----------------------------------------------------- */
+
+/** Upper bound on one remove call — matches add-to-batch. */
+export const MAX_REMOVE = MAX_BATCH_ADD
+
+/**
+ * Who may have their contact details edited by a college:
+ * only rows that have NEVER signed in, and only when this college is their
+ * sole roster. Once a student signs in, their name/email/phone belong to
+ * them (they edit them in their profile); and a pending row shared with
+ * another college can't be rewritten from one tenant.
+ */
+export async function candidateEditability(orgId: string, userId: string) {
+  const u = await prisma.user.findFirst({
+    where: { id: userId, role: 'STUDENT', memberships: { some: { orgId } } },
+    select: { firebaseUid: true, _count: { select: { memberships: true } } },
+  })
+  if (!u) throw new NotFoundError('Candidate not found')
+  if (!u.firebaseUid.startsWith('pending:')) return { editable: false as const, reason: 'signed-in' as const }
+  if (u._count.memberships > 1) return { editable: false as const, reason: 'shared' as const }
+  return { editable: true as const, reason: null }
+}
+
+export async function updateCandidate(
+  orgId: string,
+  userId: string,
+  input: { name?: string | null; email?: string | null; phone?: string | null },
+) {
+  const check = await candidateEditability(orgId, userId)
+  if (!check.editable) {
+    throw new ValidationError(
+      check.reason === 'signed-in'
+        ? 'This candidate has signed in — they manage their own details from their profile.'
+        : 'This candidate is also on another college’s roster, so their details can’t be changed here.',
+    )
+  }
+
+  const data: Prisma.UserUpdateInput = {}
+  if (input.name !== undefined) data.name = input.name?.trim() ? input.name.trim().slice(0, 120) : null
+  if (input.email !== undefined) {
+    if (input.email === null || input.email.trim() === '') data.email = null
+    else {
+      const email = normalizeEmail(input.email)
+      if (!email) throw new ValidationError('Enter a valid email address')
+      data.email = email
+    }
+  }
+  if (input.phone !== undefined) {
+    if (input.phone === null || input.phone.trim() === '') data.phone = null
+    else {
+      const phone = normalizePhone(input.phone)
+      if (!phone) throw new ValidationError('Enter a valid 10-digit mobile number')
+      data.phone = phone
+    }
+  }
+
+  // A pending row with neither contact can never be claimed — refuse.
+  const current = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true, phone: true } })
+  const nextEmail = data.email === undefined ? current.email : (data.email as string | null)
+  const nextPhone = data.phone === undefined ? current.phone : (data.phone as string | null)
+  if (!nextEmail && !nextPhone) throw new ValidationError('Keep an email or a phone number so they can sign in')
+
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data,
+      select: { id: true, name: true, email: true, phone: true },
+    })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw new ValidationError('Another account already uses that email or phone number')
+    }
+    throw e
+  }
+}
+
+export type RemoveResult = { removed: number; deletedAccounts: number; cancelledInvites: number }
+
+/**
+ * Take candidates off this college's roster.
+ *
+ *   - org membership, this college's batch memberships and NOT-YET-STARTED
+ *     invitations to this college's exams are removed;
+ *   - started / submitted attempts and results stay, so exam records and
+ *     analytics remain truthful;
+ *   - a never-signed-in row with no other college and no exam history is
+ *     deleted outright, so the email/phone can be re-imported cleanly.
+ *
+ * Other colleges' data for the same student is never touched.
+ */
+export async function removeCandidates(orgId: string, rawUserIds: string[]): Promise<RemoveResult> {
+  const userIds = [...new Set(rawUserIds)]
+  if (userIds.length === 0) return { removed: 0, deletedAccounts: 0, cancelledInvites: 0 }
+  if (userIds.length > MAX_REMOVE) throw new ValidationError(`Remove at most ${MAX_REMOVE} candidates at a time`)
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds }, role: 'STUDENT', memberships: { some: { orgId } } },
+    select: {
+      id: true,
+      firebaseUid: true,
+      _count: { select: { memberships: true, examAttempts: true } },
+    },
+  })
+  if (users.length !== userIds.length) {
+    throw new ValidationError('One or more candidates are not on this college’s roster')
+  }
+
+  const ids = users.map((u) => u.id)
+  const purge = users
+    .filter((u) => u.firebaseUid.startsWith('pending:') && u._count.memberships === 1 && u._count.examAttempts === 0)
+    .map((u) => u.id)
+
+  const [, cancelled, , deleted] = await prisma.$transaction([
+    prisma.batchMember.deleteMany({ where: { userId: { in: ids }, batch: { orgId } } }),
+    prisma.assessmentAssignment.deleteMany({
+      where: { userId: { in: ids }, status: 'INVITED', assessment: { orgId } },
+    }),
+    prisma.organizationMember.deleteMany({ where: { userId: { in: ids }, orgId } }),
+    prisma.user.deleteMany({ where: { id: { in: purge } } }),
+  ])
+
+  return { removed: ids.length, deletedAccounts: deleted.count, cancelledInvites: cancelled.count }
 }
