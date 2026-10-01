@@ -2,6 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 
+import { assessmentWhere, studentWhere, userInScope, type Scope } from '@/lib/auth/scope'
 import { prisma } from '@/lib/prisma'
 import { round } from '@/services/analytics/stats'
 
@@ -16,16 +17,21 @@ import { round } from '@/services/analytics/stats'
  *
  * Wrapped in React `cache()` so a page and its child components share one
  * computation per request.
+ *
+ * Department scope: every function takes a Scope. College-wide scopes see
+ * the whole org; an HOD's numbers count only their departments' students
+ * (and tests visible to them), so their dashboard is their department's.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-export const getOrgOverview = cache(async (orgId: string) => {
+export const getOrgOverview = cache(async (scope: Scope) => {
+  const orgId = scope.orgId
   const now = new Date()
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS)
   const twoWeeksAgo = new Date(now.getTime() - 14 * DAY_MS)
   const monthAgo = new Date(now.getTime() - 30 * DAY_MS)
-  const inOrg = { assessment: { orgId } }
+  const inOrg = { assessment: { orgId }, ...userInScope(scope) }
 
   const [
     assessmentsByStatus,
@@ -39,8 +45,8 @@ export const getOrgOverview = cache(async (orgId: string) => {
     submittedLastWeek,
     highFlags30d,
   ] = await Promise.all([
-    prisma.assessment.groupBy({ by: ['status'], where: { orgId }, _count: { _all: true } }),
-    prisma.user.count({ where: { role: 'STUDENT', memberships: { some: { orgId } } } }),
+    prisma.assessment.groupBy({ by: ['status'], where: assessmentWhere(scope), _count: { _all: true } }),
+    prisma.user.count({ where: studentWhere(scope) }),
     prisma.assessmentAssignment.groupBy({
       by: ['status'],
       where: inOrg,
@@ -64,7 +70,7 @@ export const getOrgOverview = cache(async (orgId: string) => {
       where: {
         severity: 'HIGH',
         occurredAt: { gte: monthAgo },
-        session: { attempt: { assignment: { assessment: { orgId } } } },
+        session: { attempt: { assignment: { assessment: { orgId }, ...userInScope(scope) } } },
       },
     }),
   ])
@@ -102,10 +108,10 @@ export const getOrgOverview = cache(async (orgId: string) => {
 })
 
 /** Average score per assessment, oldest → newest, for the trend chart. */
-export const getOrgScoreTrend = cache(async (orgId: string, limit = 8) => {
+export const getOrgScoreTrend = cache(async (scope: Scope, limit = 8) => {
   const groups = await prisma.result.groupBy({
     by: ['assessmentId'],
-    where: { status: 'GRADED', assessment: { orgId } },
+    where: { status: 'GRADED', assessment: { orgId: scope.orgId }, ...userInScope(scope) },
     _avg: { percentage: true },
     _count: { _all: true },
     _max: { createdAt: true },
@@ -130,9 +136,9 @@ export const getOrgScoreTrend = cache(async (orgId: string, limit = 8) => {
 })
 
 /** Latest submissions across the org, newest first. */
-export const getRecentSubmissions = cache(async (orgId: string, limit = 8) => {
+export const getRecentSubmissions = cache(async (scope: Scope, limit = 8) => {
   const rows = await prisma.assessmentAssignment.findMany({
-    where: { status: 'SUBMITTED', assessment: { orgId } },
+    where: { status: 'SUBMITTED', assessment: { orgId: scope.orgId }, ...userInScope(scope) },
     orderBy: { submittedAt: 'desc' },
     take: limit,
     select: {
@@ -155,13 +161,12 @@ export const getRecentSubmissions = cache(async (orgId: string, limit = 8) => {
 })
 
 /** Published assessments that are still open or not yet started. */
-export const getUpcomingAssessments = cache(async (orgId: string, limit = 5) => {
+export const getUpcomingAssessments = cache(async (scope: Scope, limit = 5) => {
   const now = new Date()
   return prisma.assessment.findMany({
     where: {
-      orgId,
+      AND: [assessmentWhere(scope), { OR: [{ endAt: null }, { endAt: { gt: now } }] }],
       status: 'PUBLISHED',
-      OR: [{ endAt: null }, { endAt: { gt: now } }],
     },
     orderBy: [{ startAt: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
     take: limit,
@@ -177,9 +182,9 @@ export const getUpcomingAssessments = cache(async (orgId: string, limit = 5) => 
 })
 
 /** Results waiting on a human grader, oldest first — the queue order. */
-export const getPendingReviewQueue = cache(async (orgId: string, limit = 5) => {
+export const getPendingReviewQueue = cache(async (scope: Scope, limit = 5) => {
   return prisma.result.findMany({
-    where: { status: 'PENDING_REVIEW', assessment: { orgId } },
+    where: { status: 'PENDING_REVIEW', assessment: { orgId: scope.orgId }, ...userInScope(scope) },
     orderBy: { createdAt: 'asc' },
     take: limit,
     select: {

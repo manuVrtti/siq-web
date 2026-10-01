@@ -5,10 +5,9 @@ import { notFound } from 'next/navigation'
 import AssignmentManager from '@/components/assessments/assignment-manager'
 import PageHeader from '@/components/ui/page-header'
 import { getAssessment } from '@/services/assessments'
-import { getOrgBySlug } from '@/services/organizations'
 import { listCandidates, listBatches } from '@/services/candidates'
 import { listAssignments } from '@/services/assignments'
-import { requirePagePermission } from '@/lib/auth/page-guard'
+import { requireAssessmentPage } from '@/lib/auth/page-guard'
 import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Assign Assessment — SelectIQ' }
@@ -19,19 +18,17 @@ export default async function AssignPage({
   params: Promise<{ org: string; id: string }>
 }) {
   // Managers only — [org]/layout proves membership, and students are members.
-  await requirePagePermission(PERMISSIONS.EDIT_ASSESSMENT)
 
   const { org: slug, id } = await params
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org, scope } = await requireAssessmentPage(PERMISSIONS.EDIT_ASSESSMENT, slug, id, 'edit')
 
   const assessment = await getAssessment(org.id, id).catch(() => null)
   if (!assessment) notFound()
 
   const [{ items: candidates }, batches, assignments] = await Promise.all([
-    listCandidates(org.id, { take: 500 }),
-    listBatches(org.id),
-    listAssignments(org.id, id),
+    listCandidates(scope, { take: 500 }),
+    listBatches(scope),
+    listAssignments(scope, id),
   ])
 
   // Build the canonical origin: use NEXT_PUBLIC_APP_URL if set (production

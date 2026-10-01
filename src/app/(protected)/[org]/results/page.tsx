@@ -8,10 +8,9 @@ import { DataTable, TD, TH, THead, TRow, TableEmpty } from '@/components/data/da
 import { ListHeader } from '@/components/data/list-header'
 import { ASSESSMENT_STATUS_LABEL, labelOf } from '@/constants/labels'
 import { PERMISSIONS } from '@/constants/permissions'
-import { getCurrentUser } from '@/lib/auth/get-current-user'
-import { hasPermission } from '@/lib/auth/permissions'
+import { requirePageScope } from '@/lib/auth/page-guard'
+import { assessmentWhere, userInScope } from '@/lib/auth/scope'
 import { prisma } from '@/lib/prisma'
-import { getOrgBySlug } from '@/services/organizations'
 
 export const metadata: Metadata = { title: 'Results — SelectIQ' }
 
@@ -22,27 +21,24 @@ export const metadata: Metadata = { title: 'Results — SelectIQ' }
  */
 export default async function ResultsPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: slug } = await params
-  const user = (await getCurrentUser())!
-  if (!hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)) notFound()
-
-  const org = await getOrgBySlug(slug)
+  const { org, scope } = await requirePageScope(PERMISSIONS.VIEW_ORG_RESULTS, slug)
   if (!org) notFound()
 
   // One groupBy for all assessments rather than a query per row.
   const [assessments, groups, avgs] = await Promise.all([
     prisma.assessment.findMany({
-      where: { orgId: org.id },
+      where: assessmentWhere(scope),
       select: { id: true, title: true, status: true },
     }),
     prisma.result.groupBy({
       by: ['assessmentId', 'status'],
-      where: { assessment: { orgId: org.id } },
+      where: { assessment: { orgId: org.id }, ...userInScope(scope) },
       _count: { _all: true },
       _max: { createdAt: true },
     }),
     prisma.result.groupBy({
       by: ['assessmentId'],
-      where: { status: 'GRADED', assessment: { orgId: org.id } },
+      where: { status: 'GRADED', assessment: { orgId: org.id }, ...userInScope(scope) },
       _avg: { percentage: true },
     }),
   ])

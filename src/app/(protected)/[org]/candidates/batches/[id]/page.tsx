@@ -12,8 +12,7 @@ import { Button } from '@/components/ui/button'
 import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { getBatchPerformance } from '@/services/analytics/candidate-analytics'
-import { getOrgBySlug } from '@/services/organizations'
-import { requirePagePermission } from '@/lib/auth/page-guard'
+import { requirePageScope } from '@/lib/auth/page-guard'
 import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Batch — SelectIQ' }
@@ -29,15 +28,12 @@ export default async function BatchDetailPage({
   params: Promise<{ org: string; id: string }>
 }) {
   // Managers only — [org]/layout proves membership, and students are members.
-  await requirePagePermission(PERMISSIONS.MANAGE_ORG_USERS)
-
   const { org: slug, id } = await params
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { scope } = await requirePageScope(PERMISSIONS.MANAGE_ORG_USERS, slug)
 
   let perf
   try {
-    perf = await getBatchPerformance(org.id, id) // org-scoped; NotFound otherwise
+    perf = await getBatchPerformance(scope, id) // scoped; NotFound otherwise
   } catch (error) {
     if (error instanceof NotFoundError) notFound()
     throw error

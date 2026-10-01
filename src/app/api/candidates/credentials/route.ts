@@ -1,8 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { errorResponse, successResponse } from '@/lib/api-response'
-import { requireOrgAccess } from '@/lib/auth/org-access'
 import { withRole } from '@/lib/auth/require-role'
+import { MANAGER_ROLES, getScope } from '@/lib/auth/scope'
 import { ValidationError } from '@/lib/errors'
 import { audit } from '@/services/audit'
 import { provisionPasswordLogins, type CredentialMode } from '@/services/credentials'
@@ -14,11 +14,10 @@ import { provisionPasswordLogins, type CredentialMode } from '@/services/credent
  */
 
 export const dynamic = 'force-dynamic'
-const MANAGER = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await withRole(MANAGER)
+    const user = await withRole(MANAGER_ROLES)
     const body = await request.json().catch(() => null)
     const { orgId, userIds, mode } = (body ?? {}) as { orgId?: unknown; userIds?: unknown; mode?: unknown }
     if (typeof orgId !== 'string' || !orgId) throw new ValidationError('orgId is required')
@@ -26,10 +25,10 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('userIds must be a non-empty array of ids')
     }
     if (mode !== 'temp' && mode !== 'email') throw new ValidationError('mode must be "temp" or "email"')
-    await requireOrgAccess(user, orgId)
+    const scope = await getScope(user, orgId)
 
     const result = await provisionPasswordLogins(
-      orgId,
+      scope,
       userIds as string[],
       mode as CredentialMode,
       `${request.nextUrl.origin}/login`,

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { FolderKanban, UserPlus, Users } from 'lucide-react'
 
@@ -28,8 +27,8 @@ import { Button } from '@/components/ui/button'
 import { timeAgo } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { CANDIDATE_SORTS, listBatches, listCandidates } from '@/services/candidates'
-import { getOrgBySlug } from '@/services/organizations'
-import { requirePagePermission } from '@/lib/auth/page-guard'
+import { requirePageScope } from '@/lib/auth/page-guard'
+import { listScopeDepartments, studentWhere } from '@/lib/auth/scope'
 import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Candidates — SelectIQ' }
@@ -48,43 +47,38 @@ export default async function CandidatesPage({
   searchParams: Promise<SearchParams>
 }) {
   // Managers only — [org]/layout proves membership, and students are members.
-  await requirePagePermission(PERMISSIONS.MANAGE_ORG_USERS)
-
   const { org: slug } = await params
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org, scope } = await requirePageScope(PERMISSIONS.MANAGE_ORG_USERS, slug)
 
   const p = parseTableParams(await searchParams, {
     sortable: CANDIDATE_SORTS,
     defaultSort: 'createdAt',
   })
   const batchId = p.get('batch')
+  const departmentId = p.get('dept')
   const status = p.get('status') === 'active' || p.get('status') === 'pending'
     ? (p.get('status') as 'active' | 'pending')
     : undefined
 
-  const pendingWhere = {
-    role: 'STUDENT' as const,
-    memberships: { some: { orgId: org.id } },
-    firebaseUid: { startsWith: 'pending:' },
-  }
-  const [{ items, total }, batches, rosterSize, pendingCount] = await Promise.all([
-    listCandidates(org.id, {
+  const [{ items, total }, batches, rosterSize, pendingCount, departments] = await Promise.all([
+    listCandidates(scope, {
       search: p.q || undefined,
       batchId,
+      departmentId,
       status,
       sort: p.sort,
       dir: p.dir,
       skip: p.skip,
       take: p.pageSize,
     }),
-    listBatches(org.id),
-    prisma.user.count({ where: { role: 'STUDENT', memberships: { some: { orgId: org.id } } } }),
-    prisma.user.count({ where: pendingWhere }),
+    listBatches(scope),
+    prisma.user.count({ where: studentWhere(scope) }),
+    prisma.user.count({ where: { ...studentWhere(scope), firebaseUid: { startsWith: 'pending:' } } }),
+    listScopeDepartments(scope),
   ])
 
   const pathname = `/${slug}/candidates`
-  const filtered = Boolean(p.q || batchId || status)
+  const filtered = Boolean(p.q || batchId || status || departmentId)
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -125,6 +119,18 @@ export default async function CandidatesPage({
               { value: 'pending', label: 'Yet to sign in' },
             ],
           },
+          ...(departments.length > 1 || (scope.all && departments.length > 0)
+            ? [
+                {
+                  key: 'dept',
+                  label: 'Department',
+                  options: [
+                    ...departments.map((d) => ({ value: d.id, label: d.code })),
+                    ...(scope.all ? [{ value: 'none', label: 'Unassigned' }] : []),
+                  ],
+                },
+              ]
+            : []),
           ...(batches.length > 0
             ? [
                 {
@@ -162,6 +168,7 @@ export default async function CandidatesPage({
               <HeaderCheckbox />
             </th>
             <SortHeader label="Candidate" field="name" pathname={pathname} params={p} />
+            <th className={TH}>Department</th>
             <th className={TH}>Batches</th>
             <th className={`${TH} text-right`}>Exams</th>
             <th className={TH}>Status</th>
@@ -192,6 +199,15 @@ export default async function CandidatesPage({
                       </p>
                     </div>
                   </div>
+                </td>
+                <td className={TD}>
+                  {c.department ? (
+                    <span title={c.department.name} className="bg-accent text-accent-foreground rounded-md px-1.5 py-0.5 text-[11px] font-semibold">
+                      {c.department.code}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Unassigned</span>
+                  )}
                 </td>
                 <td className={TD}>
                   {c.batchMemberships.length === 0 ? (
@@ -233,7 +249,11 @@ export default async function CandidatesPage({
             ))}
           </tbody>
         </DataTable>
-        <BulkBar batches={batches.map((b) => ({ id: b.id, name: b.name }))} />
+        <BulkBar
+          batches={batches.map((b) => ({ id: b.id, name: b.name }))}
+          departments={departments}
+          canUnassign={scope.all}
+        />
         </SelectionProvider>
       )}
     </div>

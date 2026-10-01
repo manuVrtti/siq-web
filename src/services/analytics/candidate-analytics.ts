@@ -3,6 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 
 import { NotFoundError } from '@/lib/errors'
+import { batchWhere, studentWhere, type Scope } from '@/lib/auth/scope'
 import { prisma } from '@/lib/prisma'
 import { mean, round } from '@/services/analytics/stats'
 
@@ -254,13 +255,18 @@ export const getStudentAssessments = cache(async (orgId: string, userId: string)
 })
 
 /** Aggregate graded performance of a batch's members on this org's exams. */
-export async function getBatchPerformance(orgId: string, batchId: string) {
+export async function getBatchPerformance(scope: Scope, batchId: string) {
+  const orgId = scope.orgId
   const batch = await prisma.batch.findFirst({
-    where: { id: batchId, orgId },
+    where: { id: batchId, ...batchWhere(scope) },
     select: {
       id: true,
       name: true,
-      members: { select: { user: { select: { id: true, name: true, email: true } } } },
+      // An HOD sees only their own students even inside a mixed batch.
+      members: {
+        where: scope.all ? {} : { user: studentWhere(scope) },
+        select: { user: { select: { id: true, name: true, email: true } } },
+      },
     },
   })
   if (!batch) throw new NotFoundError('Batch not found')
@@ -301,11 +307,11 @@ export async function getBatchPerformance(orgId: string, batchId: string) {
 }
 
 /** Summary rows for every batch in the org — the analytics page table. */
-export async function listBatchPerformance(orgId: string) {
+export async function listBatchPerformance(scope: Scope) {
   const batches = await prisma.batch.findMany({
-    where: { orgId },
+    where: batchWhere(scope),
     orderBy: { name: 'asc' },
     select: { id: true },
   })
-  return Promise.all(batches.map((b) => getBatchPerformance(orgId, b.id)))
+  return Promise.all(batches.map((b) => getBatchPerformance(scope, b.id)))
 }

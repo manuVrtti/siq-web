@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
  * shapes work: one per line, comma-separated, or a mix. Reports back what was
  * created, claimed (already existed), and what didn't parse.
  */
-export default function CandidateImport() {
+export default function CandidateImport({ departmentId }: { departmentId?: string } = {}) {
   const org = useActiveOrg()
   const router = useRouter()
   const [raw, setRaw] = useState('')
@@ -35,7 +35,7 @@ export default function CandidateImport() {
       const res = await fetch('/api/candidates/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId: org.id, raw }),
+        body: JSON.stringify({ orgId: org.id, raw, departmentId: departmentId || undefined }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Import failed')

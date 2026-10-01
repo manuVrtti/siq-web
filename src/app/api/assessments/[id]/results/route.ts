@@ -14,8 +14,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params
-    const { orgId } = await authorizeAssessment(id)
-    const results = await listResultsForAssessment(orgId, id)
+    const { scope } = await authorizeAssessment(id, 'view')
+    const results = await listResultsForAssessment(scope, id)
     return successResponse({ results, summary: summariseResults(results) })
   } catch (error) {
     return errorResponse(error)

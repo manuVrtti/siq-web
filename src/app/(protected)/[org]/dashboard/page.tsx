@@ -5,6 +5,7 @@ import { Plus, UserPlus } from 'lucide-react'
 
 import { DashboardHero } from '@/components/dashboard/bits'
 import { ManagerDashboard } from '@/components/dashboard/manager-dashboard'
+import { getScope, listScopeDepartments } from '@/lib/auth/scope'
 import { PlatformStrip } from '@/components/dashboard/platform-strip'
 import { StudentDashboard } from '@/components/dashboard/student-dashboard'
 import { Button } from '@/components/ui/button'
@@ -40,7 +41,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
       <StudentDashboard orgId={org.id} orgName={org.name} userId={user.id} userName={user.name} slug={slug} />
     )
   }
-  const subtitle = `Here's what's happening at ${org.name}.`
+  const scope = await getScope(user, org.id)
+  const depts = scope.all ? [] : await listScopeDepartments(scope)
+  const subtitle = scope.all
+    ? `Here's what's happening at ${org.name}.`
+    : depts.length
+      ? `Here's what's happening in ${depts.map((d) => d.code).join(', ')} at ${org.name}.`
+      : `You don't head a department yet — ask your College Admin to assign one.`
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -64,7 +71,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
 
       {user.role === 'SUPER_ADMIN' ? <PlatformStrip /> : null}
 
-      <ManagerDashboard orgId={org.id} slug={slug} />
+      <ManagerDashboard scope={scope} slug={slug} />
     </div>
   )
 }

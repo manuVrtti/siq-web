@@ -27,6 +27,11 @@ export type AuditAction =
   | 'candidate.update'
   | 'candidate.remove'
   | 'candidate.credentials'
+  | 'candidate.department'
+  | 'department.create'
+  | 'department.update'
+  | 'department.delete'
+  | 'department.heads'
 
 export async function audit(entry: {
   userId: string

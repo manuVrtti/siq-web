@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client'
 
 import { ForbiddenError, NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { userInScope, type Scope } from '@/lib/auth/scope'
 
 /**
  * Plan 016 — grading engine.
@@ -215,7 +216,7 @@ function passedFor(
  * items remain in `needsReview`.
  */
 export async function gradeSubjective(input: {
-  orgId: string
+  scope: Scope
   questionResultId: string
   scoreAwarded: number
   feedback?: string | null
@@ -228,8 +229,13 @@ export async function gradeSubjective(input: {
   if (!qr) throw new NotFoundError('Question result not found')
 
   // Tenant guard: the grader must belong to the org that owns the assessment.
-  if (qr.result.assessment.orgId !== input.orgId) {
+  if (qr.result.assessment.orgId !== input.scope.orgId) {
     throw new ForbiddenError('Result not in this organization')
+  }
+  // Department guard: an HOD grades only their own students.
+  if (!input.scope.all) {
+    const ok = await prisma.result.count({ where: { id: qr.resultId, ...userInScope(input.scope) } })
+    if (!ok) throw new ForbiddenError('This candidate is outside your department')
   }
 
   if (input.scoreAwarded < -qr.maxMarks || input.scoreAwarded > qr.maxMarks) {
@@ -287,9 +293,9 @@ export async function recomputeResult(resultId: string) {
 /**
  * Fetch a Result with breakdown. Tenant-scoped by the assessment's org.
  */
-export async function getResultForAdmin(orgId: string, resultId: string) {
+export async function getResultForAdmin(scope: Scope, resultId: string) {
   const result = await prisma.result.findFirst({
-    where: { id: resultId, assessment: { orgId } },
+    where: { id: resultId, assessment: { orgId: scope.orgId }, ...userInScope(scope) },
     include: {
       user: { select: { id: true, name: true, email: true, phone: true } },
       questionResults: true,
@@ -313,15 +319,15 @@ export async function getResultForCandidate(userId: string, resultId: string) {
   return result
 }
 
-export async function listResultsForAssessment(orgId: string, assessmentId: string) {
+export async function listResultsForAssessment(scope: Scope, assessmentId: string) {
   const a = await prisma.assessment.findFirst({
-    where: { id: assessmentId, orgId },
+    where: { id: assessmentId, orgId: scope.orgId },
     select: { id: true },
   })
   if (!a) throw new NotFoundError('Assessment not found')
 
   return prisma.result.findMany({
-    where: { assessmentId },
+    where: { assessmentId, ...userInScope(scope) },
     orderBy: [{ status: 'asc' }, { totalScore: 'desc' }],
     include: {
       user: { select: { id: true, name: true, email: true } },
@@ -340,7 +346,7 @@ export type ResultSort = (typeof RESULT_SORTS)[number]
  * `outcome`: graded-and-passed, graded-and-not-passed, or awaiting review.
  */
 export async function queryResultsForAssessment(
-  orgId: string,
+  scope: Scope,
   assessmentId: string,
   opts: {
     search?: string
@@ -352,13 +358,16 @@ export async function queryResultsForAssessment(
   },
 ) {
   const a = await prisma.assessment.findFirst({
-    where: { id: assessmentId, orgId },
+    where: { id: assessmentId, orgId: scope.orgId },
     select: { id: true },
   })
   if (!a) throw new NotFoundError('Assessment not found')
 
+  // Everything below — page, count and summary — is limited to the scope's
+  // students, so an HOD's pass rate is their department's pass rate.
+  const base: Prisma.ResultWhereInput = { assessmentId, ...userInScope(scope) }
   const where: Prisma.ResultWhereInput = {
-    assessmentId,
+    AND: [base],
     ...(opts.outcome === 'pending' && { status: 'PENDING_REVIEW' }),
     ...(opts.outcome === 'passed' && { status: 'GRADED', passed: true }),
     ...(opts.outcome === 'failed' && { status: 'GRADED', passed: false }),
@@ -391,14 +400,14 @@ export async function queryResultsForAssessment(
     prisma.result.count({ where }),
     // Summary is over the whole assessment, not the filtered page.
     prisma.result.aggregate({
-      where: { assessmentId, status: 'GRADED' },
+      where: { ...base, status: 'GRADED' },
       _avg: { percentage: true },
       _max: { percentage: true },
       _count: { _all: true },
     }),
-    prisma.result.count({ where: { assessmentId, status: 'GRADED', passed: true } }),
-    prisma.result.count({ where: { assessmentId, status: 'GRADED', passed: { not: null } } }),
-    prisma.result.count({ where: { assessmentId, status: 'PENDING_REVIEW' } }),
+    prisma.result.count({ where: { ...base, status: 'GRADED', passed: true } }),
+    prisma.result.count({ where: { ...base, status: 'GRADED', passed: { not: null } } }),
+    prisma.result.count({ where: { ...base, status: 'PENDING_REVIEW' } }),
   ])
 
   return {

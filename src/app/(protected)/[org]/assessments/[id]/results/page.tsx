@@ -21,12 +21,10 @@ import { parseTableParams, type SearchParams } from '@/components/data/table-par
 import { formatScore } from '@/components/results/score-badge'
 import { Button } from '@/components/ui/button'
 import { PERMISSIONS } from '@/constants/permissions'
-import { getCurrentUser } from '@/lib/auth/get-current-user'
-import { hasPermission } from '@/lib/auth/permissions'
+import { requireAssessmentPage } from '@/lib/auth/page-guard'
 import { timeAgo } from '@/lib/format'
 import { getAssessment } from '@/services/assessments'
 import { RESULT_SORTS, queryResultsForAssessment } from '@/services/grading'
-import { getOrgBySlug } from '@/services/organizations'
 
 export const metadata: Metadata = { title: 'Results — SelectIQ' }
 
@@ -45,11 +43,7 @@ export default async function AssessmentResultsPage({
   searchParams: Promise<SearchParams>
 }) {
   const { org: slug, id } = await params
-  const user = (await getCurrentUser())!
-  if (!hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)) notFound()
-
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org, scope } = await requireAssessmentPage(PERMISSIONS.VIEW_ORG_RESULTS, slug, id, 'view')
 
   const assessment = await getAssessment(org.id, id).catch(() => null)
   if (!assessment) notFound()
@@ -64,7 +58,7 @@ export default async function AssessmentResultsPage({
       ? outcomeRaw
       : undefined
 
-  const { items, total, summary } = await queryResultsForAssessment(org.id, id, {
+  const { items, total, summary } = await queryResultsForAssessment(scope, id, {
     search: p.q || undefined,
     outcome,
     sort: p.sort,

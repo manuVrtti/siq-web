@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { ClipboardCheck, Plus } from 'lucide-react'
 
 import { Pill } from '@/components/dashboard/bits'
@@ -22,8 +21,8 @@ import { ASSESSMENT_STATUS_LABEL, labelOf } from '@/constants/labels'
 import { shortDateTime } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { listAssessments } from '@/services/assessments'
-import { getOrgBySlug } from '@/services/organizations'
-import { requirePagePermission } from '@/lib/auth/page-guard'
+import { requirePageScope } from '@/lib/auth/page-guard'
+import { assessmentWhere, studentWhere } from '@/lib/auth/scope'
 import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Assessments — SelectIQ' }
@@ -49,20 +48,17 @@ export default async function AssessmentsPage({
   searchParams: Promise<SearchParams>
 }) {
   // Managers only — [org]/layout proves membership, and students are members.
-  await requirePagePermission(PERMISSIONS.EDIT_ASSESSMENT)
-
   const { org: slug } = await params
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org, scope } = await requirePageScope(PERMISSIONS.EDIT_ASSESSMENT, slug)
 
   const p = parseTableParams(await searchParams, { sortable: SORTS, defaultSort: 'updatedAt' })
   const status = STATUSES.find((s) => s === p.get('status'))
 
   const [all, assignmentGroups] = await Promise.all([
-    listAssessments(org.id),
+    listAssessments(scope),
     prisma.assessmentAssignment.groupBy({
       by: ['assessmentId', 'status'],
-      where: { assessment: { orgId: org.id } },
+      where: { assessment: assessmentWhere(scope), ...(scope.all ? {} : { user: studentWhere(scope) }) },
       _count: { _all: true },
     }),
   ])

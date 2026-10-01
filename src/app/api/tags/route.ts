@@ -14,7 +14,7 @@ import { tagInputSchema } from '@/lib/validators/question'
 
 export const dynamic = 'force-dynamic'
 
-const MANAGER_ROLES = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
+const MANAGER_ROLES = ['COLLEGE_ADMIN', 'COLLEGE_HOD', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export async function GET(request: NextRequest) {
   try {

@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params
-    const { orgId } = await authorizeAssessment(id)
-    return successResponse({ assignments: await listAssignments(orgId, id) })
+    const { scope } = await authorizeAssessment(id, 'view')
+    return successResponse({ assignments: await listAssignments(scope, id) })
   } catch (error) {
     return errorResponse(error)
   }
@@ -20,11 +20,11 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params
-    const { orgId } = await authorizeAssessment(id)
+    const { scope } = await authorizeAssessment(id)
     const body = await request.json().catch(() => null)
 
     if (body?.batchId) {
-      const created = await assignToBatch(orgId, id, body.batchId)
+      const created = await assignToBatch(scope, id, body.batchId)
       return successResponse({ created })
     }
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     if (!Array.isArray(userIds) || userIds.some((x) => typeof x !== 'string')) {
       throw new ValidationError('userIds must be an array, or provide batchId')
     }
-    const created = await assignToCandidates(orgId, id, userIds as string[])
+    const created = await assignToCandidates(scope, id, userIds as string[])
     return successResponse({ created })
   } catch (error) {
     return errorResponse(error)

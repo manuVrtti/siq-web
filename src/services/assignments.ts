@@ -2,7 +2,8 @@ import 'server-only'
 
 import { Prisma } from '@prisma/client'
 
-import { NotFoundError, ValidationError } from '@/lib/errors'
+import { assertStudentsInScope, studentWhere, type Scope } from '@/lib/auth/scope'
+import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -17,16 +18,17 @@ const assignmentInclude = {
   user: { select: { id: true, email: true, phone: true, name: true, firebaseUid: true } },
 } satisfies Prisma.AssessmentAssignmentInclude
 
-export async function listAssignments(orgId: string, assessmentId: string) {
+export async function listAssignments(scope: Scope, assessmentId: string) {
   // Scope check: the assessment must belong to this org.
   const a = await prisma.assessment.findFirst({
-    where: { id: assessmentId, orgId },
+    where: { id: assessmentId, orgId: scope.orgId },
     select: { id: true },
   })
   if (!a) throw new NotFoundError('Assessment not found')
 
+  // HODs only ever see their own departments' candidates on a test.
   return prisma.assessmentAssignment.findMany({
-    where: { assessmentId },
+    where: { assessmentId, ...(scope.all ? {} : { user: studentWhere(scope) }) },
     include: assignmentInclude,
     orderBy: { invitedAt: 'desc' },
   })
@@ -39,25 +41,22 @@ export async function listAssignments(orgId: string, assessmentId: string) {
  * Returns the number of NEW assignments created (not the total in the set).
  */
 export async function assignToCandidates(
-  orgId: string,
+  scope: Scope,
   assessmentId: string,
-  userIds: string[],
+  rawUserIds: string[],
 ): Promise<number> {
   // Assessment must live in this org.
   const a = await prisma.assessment.findFirst({
-    where: { id: assessmentId, orgId },
+    where: { id: assessmentId, orgId: scope.orgId },
     select: { id: true },
   })
   if (!a) throw new NotFoundError('Assessment not found')
 
-  // Every candidate must be a member of this org — no cross-tenant assignments.
+  // Every candidate must be a student in scope — no cross-tenant (or, for an
+  // HOD, cross-department) assignments.
+  const userIds = [...new Set(rawUserIds)]
   if (userIds.length === 0) return 0
-  const memberCount = await prisma.user.count({
-    where: { id: { in: userIds }, memberships: { some: { orgId } } },
-  })
-  if (memberCount !== userIds.length) {
-    throw new ValidationError('One or more users are not members of this organization')
-  }
+  await assertStudentsInScope(scope, userIds)
 
   const res = await prisma.assessmentAssignment.createMany({
     data: userIds.map((userId) => ({ assessmentId, userId })),
@@ -71,26 +70,28 @@ export async function assignToCandidates(
  * Returns the number of NEW assignments created.
  */
 export async function assignToBatch(
-  orgId: string,
+  scope: Scope,
   assessmentId: string,
   batchId: string,
 ): Promise<number> {
-  const batch = await prisma.batch.findFirst({ where: { id: batchId, orgId }, select: { id: true } })
+  const batch = await prisma.batch.findFirst({ where: { id: batchId, orgId: scope.orgId }, select: { id: true } })
   if (!batch) throw new NotFoundError('Batch not found')
 
+  // An HOD assigning a batch reaches only their own students in it.
   const members = await prisma.batchMember.findMany({
-    where: { batchId },
+    where: { batchId, ...(scope.all ? {} : { user: studentWhere(scope) }) },
     select: { userId: true },
   })
-  return assignToCandidates(orgId, assessmentId, members.map((m) => m.userId))
+  return assignToCandidates(scope, assessmentId, members.map((m) => m.userId))
 }
 
-export async function revokeAssignment(orgId: string, id: string): Promise<void> {
+export async function revokeAssignment(scope: Scope, id: string): Promise<void> {
   const a = await prisma.assessmentAssignment.findUnique({
     where: { id },
-    select: { assessment: { select: { orgId: true } } },
+    select: { userId: true, assessment: { select: { orgId: true } } },
   })
-  if (!a || a.assessment.orgId !== orgId) throw new NotFoundError('Assignment not found')
+  if (!a || a.assessment.orgId !== scope.orgId) throw new NotFoundError('Assignment not found')
+  if (!scope.all) await assertStudentsInScope(scope, [a.userId])
   await prisma.assessmentAssignment.delete({ where: { id } })
 }
 

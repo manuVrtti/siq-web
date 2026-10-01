@@ -6,12 +6,10 @@ import ManualGradingPanel from '@/components/results/manual-grading-panel'
 import { ProctoringReview } from '@/components/proctoring/proctoring-review'
 import PageHeader from '@/components/ui/page-header'
 import { PERMISSIONS } from '@/constants/permissions'
-import { getCurrentUser } from '@/lib/auth/get-current-user'
-import { hasPermission } from '@/lib/auth/permissions'
+import { requireAssessmentPage } from '@/lib/auth/page-guard'
 import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { getAssessment } from '@/services/assessments'
-import { getOrgBySlug } from '@/services/organizations'
 import { getResultForAdmin } from '@/services/grading'
 import { getSessionForAdmin } from '@/services/proctoring'
 
@@ -28,18 +26,14 @@ export default async function GradeResultPage({
   params: Promise<{ org: string; id: string; resultId: string }>
 }) {
   const { org: slug, id, resultId } = await params
-  const user = (await getCurrentUser())!
-  if (!hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)) notFound()
-
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org, scope } = await requireAssessmentPage(PERMISSIONS.VIEW_ORG_RESULTS, slug, id, 'view')
 
   const assessment = await getAssessment(org.id, id).catch(() => null)
   if (!assessment) notFound()
 
   let result
   try {
-    result = await getResultForAdmin(org.id, resultId)
+    result = await getResultForAdmin(scope, resultId)
   } catch (error) {
     if (error instanceof NotFoundError) notFound()
     throw error

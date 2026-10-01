@@ -24,6 +24,7 @@ import {
   getRecentSubmissions,
   getUpcomingAssessments,
 } from '@/services/analytics/org-analytics'
+import type { Scope } from '@/lib/auth/scope'
 
 /**
  * Plan 019 — dashboard for placement cells, college admins and recruiters.
@@ -31,13 +32,13 @@ import {
  * "what just happened" beside "what's live". Every panel links to the page
  * where the admin acts on it.
  */
-export async function ManagerDashboard({ orgId, slug }: { orgId: string; slug: string }) {
+export async function ManagerDashboard({ scope, slug }: { scope: Scope; slug: string }) {
   const [overview, trend, recent, upcoming, queue] = await Promise.all([
-    getOrgOverview(orgId),
-    getOrgScoreTrend(orgId),
-    getRecentSubmissions(orgId),
-    getUpcomingAssessments(orgId),
-    getPendingReviewQueue(orgId),
+    getOrgOverview(scope),
+    getOrgScoreTrend(scope),
+    getRecentSubmissions(scope),
+    getUpcomingAssessments(scope),
+    getPendingReviewQueue(scope),
   ])
 
   const weekDelta = overview.submissions.thisWeek - overview.submissions.lastWeek
