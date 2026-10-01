@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { errorResponse } from '@/lib/api-response'
-import { belongsToOrg } from '@/lib/auth/org-access'
+import { assertStudentsInScope, getScope } from '@/lib/auth/scope'
 import { hasPermission } from '@/lib/auth/permissions'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { PERMISSIONS } from '@/constants/permissions'
@@ -30,9 +30,18 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ userId:
 
     const data = await getReportData(userId, assessmentId)
     const self = user.id === userId
-    const manager =
-      hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS) &&
-      (user.role === 'SUPER_ADMIN' || (await belongsToOrg(user.id, data.assessment.orgId)))
+    // Managers: org guard (membership + suspension) and department scope —
+    // an HOD only gets reports for students in departments they head.
+    let manager = false
+    if (!self && hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)) {
+      try {
+        const scope = await getScope(user, data.assessment.orgId)
+        await assertStudentsInScope(scope, [userId])
+        manager = true
+      } catch {
+        manager = false
+      }
+    }
     if (!self && !manager) throw new NotFoundError('Result not found')
 
     const { filename, body } = await renderCandidateReport(data, { includeProctoring: manager })

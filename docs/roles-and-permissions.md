@@ -51,6 +51,8 @@ Super Admin
 | Results, grading, proctoring review, analytics, exports | ✅ | own college | own students only |
 | Question bank | ✅ | shared college-wide | shared college-wide |
 | Suspend / reactivate accounts | ✅ | — | — |
+| Suspend / reactivate a whole college (contract, payment…) | ✅ | — | — |
+| Onboard colleges, export directories, global search | ✅ | — | — |
 | Grant Super Admin | ✅ | — | — |
 
 ## 3. Guards that apply to everyone (Super Admins included)
@@ -65,9 +67,12 @@ Super Admin
    visible only to College Admins.
 7. **Suspension is immediate.** It blocks sign-in, rejects every request even on a live session,
    disables the Firebase account and revokes its tokens. Nothing is deleted; it can be reversed.
-8. **Every change is audited** (`AuditLog`): role changes, staff changes, suspensions, Super Admin
+8. **A suspended college is paused for every member** — APIs (`requireOrgAccess`, `services/people.ts`),
+   the workspace (paused page), exam start (`ORG_PAUSED`), reports and résumé access. Super Admins
+   keep access to fix things. Nothing is deleted; reactivating restores everything.
+9. **Every change is audited** (`AuditLog`): role changes, staff changes, suspensions, Super Admin
    grants, department and HOD changes. Audit metadata never holds secrets, passwords or answer content.
-9. **No env-based admin grants.** Super Admin is only ever granted by an existing Super Admin, in
+10. **No env-based admin grants.** Super Admin is only ever granted by an existing Super Admin, in
    the console, and audited. (Lesson from ABtalks plan 169: a grant made from the environment comes
    back after it was revoked.)
 
@@ -86,7 +91,7 @@ Super Admin
 
 | Panel | Who | Where |
 |---|---|---|
-| **Platform console** | Super Admin | `/admin`: Overview, Colleges & companies (People · Departments · Students · Settings per college), All people (role, suspend, detail), Platform admins, Audit log |
+| **Platform console** | Super Admin | `/admin`: Overview (KPIs, needs attention, most active, recently onboarded), Search, Colleges & companies directory (search, filters incl. state & health, sort, export) with an Onboard wizard and per-college Overview · People · Departments · Students · Settings (suspend/reactivate), All people (filters, export, role, suspend, detail), Platform admins, Audit log (filter by college) |
 | **College admin** | College Admin (and Super Admin) | `/[college]/manage`: Overview (health + needs attention), People (College Admins + HODs), Departments, Settings |
 | **My department** | HOD | `/[college]/department`: each department's students, tests, scores, pass rate, shortcuts |
 

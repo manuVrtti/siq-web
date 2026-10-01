@@ -51,6 +51,7 @@ export type ValidationFail = {
     | 'NOT_OPEN'
     | 'CLOSED'
     | 'ALREADY_SUBMITTED'
+    | 'ORG_PAUSED'
 }
 export type ValidationResult = ValidationOk | ValidationFail
 
@@ -65,6 +66,7 @@ export async function validateToken(token: string, userId: string | null): Promi
       assessment: {
         include: {
           sections: { include: { _count: { select: { questions: true } } } },
+          org: { select: { status: true } },
         },
       },
     },
@@ -73,6 +75,9 @@ export async function validateToken(token: string, userId: string | null): Promi
 
   // Token alone is not sufficient. The caller must be the assigned user.
   if (!userId || userId !== assignment.userId) return { ok: false, reason: 'WRONG_USER' }
+
+  // The college's access is paused by SelectIQ (contract, payment…).
+  if (assignment.assessment.org.status === 'SUSPENDED') return { ok: false, reason: 'ORG_PAUSED' }
 
   if (assignment.assessment.status !== 'PUBLISHED') {
     return { ok: false, reason: 'ASSESSMENT_NOT_PUBLISHED' }

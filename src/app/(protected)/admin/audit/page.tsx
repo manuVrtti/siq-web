@@ -7,6 +7,7 @@ import { FilterBar } from '@/components/data/filter-bar'
 import { ListHeader } from '@/components/data/list-header'
 import { parseTableParams, type SearchParams } from '@/components/data/table-params'
 import { shortDateTime } from '@/lib/format'
+import { prisma } from '@/lib/prisma'
 import { listAudit } from '@/services/audit'
 
 export const metadata: Metadata = { title: 'Audit log — Admin — SelectIQ' }
@@ -36,24 +37,34 @@ const ACTIONS = [
   'user.suspend',
   'user.reactivate',
   'superadmin.grant',
+  'org.suspend',
+  'org.reactivate',
 ] as const
 
 /** Who did what, newest first. Read-only; entries are never edited or deleted. */
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const p = parseTableParams(await searchParams, { sortable: ['createdAt'] as const, defaultSort: 'createdAt', pageSize: 50 })
   const action = ACTIONS.find((a) => a === p.get('action'))
-  const { items, total } = await listAudit({ action, skip: p.skip, take: p.pageSize })
+  const orgId = p.get('org') || undefined
+  const [{ items, total }, org] = await Promise.all([
+    listAudit({ action, orgId, skip: p.skip, take: p.pageSize }),
+    orgId ? prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }) : Promise.resolve(null),
+  ])
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
-      <ListHeader eyebrow="Governance" title="Audit log" description="Sensitive actions across the platform, newest first." />
+      <ListHeader
+        eyebrow="Governance"
+        title="Audit log"
+        description={org ? `Everything recorded for ${org.name}, newest first.` : 'Sensitive actions across the platform, newest first.'}
+      />
       <FilterBar
         showSearch={false}
         filters={[{ key: 'action', label: 'Action', options: ACTIONS.map((a) => ({ value: a, label: a })) }]}
       />
       {items.length === 0 ? (
         <TableEmpty
-          filtered={Boolean(action)}
+          filtered={Boolean(action || orgId)}
           clearHref="/admin/audit"
           icon={<ScrollText className="size-5" aria-hidden />}
           title="Nothing recorded yet"

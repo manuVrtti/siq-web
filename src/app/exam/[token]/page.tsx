@@ -26,6 +26,7 @@ const REASON_COPY: Record<string, { title: string; body: string }> = {
     title: 'Not ready',
     body: 'This assessment has not been published yet. Try again once your college has released it.',
   },
+  ORG_PAUSED: { title: 'Access paused', body: 'Your college’s SelectIQ access is paused right now. Please contact your placement cell.' },
   NOT_OPEN: { title: 'Not yet open', body: "This exam has a scheduled start time that hasn't been reached yet." },
   CLOSED: { title: 'Closed', body: 'The window for this exam has ended.' },
   ALREADY_SUBMITTED: { title: 'Already submitted', body: 'You have already submitted this exam. It cannot be retaken.' },

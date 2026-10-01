@@ -13,7 +13,13 @@ export default async function DevFrame({ searchParams }: { searchParams: Promise
   if (!src.startsWith('/dev/') && src !== '/login') notFound()
   return (
     <div style={{ padding: 0, margin: 0, background: '#e2e8f0' }}>
-      <iframe title="preview" src={src} width={Number(w)} height={Number(h)} style={{ border: 0, display: 'block', background: 'white' }} />
+      <iframe id="siq-frame" title="preview" src={src} width={Number(w)} height={Number(h)} style={{ border: 0, display: 'block', background: 'white' }} />
+      {/* Reports the framed page's scroll size in the title, for overflow checks. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `setTimeout(function(){try{var d=document.getElementById('siq-frame').contentDocument.documentElement;document.title='H='+d.scrollHeight+' W='+d.scrollWidth}catch(e){document.title='ERR'}},4000)`,
+        }}
+      />
     </div>
   )
 }

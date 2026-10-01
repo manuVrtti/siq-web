@@ -6,7 +6,7 @@ import { Ban, Building2, Clock, ExternalLink, FileCheck2, Mail, Phone, UserRound
 import { RoleSelect } from '@/components/admin/admin-actions'
 import { SuspendToggle } from '@/components/admin/user-actions'
 import { Panel } from '@/components/analytics/panel'
-import { ROLE_LABEL } from '@/constants/labels'
+import { AUDIT_ACTION_LABEL, ROLE_LABEL } from '@/constants/labels'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { NotFoundError } from '@/lib/errors'
 import { timeAgo } from '@/lib/format'
@@ -128,10 +128,10 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel eyebrow="Audit" title="Changes to this person">
-          <AuditList items={u.auditAbout.map((a) => ({ id: a.id, text: `${a.user.name ?? a.user.email} · ${a.action}`, at: a.createdAt }))} />
+          <AuditList items={u.auditAbout.map((a) => ({ id: a.id, text: `${a.user.name ?? a.user.email} · ${AUDIT_ACTION_LABEL[a.action] ?? a.action}`, at: a.createdAt }))} />
         </Panel>
         <Panel eyebrow="Audit" title="What they changed">
-          <AuditList items={u.auditBy.map((a) => ({ id: a.id, text: `${a.action} · ${a.entityType}`, at: a.createdAt }))} />
+          <AuditList items={u.auditBy.map((a) => ({ id: a.id, text: `${AUDIT_ACTION_LABEL[a.action] ?? a.action} · ${a.entityType}`, at: a.createdAt }))} />
         </Panel>
       </div>
     </div>

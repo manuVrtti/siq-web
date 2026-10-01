@@ -6,6 +6,7 @@ import { belongsToOrg } from '@/lib/auth/org-access'
 import { OrgProvider } from '@/lib/org-context'
 import { getOrgBySlug } from '@/services/organizations'
 import { isRegistered } from '@/services/profile'
+import { OrgPaused } from '@/components/layout/org-paused'
 
 /**
  * Plan T02 — the tenant boundary.
@@ -30,6 +31,9 @@ export default async function OrgLayout({
 
   const allowed = user.role === 'SUPER_ADMIN' || (await belongsToOrg(user.id, org.id))
   if (!allowed) notFound()
+
+  // Paused by SelectIQ: members see why instead of a broken workspace.
+  if (org.status === 'SUSPENDED' && user.role !== 'SUPER_ADMIN') return <OrgPaused name={org.name} />
 
   // Registration gate (students only). Exam pages live outside this layout,
   // so an unregistered student can always still sit an assigned exam.

@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, Building2, LayoutDashboard, Menu, ScrollText, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeft, Building2, LayoutDashboard, Menu, ScrollText, Search, ShieldCheck, Users } from 'lucide-react'
 
 import { BrandMark } from '@/components/brand/mark'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ const GROUPS = [
     label: 'Platform',
     items: [
       { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
+      { href: '/admin/search', label: 'Search', icon: Search },
       { href: '/admin/organizations', label: 'Colleges & companies', icon: Building2 },
     ],
   },
@@ -103,7 +104,16 @@ export function AdminShell({ children, userName }: { children: ReactNode; userNa
             </Sheet>
             <p className="text-sm font-semibold">Platform console</p>
           </div>
-          <p className="text-muted-foreground text-xs">
+          <form action="/admin/search" className="relative hidden max-w-md flex-1 sm:block">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden />
+            <input
+              name="q"
+              placeholder="Search colleges, people, departments…"
+              aria-label="Search the platform"
+              className="border-input bg-card focus-visible:border-ring h-9 w-full rounded-lg border pr-3 pl-9 text-sm outline-none"
+            />
+          </form>
+          <p className="text-muted-foreground hidden text-xs lg:block">
             Signed in as <span className="text-foreground font-medium">{userName}</span> · super admin
           </p>
         </header>

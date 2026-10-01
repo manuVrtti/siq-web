@@ -53,6 +53,11 @@ export async function getOrganizationDetail(id: string) {
       slug: true,
       type: true,
       domain: true,
+      city: true,
+      state: true,
+      status: true,
+      suspendedAt: true,
+      suspendedReason: true,
       createdAt: true,
       _count: { select: { assessments: true, batches: true, questions: true } },
       members: {
@@ -77,16 +82,6 @@ export function normalizeDomain(raw: string | null | undefined): string | null {
   if (!d) return null
   if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) throw new ValidationError('Enter a bare email domain like abes.ac.in')
   return d
-}
-
-export async function updateOrganization(id: string, data: { name?: string; domain?: string | null }) {
-  return prisma.organization.update({
-    where: { id },
-    data: {
-      ...(data.name !== undefined && { name: data.name.trim() }),
-      ...(data.domain !== undefined && { domain: normalizeDomain(data.domain) }),
-    },
-  })
 }
 
 export async function listUsers(opts: {
