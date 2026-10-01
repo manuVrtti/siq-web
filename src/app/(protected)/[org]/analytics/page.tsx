@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { BarChart3, Layers, Users } from 'lucide-react'
 
 import { Panel } from '@/components/analytics/panel'
@@ -8,12 +7,10 @@ import { StatCard } from '@/components/analytics/stat-card'
 import { TrendLine } from '@/components/analytics/trend-line'
 import { PanelEmpty, Pill } from '@/components/dashboard/bits'
 import { PERMISSIONS } from '@/constants/permissions'
-import { getCurrentUser } from '@/lib/auth/get-current-user'
-import { hasPermission } from '@/lib/auth/permissions'
+import { requirePageScope } from '@/lib/auth/page-guard'
 import { listAssessmentPerformance } from '@/services/analytics/assessment-analytics'
 import { listBatchPerformance } from '@/services/analytics/candidate-analytics'
 import { getOrgOverview, getOrgScoreTrend } from '@/services/analytics/org-analytics'
-import { getOrgBySlug } from '@/services/organizations'
 
 export const metadata: Metadata = { title: 'Analytics — SelectIQ' }
 
@@ -24,17 +21,13 @@ export const metadata: Metadata = { title: 'Analytics — SelectIQ' }
  */
 export default async function AnalyticsPage({ params }: { params: Promise<{ org: string }> }) {
   const { org: slug } = await params
-  const user = (await getCurrentUser())!
-  if (!hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)) notFound()
-
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org, scope } = await requirePageScope(PERMISSIONS.VIEW_ORG_RESULTS, slug)
 
   const [overview, trend, assessments, batches] = await Promise.all([
-    getOrgOverview(org.id),
-    getOrgScoreTrend(org.id, 12),
-    listAssessmentPerformance(org.id),
-    listBatchPerformance(org.id),
+    getOrgOverview(scope),
+    getOrgScoreTrend(scope, 12),
+    listAssessmentPerformance(scope),
+    listBatchPerformance(scope),
   ])
 
   const completion =

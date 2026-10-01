@@ -10,7 +10,7 @@ export const runtime = 'nodejs'
 
 export async function GET() {
   try {
-    await withRole(['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'])
+    await withRole(['COLLEGE_ADMIN', 'COLLEGE_HOD', 'RECRUITER', 'SUPER_ADMIN'])
     return fileResponse(getQuestionTemplate(), 'SelectIQ question import template.xlsx', XLSX_MIME)
   } catch (error) {
     return errorResponse(error)

@@ -2,8 +2,8 @@ import { type NextRequest } from 'next/server'
 import { z } from 'zod'
 
 import { errorResponse, successResponse } from '@/lib/api-response'
-import { requireOrgAccess } from '@/lib/auth/org-access'
 import { withRole } from '@/lib/auth/require-role'
+import { MANAGER_ROLES, getScope } from '@/lib/auth/scope'
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { gradeSubjective } from '@/services/grading'
@@ -18,7 +18,6 @@ import { audit } from '@/services/audit'
  */
 
 export const dynamic = 'force-dynamic'
-const MANAGER_ROLES = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 const gradesSchema = z.object({
   grades: z
@@ -49,7 +48,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       select: { assessment: { select: { orgId: true } } },
     })
     if (!result) throw new NotFoundError('Result not found')
-    await requireOrgAccess(user, result.assessment.orgId)
+    const scope = await getScope(user, result.assessment.orgId)
 
     // Every grade must reference a QuestionResult ON THIS Result — no
     // cross-result forgery.
@@ -64,7 +63,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     let updated
     for (const g of parsed.data.grades) {
       updated = await gradeSubjective({
-        orgId: result.assessment.orgId,
+        scope,
         questionResultId: g.questionResultId,
         scoreAwarded: g.scoreAwarded,
         feedback: g.feedback ?? null,

@@ -1,8 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { errorResponse, successResponse } from '@/lib/api-response'
-import { requireOrgAccess } from '@/lib/auth/org-access'
 import { withRole } from '@/lib/auth/require-role'
+import { MANAGER_ROLES, getScope } from '@/lib/auth/scope'
 import { ValidationError } from '@/lib/errors'
 import { audit } from '@/services/audit'
 import { updateCandidate } from '@/services/candidates'
@@ -14,7 +14,6 @@ import { updateCandidate } from '@/services/candidates'
  */
 
 export const dynamic = 'force-dynamic'
-const MANAGER = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 const optStr = (v: unknown, field: string): string | null | undefined => {
   if (v === undefined) return undefined
@@ -26,13 +25,13 @@ const optStr = (v: unknown, field: string): string | null | undefined => {
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params
-    const user = await withRole(MANAGER)
+    const user = await withRole(MANAGER_ROLES)
     const body = await request.json().catch(() => null)
     const orgId: unknown = body?.orgId
     if (typeof orgId !== 'string' || !orgId) throw new ValidationError('orgId is required')
-    await requireOrgAccess(user, orgId)
+    const scope = await getScope(user, orgId)
 
-    const updated = await updateCandidate(orgId, id, {
+    const updated = await updateCandidate(scope, id, {
       name: optStr(body.name, 'name'),
       email: optStr(body.email, 'email'),
       phone: optStr(body.phone, 'phone'),

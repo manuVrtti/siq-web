@@ -9,6 +9,7 @@ import SidebarNav from '@/components/layout/sidebar-nav'
 import UserMenu from '@/components/layout/user-menu'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { ROLE_LABEL, labelOf } from '@/constants/labels'
 import { useCurrentUser } from '@/lib/auth/user-context'
 import { useActiveOrg } from '@/lib/org-context'
 
@@ -58,8 +59,8 @@ function SidebarFooter() {
         <p className="text-sidebar-foreground truncate text-sm font-medium">
           {user.name ?? user.email}
         </p>
-        <p className="text-sidebar-muted truncate text-[11px] capitalize">
-          {user.role.replace(/_/g, ' ').toLowerCase()}
+        <p className="text-sidebar-muted truncate text-[11px]">
+          {labelOf(ROLE_LABEL, user.role)}
         </p>
       </div>
     </div>

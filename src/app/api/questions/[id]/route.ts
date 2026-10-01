@@ -18,7 +18,7 @@ import { questionUpdateSchema } from '@/lib/validators/question'
 
 export const dynamic = 'force-dynamic'
 
-const MANAGER_ROLES = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
+const MANAGER_ROLES = ['COLLEGE_ADMIN', 'COLLEGE_HOD', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 /** Loads the question's org and authorises the caller for it. */
 async function authorizeForQuestion(id: string) {

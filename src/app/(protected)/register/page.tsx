@@ -7,7 +7,9 @@ import { RegistrationForm } from '@/components/profile/registration-form'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { getUserOrgs } from '@/lib/auth/org-access'
 import { DEGREES, graduationYears } from '@/lib/validators/profile'
-import { getProfile, isRegistered } from '@/services/profile'
+import { pickableDepartments } from '@/services/departments'
+import { collegeForEmail, getProfile, isRegistered } from '@/services/profile'
+import { prisma } from '@/lib/prisma'
 
 export const metadata: Metadata = { title: 'Create your profile — SelectIQ' }
 
@@ -28,6 +30,13 @@ export default async function RegisterPage() {
   if (user.role !== 'STUDENT' || (await isRegistered(user.id))) redirect('/select-org')
 
   const [{ profile }, orgs] = await Promise.all([getProfile(user.id), getUserOrgs(user.id)])
+  // The college they're joining: an existing (imported) membership, or the
+  // one their email domain will match on submit.
+  const college = orgs.find((o) => o.type === 'COLLEGE') ?? (await collegeForEmail(user.email))
+  const placed = college
+    ? await prisma.organizationMember.findFirst({ where: { userId: user.id, orgId: college.id, NOT: { departmentId: null } }, select: { id: true } })
+    : null
+  const departments = college && !placed ? await pickableDepartments(college.id) : []
 
   return (
     <main className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
@@ -53,9 +62,11 @@ export default async function RegisterPage() {
                 branch: profile?.branch ?? '',
                 graduationYear: profile?.graduationYear ? String(profile.graduationYear) : '',
                 rollNumber: profile?.rollNumber ?? '',
+                departmentId: '',
               }}
               email={user.email}
               college={orgs.find((o) => o.type === 'COLLEGE')?.name ?? null}
+              departments={departments}
               degrees={[...DEGREES]}
               years={graduationYears()}
             />

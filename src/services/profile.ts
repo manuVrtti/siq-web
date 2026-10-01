@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client'
 
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { memberWhere, type Scope } from '@/lib/auth/scope'
 import { deleteFile, getSignedUrl, uploadFile } from '@/lib/storage'
 import { normalizePhone } from '@/lib/validators/contact'
 import type {
@@ -72,17 +73,22 @@ async function setPhone(userId: string, rawPhone: string) {
  * colleges sharing a domain, or an unverified email, joins nothing.
  * Returns the org joined, if any.
  */
-async function joinCollegeByEmailDomain(user: CurrentUser, emailVerified: boolean) {
-  if (!emailVerified || !user.email) return null
-  const domain = user.email.split('@')[1]?.toLowerCase()
+/** The single college whose domain matches this email, if exactly one does. */
+export async function collegeForEmail(email: string | null) {
+  const domain = email?.split('@')[1]?.toLowerCase()
   if (!domain) return null
   const colleges = await prisma.organization.findMany({
     where: { type: 'COLLEGE', domain: { equals: domain, mode: 'insensitive' } },
     select: { id: true, name: true, slug: true },
     take: 2,
   })
-  if (colleges.length !== 1) return null
-  const org = colleges[0]!
+  return colleges.length === 1 ? colleges[0]! : null
+}
+
+async function joinCollegeByEmailDomain(user: CurrentUser, emailVerified: boolean) {
+  if (!emailVerified || !user.email) return null
+  const org = await collegeForEmail(user.email)
+  if (!org) return null
   await prisma.organizationMember.createMany({
     data: [{ userId: user.id, orgId: org.id }],
     skipDuplicates: true,
@@ -111,6 +117,22 @@ export async function register(
 
   const memberships = await prisma.organizationMember.count({ where: { userId: user.id } })
   const joined = memberships === 0 ? await joinCollegeByEmailDomain(user, opts.emailVerified) : null
+
+  // Department choice: only into a department of a college the student is
+  // in, only where that college lets students choose, and only if the
+  // college hasn't already placed them.
+  if (input.departmentId) {
+    const dept = await prisma.department.findUnique({
+      where: { id: input.departmentId },
+      select: { orgId: true, org: { select: { studentsPickDepartment: true } } },
+    })
+    if (dept?.org.studentsPickDepartment) {
+      await prisma.organizationMember.updateMany({
+        where: { userId: user.id, orgId: dept.orgId, departmentId: null },
+        data: { departmentId: input.departmentId },
+      })
+    }
+  }
   return { joined }
 }
 
@@ -198,12 +220,19 @@ export async function resumeDownloadUrl(userId: string): Promise<string> {
 /* ---- access ------------------------------------------------------------ */
 
 /**
- * May `viewer` see `candidateId`'s profile? Themselves, SUPER_ADMIN, or a
- * manager (VIEW_ORG_RESULTS roles) who shares a college with the candidate.
+ * May `viewer` see `candidateId`'s profile? Themselves, SUPER_ADMIN, a
+ * College Admin / Recruiter who shares a college with the candidate, or an
+ * HOD who heads the candidate's department in that college.
  */
 export async function canViewProfile(viewer: CurrentUser, candidateId: string): Promise<boolean> {
   if (viewer.id === candidateId) return true
   if (viewer.role === 'SUPER_ADMIN') return true
+  if (viewer.role === 'COLLEGE_HOD') {
+    const inDept = await prisma.organizationMember.count({
+      where: { userId: candidateId, department: { heads: { some: { userId: viewer.id } } } },
+    })
+    return inDept > 0
+  }
   if (viewer.role !== 'COLLEGE_ADMIN' && viewer.role !== 'RECRUITER') return false
   const shared = await prisma.organizationMember.count({
     where: {
@@ -215,14 +244,15 @@ export async function canViewProfile(viewer: CurrentUser, candidateId: string): 
 }
 
 /**
- * A candidate as a manager of `orgId` sees them: profile + this org's exam
- * history + batches. NotFound unless the user is a STUDENT member of the org
- * (never reveal whether an id exists elsewhere).
+ * A candidate as a manager of the scope's org sees them: profile + this
+ * org's exam history + batches. NotFound unless the user is a STUDENT
+ * member in scope (never reveal whether an id exists elsewhere).
  */
-export async function getCandidateForManager(orgId: string, userId: string) {
-  const member = await prisma.organizationMember.findUnique({
-    where: { userId_orgId: { userId, orgId } },
-    select: { user: { select: { role: true } } },
+export async function getCandidateForManager(scope: Scope, userId: string) {
+  const orgId = scope.orgId
+  const member = await prisma.organizationMember.findFirst({
+    where: { userId, ...memberWhere(scope) },
+    select: { user: { select: { role: true } }, department: { select: { id: true, code: true, name: true } } },
   })
   if (!member || member.user.role !== 'STUDENT') throw new NotFoundError('Candidate not found')
 
@@ -251,7 +281,7 @@ export async function getCandidateForManager(orgId: string, userId: string) {
       select: { batch: { select: { id: true, name: true } } },
     }),
   ])
-  return { ...full, results, pending: assignments, batches: batches.map((b) => b.batch) }
+  return { ...full, department: member.department, results, pending: assignments, batches: batches.map((b) => b.batch) }
 }
 
 /* ---- completeness ------------------------------------------------------ */

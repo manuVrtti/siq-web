@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { FolderKanban } from 'lucide-react'
 
 import { Panel } from '@/components/analytics/panel'
@@ -10,8 +9,7 @@ import { ListHeader } from '@/components/data/list-header'
 import { shortDateTime } from '@/lib/format'
 import { listBatchPerformance } from '@/services/analytics/candidate-analytics'
 import { listBatches } from '@/services/candidates'
-import { getOrgBySlug } from '@/services/organizations'
-import { requirePagePermission } from '@/lib/auth/page-guard'
+import { requirePageScope } from '@/lib/auth/page-guard'
 import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Batches — SelectIQ' }
@@ -25,15 +23,12 @@ export const metadata: Metadata = { title: 'Batches — SelectIQ' }
  */
 export default async function BatchesPage({ params }: { params: Promise<{ org: string }> }) {
   // Managers only — [org]/layout proves membership, and students are members.
-  await requirePagePermission(PERMISSIONS.MANAGE_ORG_USERS)
-
   const { org: slug } = await params
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { scope } = await requirePageScope(PERMISSIONS.MANAGE_ORG_USERS, slug)
 
   const [batches, performance] = await Promise.all([
-    listBatches(org.id),
-    listBatchPerformance(org.id),
+    listBatches(scope),
+    listBatchPerformance(scope),
   ])
   const perfById = new Map(performance.map((b) => [b.id, b]))
   const base = `/${slug}/candidates`

@@ -22,6 +22,17 @@ export const ASSESSMENT_STATUS_LABEL: Record<string, string> = {
   ARCHIVED: 'Archived',
 }
 
+export const ROLE_LABEL: Record<string, string> = {
+  SUPER_ADMIN: 'Super admin',
+  COLLEGE_ADMIN: 'College admin',
+  COLLEGE_HOD: 'College HOD',
+  RECRUITER: 'Recruiter',
+  STUDENT: 'Student',
+}
+
+/** The five roles, most to least privileged — for pickers and filters. */
+export const ROLES = ['SUPER_ADMIN', 'COLLEGE_ADMIN', 'COLLEGE_HOD', 'RECRUITER', 'STUDENT'] as const
+
 export function labelOf(map: Record<string, string>, value: string): string {
   return map[value] ?? value.replace(/_/g, ' ').toLowerCase()
 }

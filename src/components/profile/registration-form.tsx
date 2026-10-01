@@ -14,6 +14,7 @@ type Values = {
   branch: string
   graduationYear: string
   rollNumber: string
+  departmentId: string
 }
 
 /**
@@ -27,12 +28,15 @@ export function RegistrationForm({
   college,
   degrees,
   years,
+  departments = [],
 }: {
   initial: Values
   email: string | null
   college: string | null
   degrees: string[]
   years: number[]
+  /** Shown only when the college lets students choose their department. */
+  departments?: { id: string; code: string; name: string }[]
 }) {
   const router = useRouter()
   const [v, setV] = useState<Values>(initial)
@@ -43,13 +47,17 @@ export function RegistrationForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (departments.length > 0 && !v.departmentId) {
+      setError('Choose your department')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(v),
+        body: JSON.stringify({ ...v, departmentId: v.departmentId || undefined }),
       })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.success) throw new Error(json?.error?.message ?? 'Could not save your details')
@@ -113,6 +121,17 @@ export function RegistrationForm({
           <TextInput value={v.branch} onChange={set('branch')} maxLength={80} required />
         </Field>
       </div>
+
+      {departments.length > 0 ? (
+        <Field label="Department" hint="Your HOD sees your results and assigns department tests" required>
+          <SelectInput
+            value={v.departmentId}
+            onChange={set('departmentId')}
+            placeholder="Choose your department"
+            options={departments.map((d) => ({ value: d.id, label: `${d.code} — ${d.name}` }))}
+          />
+        </Field>
+      ) : null}
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Graduation year" required>

@@ -13,8 +13,8 @@ export const runtime = 'nodejs'
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params
-    const { orgId } = await authorizeAssessment(id)
-    const { filename, body } = await exportAssessmentAnalytics(orgId, id)
+    const { scope } = await authorizeAssessment(id, 'view')
+    const { filename, body } = await exportAssessmentAnalytics(scope, id)
     return fileResponse(body, filename, XLSX_MIME)
   } catch (error) {
     return errorResponse(error)

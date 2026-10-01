@@ -17,8 +17,8 @@ export const maxDuration = 120
 
 export async function POST(request: NextRequest) {
   try {
-    const { user, orgId, bytes } = await readImportUpload(request)
-    const result = await commitCandidateImport(orgId, bytes)
+    const { user, orgId, scope, departmentId, bytes } = await readImportUpload(request)
+    const result = await commitCandidateImport(scope, bytes, departmentId)
     await audit({ userId: user.id, action: 'import.candidates', entityType: 'Organization', entityId: orgId, metadata: result })
     return successResponse(result)
   } catch (error) {

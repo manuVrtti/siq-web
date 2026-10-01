@@ -22,11 +22,11 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
     const { id: questionId } = await ctx.params
     const assessmentId = request.nextUrl.searchParams.get('assessmentId')
     if (!assessmentId) throw new ValidationError('assessmentId is required')
-    await authorizeAssessment(assessmentId)
+    const { scope } = await authorizeAssessment(assessmentId, 'view')
 
     const [stats, distributions] = await Promise.all([
-      getQuestionStats(assessmentId),
-      getOptionDistributions(assessmentId),
+      getQuestionStats(assessmentId, scope),
+      getOptionDistributions(assessmentId, scope),
     ])
     const stat = stats.find((s) => s.questionId === questionId)
     if (!stat) throw new ValidationError('Question is not part of this assessment')

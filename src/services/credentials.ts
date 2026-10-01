@@ -2,6 +2,7 @@ import 'server-only'
 
 import { randomBytes, randomInt } from 'node:crypto'
 
+import { studentWhere, type Scope } from '@/lib/auth/scope'
 import { ValidationError } from '@/lib/errors'
 import { getAdminAuth } from '@/lib/firebase-admin'
 import { prisma } from '@/lib/prisma'
@@ -121,7 +122,7 @@ async function pool<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): 
 }
 
 export async function provisionPasswordLogins(
-  orgId: string,
+  scope: Scope,
   rawUserIds: string[],
   mode: CredentialMode,
   continueUrl: string,
@@ -133,11 +134,13 @@ export async function provisionPasswordLogins(
   }
 
   const users = await prisma.user.findMany({
-    where: { id: { in: userIds }, role: 'STUDENT', memberships: { some: { orgId } } },
+    where: { id: { in: userIds }, ...studentWhere(scope) },
     select: { id: true, name: true, email: true, phone: true, firebaseUid: true },
   })
   if (users.length !== userIds.length) {
-    throw new ValidationError('One or more candidates are not on this college’s roster')
+    throw new ValidationError(
+      scope.all ? 'One or more candidates are not on this college’s roster' : 'One or more candidates are outside your department',
+    )
   }
 
   const result: CredentialResult = { done: [], skipped: [] }

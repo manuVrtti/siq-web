@@ -1,8 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { errorResponse, successResponse } from '@/lib/api-response'
-import { requireOrgAccess } from '@/lib/auth/org-access'
 import { withRole } from '@/lib/auth/require-role'
+import { MANAGER_ROLES, getScope } from '@/lib/auth/scope'
 import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { deleteBatch } from '@/services/candidates'
@@ -14,16 +14,15 @@ import { audit } from '@/services/audit'
  */
 
 export const dynamic = 'force-dynamic'
-const MANAGER = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params
-    const user = await withRole(MANAGER)
+    const user = await withRole(MANAGER_ROLES)
     const batch = await prisma.batch.findUnique({ where: { id }, select: { orgId: true } })
     if (!batch) throw new NotFoundError('Batch not found')
-    await requireOrgAccess(user, batch.orgId)
-    await deleteBatch(batch.orgId, id)
+    const scope = await getScope(user, batch.orgId)
+    await deleteBatch(scope, id)
     await audit({ userId: user.id, action: 'batch.delete', entityType: 'Batch', entityId: id, metadata: { orgId: batch.orgId } })
     return successResponse({ deleted: true })
   } catch (error) {

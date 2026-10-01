@@ -29,6 +29,17 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.VIEW_ORG_RESULTS,
   ],
 
+  // Same powers as a College Admin, minus college settings — and every
+  // query is limited to the departments they head (lib/auth/scope.ts).
+  COLLEGE_HOD: [
+    PERMISSIONS.MANAGE_ORG_USERS,
+    PERMISSIONS.VIEW_OWN_ORG,
+    PERMISSIONS.CREATE_ASSESSMENT,
+    PERMISSIONS.EDIT_ASSESSMENT,
+    PERMISSIONS.VIEW_ASSESSMENT,
+    PERMISSIONS.VIEW_ORG_RESULTS,
+  ],
+
   RECRUITER: [
     PERMISSIONS.MANAGE_ORG_USERS,
     PERMISSIONS.VIEW_OWN_ORG,

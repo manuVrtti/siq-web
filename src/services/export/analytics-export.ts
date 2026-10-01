@@ -1,3 +1,4 @@
+import type { Scope } from '@/lib/auth/scope'
 import 'server-only'
 
 import { buildWorkbook } from '@/lib/import/xlsx-parser'
@@ -8,8 +9,8 @@ import { getAssessmentAnalytics } from '@/services/analytics/assessment-analytic
  * exact same numbers as the analytics page (getAssessmentAnalytics), so the
  * export can never disagree with the screen.
  */
-export async function exportAssessmentAnalytics(orgId: string, assessmentId: string) {
-  const a = await getAssessmentAnalytics(orgId, assessmentId)
+export async function exportAssessmentAnalytics(scope: Scope, assessmentId: string) {
+  const a = await getAssessmentAnalytics(scope, assessmentId)
   const dash = (v: number | null) => (v === null ? '' : v)
 
   const overview = [

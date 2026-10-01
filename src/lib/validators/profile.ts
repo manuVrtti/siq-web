@@ -75,6 +75,8 @@ export const registrationSchema = z.object({
     .min(CURRENT_YEAR - 10, 'Choose your graduation year')
     .max(CURRENT_YEAR + 6, 'Choose your graduation year'),
   rollNumber: optText(40),
+  /** Only honoured when the college lets students choose (Organization.studentsPickDepartment). */
+  departmentId: z.string().trim().max(40).optional(),
 })
 export type RegistrationInput = z.infer<typeof registrationSchema>
 

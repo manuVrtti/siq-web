@@ -6,10 +6,9 @@ import AssessmentBuilder from '@/components/assessments/assessment-builder'
 import { Button } from '@/components/ui/button'
 import PageHeader from '@/components/ui/page-header'
 import { getAssessment } from '@/services/assessments'
-import { getOrgBySlug } from '@/services/organizations'
 import { listQuestions } from '@/services/questions'
 import { prisma } from '@/lib/prisma'
-import { requirePagePermission } from '@/lib/auth/page-guard'
+import { requireAssessmentPage } from '@/lib/auth/page-guard'
 import { PERMISSIONS } from '@/constants/permissions'
 
 export const metadata: Metadata = { title: 'Build Assessment — SelectIQ' }
@@ -20,11 +19,9 @@ export default async function BuildPage({
   params: Promise<{ org: string; id: string }>
 }) {
   // Managers only — [org]/layout proves membership, and students are members.
-  await requirePagePermission(PERMISSIONS.EDIT_ASSESSMENT)
 
   const { org: slug, id } = await params
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org } = await requireAssessmentPage(PERMISSIONS.EDIT_ASSESSMENT, slug, id, 'edit')
 
   const assessment = await getAssessment(org.id, id).catch(() => null)
   if (!assessment) notFound()

@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client'
 
 import { NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { assessmentWhere, type Scope } from '@/lib/auth/scope'
 import {
   publishBlockers,
   type AssessmentInput,
@@ -30,11 +31,14 @@ const fullInclude = {
   },
 } satisfies Prisma.AssessmentInclude
 
-export async function listAssessments(orgId: string, status?: string) {
+export async function listAssessments(scope: Scope, status?: string) {
   return prisma.assessment.findMany({
-    where: { orgId, ...(status ? { status: status as never } : {}) },
+    where: { ...assessmentWhere(scope), ...(status ? { status: status as never } : {}) },
     orderBy: { updatedAt: 'desc' },
-    include: { sections: { include: { questions: true } } },
+    include: {
+      sections: { include: { questions: true } },
+      department: { select: { id: true, code: true } },
+    },
   })
 }
 
@@ -52,11 +56,17 @@ export async function getAssessmentOrgId(id: string): Promise<string> {
   return a.orgId
 }
 
-export async function createAssessment(orgId: string, userId: string, data: AssessmentInput) {
+export async function createAssessment(
+  orgId: string,
+  userId: string,
+  data: AssessmentInput,
+  departmentId: string | null = null,
+) {
   return prisma.assessment.create({
     data: {
       orgId,
       createdById: userId,
+      departmentId,
       title: data.title,
       description: data.description ?? null,
       durationMinutes: data.durationMinutes,

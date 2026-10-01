@@ -10,7 +10,7 @@ import { audit } from '@/services/audit'
 /** Change a user's global role — SUPER_ADMIN only, audited. */
 
 export const dynamic = 'force-dynamic'
-const schema = z.object({ role: z.enum(['STUDENT', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN']) })
+const schema = z.object({ role: z.enum(['STUDENT', 'COLLEGE_HOD', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN']) })
 
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
