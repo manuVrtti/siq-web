@@ -149,7 +149,7 @@ export default async function AdminOverviewPage() {
 
         <Panel eyebrow="Mix" title="Users by role">
           <ul className="flex flex-col gap-3">
-            {(['STUDENT', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const).map((r) => {
+            {(['STUDENT', 'COLLEGE_HOD', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const).map((r) => {
               const n = platform.users[r] ?? 0
               const pct = platform.totalUsers ? (n / platform.totalUsers) * 100 : 0
               return (

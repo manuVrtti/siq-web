@@ -1,25 +1,24 @@
 import { type NextRequest } from 'next/server'
 
 import { errorResponse, successResponse } from '@/lib/api-response'
-import { requireOrgAccess } from '@/lib/auth/org-access'
 import { withRole } from '@/lib/auth/require-role'
+import { MANAGER_ROLES, getScope } from '@/lib/auth/scope'
 import { ValidationError } from '@/lib/errors'
 import { audit } from '@/services/audit'
-import { listCandidates, removeCandidates } from '@/services/candidates'
+import { listCandidates, removeCandidates, setCandidatesDepartment } from '@/services/candidates'
 
 export const dynamic = 'force-dynamic'
-const MANAGER = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await withRole(MANAGER)
+    const user = await withRole(MANAGER_ROLES)
     const p = request.nextUrl.searchParams
     const orgId = p.get('orgId')
     if (!orgId) throw new ValidationError('orgId is required')
-    await requireOrgAccess(user, orgId)
+    const scope = await getScope(user, orgId)
 
     return successResponse(
-      await listCandidates(orgId, {
+      await listCandidates(scope, {
         search: p.get('search') || undefined,
         batchId: p.get('batchId') || undefined,
         skip: p.get('skip') ? Number(p.get('skip')) : undefined,
@@ -37,7 +36,7 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await withRole(MANAGER)
+    const user = await withRole(MANAGER_ROLES)
     const body = await request.json().catch(() => null)
     const orgId: unknown = body?.orgId
     const userIds: unknown = body?.userIds
@@ -45,9 +44,9 @@ export async function DELETE(request: NextRequest) {
     if (!Array.isArray(userIds) || userIds.length === 0 || userIds.some((x) => typeof x !== 'string')) {
       throw new ValidationError('userIds must be a non-empty array of ids')
     }
-    await requireOrgAccess(user, orgId)
+    const scope = await getScope(user, orgId)
 
-    const result = await removeCandidates(orgId, userIds as string[])
+    const result = await removeCandidates(scope, userIds as string[])
     await audit({
       userId: user.id,
       action: 'candidate.remove',
@@ -56,6 +55,37 @@ export async function DELETE(request: NextRequest) {
       metadata: { orgId, ...result },
     })
     return successResponse(result)
+  } catch (error) {
+    return errorResponse(error)
+  }
+}
+
+/**
+ * Move candidates to a department. Body: { orgId, userIds, departmentId }
+ * (departmentId null = unassigned, College Admins only).
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const user = await withRole(MANAGER_ROLES)
+    const body = await request.json().catch(() => null)
+    const orgId: unknown = body?.orgId
+    const userIds: unknown = body?.userIds
+    const departmentId: unknown = body?.departmentId
+    if (typeof orgId !== 'string' || !orgId) throw new ValidationError('orgId is required')
+    if (!Array.isArray(userIds) || userIds.length === 0 || userIds.some((x) => typeof x !== 'string')) {
+      throw new ValidationError('userIds must be a non-empty array of ids')
+    }
+    if (departmentId !== null && typeof departmentId !== 'string') throw new ValidationError('departmentId must be an id or null')
+    const scope = await getScope(user, orgId)
+    const moved = await setCandidatesDepartment(scope, userIds as string[], departmentId as string | null)
+    await audit({
+      userId: user.id,
+      action: 'candidate.department',
+      entityType: 'User',
+      entityId: null,
+      metadata: { orgId, departmentId: departmentId as string | null, moved },
+    })
+    return successResponse({ moved })
   } catch (error) {
     return errorResponse(error)
   }

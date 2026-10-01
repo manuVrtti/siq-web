@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto'
 
 import { Prisma } from '@prisma/client'
 
-import { NotFoundError, ValidationError } from '@/lib/errors'
+import { assertStudentsInScope, batchWhere, memberWhere, studentWhere, type Scope } from '@/lib/auth/scope'
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { normalizeEmail, normalizePhone } from '@/lib/validators/contact'
 
@@ -55,6 +56,8 @@ export type CandidateSort = (typeof CANDIDATE_SORTS)[number]
 export type CandidateFilters = {
   search?: string
   batchId?: string
+  /** A department id, or 'none' for students not yet in a department. */
+  departmentId?: string
   /** 'active' = has signed in at least once; 'pending' = invited, never claimed. */
   status?: 'active' | 'pending'
   skip?: number
@@ -81,10 +84,18 @@ function candidateOrderBy(
  * Candidates = STUDENT users in this org. Joined via OrganizationMember so a
  * user can belong to multiple colleges without cross-tenant leakage.
  */
-export async function listCandidates(orgId: string, filters: CandidateFilters = {}) {
+export async function listCandidates(scope: Scope, filters: CandidateFilters = {}) {
+  const orgId = scope.orgId
+  const deptFilter: Prisma.OrganizationMemberWhereInput =
+    filters.departmentId === 'none'
+      ? { departmentId: null }
+      : filters.departmentId
+        ? { departmentId: filters.departmentId }
+        : {}
   const where: Prisma.UserWhereInput = {
     role: 'STUDENT',
-    memberships: { some: { orgId } },
+    // Department scope AND the optional department filter, on the same membership row.
+    memberships: { some: { AND: [memberWhere(scope), deptFilter] } },
     ...(filters.batchId && { batchMemberships: { some: { batchId: filters.batchId } } }),
     ...(filters.status === 'pending' && { firebaseUid: { startsWith: 'pending:' } }),
     ...(filters.status === 'active' && { NOT: { firebaseUid: { startsWith: 'pending:' } } }),
@@ -117,6 +128,10 @@ export async function listCandidates(orgId: string, filters: CandidateFilters = 
           where: { batch: { orgId } },
           select: { batch: { select: { id: true, name: true } } },
         },
+        memberships: {
+          where: { orgId },
+          select: { department: { select: { id: true, code: true, name: true } } },
+        },
         _count: { select: { memberships: true, assignments: { where: { assessment: { orgId } } } } },
       },
     }),
@@ -128,7 +143,13 @@ export async function listCandidates(orgId: string, filters: CandidateFilters = 
     items: items.map((u) => {
       const claimed = !u.firebaseUid.startsWith('pending:')
       // Same rule as candidateEditability — kept in sync so the menu never offers an edit the API refuses.
-      return { ...u, claimed, editable: !claimed && u._count.memberships === 1 }
+      const { memberships, ...rest } = u
+      return {
+        ...rest,
+        department: memberships[0]?.department ?? null,
+        claimed,
+        editable: !claimed && u._count.memberships === 1,
+      }
     }),
     total,
   }
@@ -155,7 +176,12 @@ export type ImportResult = {
  * The pending uid is what makes the claim-on-first-login (session route) safe:
  * a real Firebase uid can never start with `pending:`.
  */
-export async function importCandidates(orgId: string, raw: string): Promise<ImportResult> {
+export async function importCandidates(
+  scope: Scope,
+  raw: string,
+  departmentId: string | null = null,
+): Promise<ImportResult> {
+  const orgId = scope.orgId
   const parsed = parseCandidateList(raw)
   const result: ImportResult = {
     createdUsers: 0,
@@ -182,7 +208,7 @@ export async function importCandidates(orgId: string, raw: string): Promise<Impo
     const found = byEmail.get(email)
     if (found) {
       result.claimedExisting += 1
-      if (await ensureMembership(orgId, found.id)) result.addedMemberships += 1
+      if (await ensureMembership(orgId, found.id, departmentId)) result.addedMemberships += 1
     } else {
       const created = await prisma.user.create({
         data: {
@@ -192,7 +218,7 @@ export async function importCandidates(orgId: string, raw: string): Promise<Impo
         },
       })
       result.createdUsers += 1
-      if (await ensureMembership(orgId, created.id)) result.addedMemberships += 1
+      if (await ensureMembership(orgId, created.id, departmentId)) result.addedMemberships += 1
     }
   }
 
@@ -200,7 +226,7 @@ export async function importCandidates(orgId: string, raw: string): Promise<Impo
     const found = byPhone.get(phone)
     if (found) {
       result.claimedExisting += 1
-      if (await ensureMembership(orgId, found.id)) result.addedMemberships += 1
+      if (await ensureMembership(orgId, found.id, departmentId)) result.addedMemberships += 1
     } else {
       const created = await prisma.user.create({
         data: {
@@ -210,39 +236,58 @@ export async function importCandidates(orgId: string, raw: string): Promise<Impo
         },
       })
       result.createdUsers += 1
-      if (await ensureMembership(orgId, created.id)) result.addedMemberships += 1
+      if (await ensureMembership(orgId, created.id, departmentId)) result.addedMemberships += 1
     }
   }
 
   return result
 }
 
-async function ensureMembership(orgId: string, userId: string): Promise<boolean> {
+export async function ensureMembership(orgId: string, userId: string, departmentId: string | null = null): Promise<boolean> {
   try {
-    await prisma.organizationMember.create({ data: { orgId, userId, role: 'MEMBER' } })
+    await prisma.organizationMember.create({ data: { orgId, userId, role: 'MEMBER', departmentId } })
     return true
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return false // already a member
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      // Already a member: fill in a department if they have none yet; never
+      // silently move them out of an existing one.
+      if (departmentId) {
+        await prisma.organizationMember.updateMany({
+          where: { orgId, userId, departmentId: null },
+          data: { departmentId },
+        })
+      }
+      return false
+    }
     throw e
   }
 }
 
 /* ---- batches ----------------------------------------------------------- */
 
-export async function listBatches(orgId: string) {
+export async function listBatches(scope: Scope) {
   return prisma.batch.findMany({
-    where: { orgId },
+    where: batchWhere(scope),
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { members: true } } },
+    include: {
+      _count: { select: { members: true } },
+      department: { select: { id: true, code: true } },
+    },
   })
 }
 
-export async function createBatch(orgId: string, name: string, description?: string) {
+export async function createBatch(
+  scope: Scope,
+  name: string,
+  description?: string,
+  departmentId: string | null = null,
+) {
+  const orgId = scope.orgId
   const trimmed = name.trim()
   if (!trimmed) throw new ValidationError('Batch name is required')
   try {
     return await prisma.batch.create({
-      data: { orgId, name: trimmed, description: description?.trim() || null },
+      data: { orgId, name: trimmed, description: description?.trim() || null, departmentId },
     })
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -252,15 +297,15 @@ export async function createBatch(orgId: string, name: string, description?: str
   }
 }
 
-async function assertBatchInOrg(orgId: string, batchId: string) {
-  const b = await prisma.batch.findUnique({ where: { id: batchId }, select: { orgId: true } })
-  if (!b || b.orgId !== orgId) throw new NotFoundError('Batch not found')
+async function assertBatchInScope(scope: Scope, batchId: string) {
+  const b = await prisma.batch.findFirst({ where: { id: batchId, ...batchWhere(scope) }, select: { id: true } })
+  if (!b) throw new NotFoundError('Batch not found')
 }
 
 /** Upper bound on one add-to-batch call — a whole roster page, with headroom. */
 export const MAX_BATCH_ADD = 1000
 
-export async function addToBatch(orgId: string, batchId: string, rawUserIds: string[]) {
+export async function addToBatch(scope: Scope, batchId: string, rawUserIds: string[]) {
   // Dedupe first: the ownership check compares counts, so a repeated id
   // would otherwise fail as "not a member of this organization".
   const userIds = [...new Set(rawUserIds)]
@@ -268,27 +313,23 @@ export async function addToBatch(orgId: string, batchId: string, rawUserIds: str
   if (userIds.length > MAX_BATCH_ADD) {
     throw new ValidationError(`Add at most ${MAX_BATCH_ADD} candidates at a time`)
   }
-  await assertBatchInOrg(orgId, batchId)
-  // Every user must be a member of the org — no borrowing across tenants.
-  const owned = await prisma.user.count({
-    where: { id: { in: userIds }, memberships: { some: { orgId } } },
-  })
-  if (owned !== userIds.length) {
-    throw new ValidationError('One or more users are not members of this organization')
-  }
+  await assertBatchInScope(scope, batchId)
+  // Every user must be a student in scope — no borrowing across tenants or departments.
+  await assertStudentsInScope(scope, userIds)
   await prisma.batchMember.createMany({
     data: userIds.map((userId) => ({ batchId, userId })),
     skipDuplicates: true,
   })
 }
 
-export async function removeFromBatch(orgId: string, batchId: string, userId: string) {
-  await assertBatchInOrg(orgId, batchId)
+export async function removeFromBatch(scope: Scope, batchId: string, userId: string) {
+  await assertBatchInScope(scope, batchId)
+  if (!scope.all) await assertStudentsInScope(scope, [userId])
   await prisma.batchMember.deleteMany({ where: { batchId, userId } })
 }
 
-export async function deleteBatch(orgId: string, batchId: string) {
-  await assertBatchInOrg(orgId, batchId)
+export async function deleteBatch(scope: Scope, batchId: string) {
+  await assertBatchInScope(scope, batchId)
   await prisma.batch.delete({ where: { id: batchId } })
 }
 
@@ -304,9 +345,9 @@ export const MAX_REMOVE = MAX_BATCH_ADD
  * them (they edit them in their profile); and a pending row shared with
  * another college can't be rewritten from one tenant.
  */
-export async function candidateEditability(orgId: string, userId: string) {
+export async function candidateEditability(scope: Scope, userId: string) {
   const u = await prisma.user.findFirst({
-    where: { id: userId, role: 'STUDENT', memberships: { some: { orgId } } },
+    where: { id: userId, ...studentWhere(scope) },
     select: { firebaseUid: true, _count: { select: { memberships: true } } },
   })
   if (!u) throw new NotFoundError('Candidate not found')
@@ -316,11 +357,11 @@ export async function candidateEditability(orgId: string, userId: string) {
 }
 
 export async function updateCandidate(
-  orgId: string,
+  scope: Scope,
   userId: string,
   input: { name?: string | null; email?: string | null; phone?: string | null },
 ) {
-  const check = await candidateEditability(orgId, userId)
+  const check = await candidateEditability(scope, userId)
   if (!check.editable) {
     throw new ValidationError(
       check.reason === 'signed-in'
@@ -382,13 +423,14 @@ export type RemoveResult = { removed: number; deletedAccounts: number; cancelled
  *
  * Other colleges' data for the same student is never touched.
  */
-export async function removeCandidates(orgId: string, rawUserIds: string[]): Promise<RemoveResult> {
+export async function removeCandidates(scope: Scope, rawUserIds: string[]): Promise<RemoveResult> {
+  const orgId = scope.orgId
   const userIds = [...new Set(rawUserIds)]
   if (userIds.length === 0) return { removed: 0, deletedAccounts: 0, cancelledInvites: 0 }
   if (userIds.length > MAX_REMOVE) throw new ValidationError(`Remove at most ${MAX_REMOVE} candidates at a time`)
 
   const users = await prisma.user.findMany({
-    where: { id: { in: userIds }, role: 'STUDENT', memberships: { some: { orgId } } },
+    where: { id: { in: userIds }, ...studentWhere(scope) },
     select: {
       id: true,
       firebaseUid: true,
@@ -396,7 +438,11 @@ export async function removeCandidates(orgId: string, rawUserIds: string[]): Pro
     },
   })
   if (users.length !== userIds.length) {
-    throw new ValidationError('One or more candidates are not on this college’s roster')
+    throw new ValidationError(
+      scope.all
+        ? 'One or more candidates are not on this college’s roster'
+        : 'One or more candidates are outside your department',
+    )
   }
 
   const ids = users.map((u) => u.id)
@@ -414,4 +460,30 @@ export async function removeCandidates(orgId: string, rawUserIds: string[]): Pro
   ])
 
   return { removed: ids.length, deletedAccounts: deleted.count, cancelledInvites: cancelled.count }
+}
+
+/* ---- departments ------------------------------------------------------- */
+
+/**
+ * Move students into a department (or out of one with null). College-wide
+ * scopes may use any of the org's departments; an HOD may only move their
+ * own students, and only into departments they head.
+ */
+export async function setCandidatesDepartment(scope: Scope, rawUserIds: string[], departmentId: string | null) {
+  const userIds = [...new Set(rawUserIds)]
+  if (userIds.length === 0) return 0
+  if (userIds.length > MAX_REMOVE) throw new ValidationError(`Move at most ${MAX_REMOVE} candidates at a time`)
+  await assertStudentsInScope(scope, userIds)
+  if (departmentId) {
+    const d = await prisma.department.findFirst({ where: { id: departmentId, orgId: scope.orgId }, select: { id: true } })
+    if (!d) throw new NotFoundError('Department not found')
+    if (!scope.all && !scope.departmentIds.includes(departmentId)) throw new ForbiddenError('That department isn’t yours')
+  } else if (!scope.all) {
+    throw new ForbiddenError('Only a College Admin can take students out of a department')
+  }
+  const res = await prisma.organizationMember.updateMany({
+    where: { orgId: scope.orgId, userId: { in: userIds } },
+    data: { departmentId },
+  })
+  return res.count
 }

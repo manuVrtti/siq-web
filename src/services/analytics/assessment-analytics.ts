@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { NotFoundError } from '@/lib/errors'
+import { assessmentWhere, userInScope, type Scope } from '@/lib/auth/scope'
 import { prisma } from '@/lib/prisma'
 import {
   getOptionDistributions,
@@ -13,12 +14,15 @@ import { mean, median, percentageHistogram, round, stdDev } from '@/services/ana
  * Plan 019 — everything the per-assessment analytics page shows, in one call
  * so the page issues one parallel batch of queries instead of a waterfall.
  *
- * Tenant check first: the assessment must belong to `orgId`, otherwise
- * NotFound (never confirm that an id exists in another org).
+ * Tenant check first: the assessment must belong to the scope's org,
+ * otherwise NotFound (never confirm that an id exists in another org).
+ * Every people-linked number is limited to the scope's students, so an
+ * HOD's funnel and pass rate describe their department only.
  */
-export async function getAssessmentAnalytics(orgId: string, assessmentId: string) {
+export async function getAssessmentAnalytics(scope: Scope, assessmentId: string) {
+  const u = userInScope(scope)
   const assessment = await prisma.assessment.findFirst({
-    where: { id: assessmentId, orgId },
+    where: { id: assessmentId, orgId: scope.orgId },
     select: {
       id: true,
       title: true,
@@ -36,22 +40,22 @@ export async function getAssessmentAnalytics(orgId: string, assessmentId: string
     await Promise.all([
       prisma.assessmentAssignment.groupBy({
         by: ['status'],
-        where: { assessmentId },
+        where: { assessmentId, ...u },
         _count: { _all: true },
       }),
       prisma.examAttempt.findMany({
-        where: { assessmentId },
+        where: { assessmentId, ...u },
         select: { startedAt: true, submittedAt: true, deadlineAt: true },
       }),
       prisma.result.findMany({
-        where: { assessmentId },
+        where: { assessmentId, ...u },
         select: { status: true, percentage: true, passed: true },
       }),
-      getQuestionStats(assessmentId),
-      getOptionDistributions(assessmentId),
+      getQuestionStats(assessmentId, scope),
+      getOptionDistributions(assessmentId, scope),
       prisma.proctoringFlag.groupBy({
         by: ['type'],
-        where: { session: { attempt: { assessmentId } } },
+        where: { session: { attempt: { assessmentId, ...u } } },
         _count: { _all: true },
       }),
     ])
@@ -144,33 +148,35 @@ export type AssessmentAnalytics = Awaited<ReturnType<typeof getAssessmentAnalyti
  * Compact per-assessment rows for the org analytics table: one aggregate
  * pass over results + assignments instead of N× getAssessmentAnalytics.
  */
-export async function listAssessmentPerformance(orgId: string) {
+export async function listAssessmentPerformance(scope: Scope) {
+  const u = userInScope(scope)
+  const orgId = scope.orgId
   const [assessments, resultGroups, passedGroups, decidedGroups, assignmentGroups] =
     await Promise.all([
       prisma.assessment.findMany({
-        where: { orgId, status: { in: ['PUBLISHED', 'ARCHIVED'] } },
+        where: { ...assessmentWhere(scope), status: { in: ['PUBLISHED', 'ARCHIVED'] } },
         orderBy: { updatedAt: 'desc' },
         select: { id: true, title: true, status: true, proctoringEnabled: true },
       }),
       prisma.result.groupBy({
         by: ['assessmentId'],
-        where: { status: 'GRADED', assessment: { orgId } },
+        where: { status: 'GRADED', assessment: { orgId }, ...u },
         _avg: { percentage: true },
         _count: { _all: true },
       }),
       prisma.result.groupBy({
         by: ['assessmentId'],
-        where: { status: 'GRADED', passed: true, assessment: { orgId } },
+        where: { status: 'GRADED', passed: true, assessment: { orgId }, ...u },
         _count: { _all: true },
       }),
       prisma.result.groupBy({
         by: ['assessmentId'],
-        where: { status: 'GRADED', passed: { not: null }, assessment: { orgId } },
+        where: { status: 'GRADED', passed: { not: null }, assessment: { orgId }, ...u },
         _count: { _all: true },
       }),
       prisma.assessmentAssignment.groupBy({
         by: ['assessmentId', 'status'],
-        where: { assessment: { orgId } },
+        where: { assessment: { orgId }, ...u },
         _count: { _all: true },
       }),
     ])

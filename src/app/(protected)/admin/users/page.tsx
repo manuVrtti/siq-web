@@ -14,7 +14,7 @@ import { listUsers } from '@/services/admin'
 
 export const metadata: Metadata = { title: 'Users — Admin — SelectIQ' }
 
-const ROLES = ['STUDENT', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
+const ROLES = ['STUDENT', 'COLLEGE_HOD', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const me = (await getCurrentUser())!

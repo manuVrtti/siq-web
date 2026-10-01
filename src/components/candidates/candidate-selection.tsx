@@ -94,7 +94,15 @@ export function HeaderCheckbox() {
  * Floating bar shown while anything is selected: add the selection to an
  * existing batch, or create a new batch and add to it in one go.
  */
-export function BulkBar({ batches }: { batches: { id: string; name: string }[] }) {
+export function BulkBar({
+  batches,
+  departments = [],
+  canUnassign = false,
+}: {
+  batches: { id: string; name: string }[]
+  departments?: { id: string; code: string; name: string }[]
+  canUnassign?: boolean
+}) {
   const { selected, clear } = useSelection()
   const org = useActiveOrg()
   const router = useRouter()
@@ -105,6 +113,30 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [removing, setRemoving] = useState(false)
   const [creds, setCreds] = useState(false)
+
+  async function moveTo(value: string) {
+    if (!value) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const res = await fetch('/api/candidates', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: org.id, userIds: [...selected], departmentId: value === '__none' ? null : value }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Could not move')
+      const label = value === '__none' ? 'Unassigned' : (departments.find((d) => d.id === value)?.code ?? 'department')
+      setMsg({ ok: true, text: `Moved ${json.data.moved} to ${label}` })
+      clear()
+      router.refresh()
+      setTimeout(() => setMsg(null), 3000)
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : 'Something went wrong' })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   if (selected.size === 0 && !msg) return null
 
@@ -211,6 +243,24 @@ export function BulkBar({ batches }: { batches: { id: string; name: string }[] }
               {mode === 'new' ? 'Create & add' : 'Add'}
             </Button>
           </div>
+
+          {departments.length > 0 ? (
+            <select
+              value=""
+              disabled={busy}
+              onChange={(e) => void moveTo(e.target.value)}
+              className="border-input bg-card h-8 rounded-lg border px-2 text-sm outline-none"
+              aria-label="Move selected to a department"
+            >
+              <option value="">Move to…</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.code} — {d.name}
+                </option>
+              ))}
+              {canUnassign ? <option value="__none">Unassigned</option> : null}
+            </select>
+          ) : null}
 
           <Button size="sm" variant="outline" onClick={() => setCreds(true)}>
             <KeyRound className="size-4" aria-hidden />

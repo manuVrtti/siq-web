@@ -2,6 +2,7 @@ import 'server-only'
 
 import { NotFoundError } from '@/lib/errors'
 import { buildWorkbook } from '@/lib/import/xlsx-parser'
+import { batchWhere, studentWhere, userInScope, type Scope } from '@/lib/auth/scope'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -31,7 +32,8 @@ function outcome(status: string, passed: boolean | null): string {
   return 'Graded'
 }
 
-export async function exportAssessmentResults(orgId: string, assessmentId: string) {
+export async function exportAssessmentResults(scope: Scope, assessmentId: string) {
+  const orgId = scope.orgId
   const assessment = await prisma.assessment.findFirst({
     where: { id: assessmentId, orgId },
     select: {
@@ -48,7 +50,7 @@ export async function exportAssessmentResults(orgId: string, assessmentId: strin
   if (!assessment) throw new NotFoundError('Assessment not found')
 
   const results = await prisma.result.findMany({
-    where: { assessmentId },
+    where: { assessmentId, ...userInScope(scope) },
     orderBy: [{ percentage: 'desc' }, { createdAt: 'asc' }],
     select: {
       status: true,
@@ -152,10 +154,11 @@ export async function exportAssessmentResults(orgId: string, assessmentId: strin
 }
 
 /** Every graded result of a batch's members across this org's assessments. */
-export async function exportBatchResults(orgId: string, batchId: string) {
+export async function exportBatchResults(scope: Scope, batchId: string) {
+  const orgId = scope.orgId
   const batch = await prisma.batch.findFirst({
-    where: { id: batchId, orgId },
-    select: { name: true, members: { select: { userId: true } } },
+    where: { id: batchId, ...batchWhere(scope) },
+    select: { name: true, members: { where: scope.all ? {} : { user: studentWhere(scope) }, select: { userId: true } } },
   })
   if (!batch) throw new NotFoundError('Batch not found')
 

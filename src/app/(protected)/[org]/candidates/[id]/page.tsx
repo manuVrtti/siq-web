@@ -9,10 +9,9 @@ import { Initials, Pill, StatusPill } from '@/components/dashboard/bits'
 import { ListHeader } from '@/components/data/list-header'
 import { Button } from '@/components/ui/button'
 import { PERMISSIONS } from '@/constants/permissions'
-import { requirePagePermission } from '@/lib/auth/page-guard'
+import { requirePageScope } from '@/lib/auth/page-guard'
 import { NotFoundError } from '@/lib/errors'
 import { timeAgo } from '@/lib/format'
-import { getOrgBySlug } from '@/services/organizations'
 import { computeCompleteness, getCandidateForManager } from '@/services/profile'
 
 export const metadata: Metadata = { title: 'Candidate — SelectIQ' }
@@ -30,14 +29,12 @@ export default async function CandidateDetailPage({
 }: {
   params: Promise<{ org: string; id: string }>
 }) {
-  await requirePagePermission(PERMISSIONS.MANAGE_ORG_USERS)
   const { org: slug, id } = await params
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { org, scope } = await requirePageScope(PERMISSIONS.MANAGE_ORG_USERS, slug)
 
   let c
   try {
-    c = await getCandidateForManager(org.id, id)
+    c = await getCandidateForManager(scope, id)
   } catch (e) {
     if (e instanceof NotFoundError) notFound()
     throw e

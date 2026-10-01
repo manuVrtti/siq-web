@@ -35,6 +35,7 @@ export function ImportWizard({
   describeSummary,
   describeDone,
   doneHref,
+  extra,
 }: {
   kind: string
   templateHref: string
@@ -44,6 +45,8 @@ export function ImportWizard({
   describeSummary: 'question' | 'candidate'
   describeDone: 'question' | 'candidate'
   doneHref: string
+  /** Extra form fields sent with validate + commit (e.g. a default departmentId). */
+  extra?: Record<string, string>
 }) {
   const org = useActiveOrg()
   const router = useRouter()
@@ -58,6 +61,7 @@ export function ImportWizard({
   async function send(url: string, f: File) {
     const form = new FormData()
     form.append('orgId', org.id)
+    for (const [k, v] of Object.entries(extra ?? {})) if (v) form.append(k, v)
     form.append('file', f)
     const res = await fetch(url, { method: 'POST', body: form })
     const json = await res.json().catch(() => null)

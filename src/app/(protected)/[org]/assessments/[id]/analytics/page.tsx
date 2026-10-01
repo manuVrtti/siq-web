@@ -12,11 +12,9 @@ import { StatCard } from '@/components/analytics/stat-card'
 import { PanelEmpty, Pill } from '@/components/dashboard/bits'
 import { Button } from '@/components/ui/button'
 import { PERMISSIONS } from '@/constants/permissions'
-import { getCurrentUser } from '@/lib/auth/get-current-user'
-import { hasPermission } from '@/lib/auth/permissions'
+import { requireAssessmentPage } from '@/lib/auth/page-guard'
 import { NotFoundError } from '@/lib/errors'
 import { getAssessmentAnalytics } from '@/services/analytics/assessment-analytics'
-import { getOrgBySlug } from '@/services/organizations'
 
 export const metadata: Metadata = { title: 'Assessment analytics — SelectIQ' }
 
@@ -42,15 +40,11 @@ export default async function AssessmentAnalyticsPage({
   params: Promise<{ org: string; id: string }>
 }) {
   const { org: slug, id } = await params
-  const user = (await getCurrentUser())!
-  if (!hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)) notFound()
-
-  const org = await getOrgBySlug(slug)
-  if (!org) notFound()
+  const { scope } = await requireAssessmentPage(PERMISSIONS.VIEW_ORG_RESULTS, slug, id, 'view')
 
   let a
   try {
-    a = await getAssessmentAnalytics(org.id, id)
+    a = await getAssessmentAnalytics(scope, id)
   } catch (error) {
     if (error instanceof NotFoundError) notFound()
     throw error

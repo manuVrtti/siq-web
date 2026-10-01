@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { userInScope, type Scope } from '@/lib/auth/scope'
 import { prisma } from '@/lib/prisma'
 import { mean, pointBiserial, round } from '@/services/analytics/stats'
 
@@ -34,7 +35,8 @@ export type QuestionStat = {
   maxMarks: number
 }
 
-export async function getQuestionStats(assessmentId: string): Promise<QuestionStat[]> {
+/** `scope` limits the responses to an HOD's students; omit or college-wide = everyone. */
+export async function getQuestionStats(assessmentId: string, scope?: Scope): Promise<QuestionStat[]> {
   const [placements, questionResults] = await Promise.all([
     prisma.assessmentQuestion.findMany({
       where: { section: { assessmentId } },
@@ -46,7 +48,7 @@ export async function getQuestionStats(assessmentId: string): Promise<QuestionSt
       },
     }),
     prisma.questionResult.findMany({
-      where: { result: { assessmentId, status: 'GRADED' }, needsReview: false },
+      where: { result: { assessmentId, status: 'GRADED', ...(scope ? userInScope(scope) : {}) }, needsReview: false },
       select: {
         questionId: true,
         scoreAwarded: true,
@@ -104,6 +106,7 @@ export type OptionDistribution = {
  */
 export async function getOptionDistributions(
   assessmentId: string,
+  scope?: Scope,
 ): Promise<Map<string, OptionDistribution>> {
   const [questions, answers] = await Promise.all([
     prisma.question.findMany({
@@ -120,7 +123,7 @@ export async function getOptionDistributions(
       },
     }),
     prisma.examAnswer.findMany({
-      where: { attempt: { assessmentId, submittedAt: { not: null } } },
+      where: { attempt: { assessmentId, submittedAt: { not: null }, ...(scope ? userInScope(scope) : {}) } },
       select: { questionId: true, selectedOptionIds: true },
     }),
   ])

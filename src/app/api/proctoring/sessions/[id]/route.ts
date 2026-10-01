@@ -1,8 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { errorResponse, successResponse } from '@/lib/api-response'
-import { requireOrgAccess } from '@/lib/auth/org-access'
 import { withRole } from '@/lib/auth/require-role'
+import { MANAGER_ROLES, assertStudentsInScope, getScope } from '@/lib/auth/scope'
 import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { getSessionForAdmin } from '@/services/proctoring'
@@ -16,7 +16,6 @@ import { getSessionForAdmin } from '@/services/proctoring'
  */
 
 export const dynamic = 'force-dynamic'
-const MANAGER_ROLES = ['COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -27,7 +26,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     // no relation object, only assessmentId, so this needs two hops.
     const row = await prisma.proctoringSession.findUnique({
       where: { id },
-      select: { attempt: { select: { assessmentId: true } } },
+      select: { userId: true, attempt: { select: { assessmentId: true } } },
     })
     if (!row) throw new NotFoundError('Proctoring session not found')
     const assessment = await prisma.assessment.findUnique({
@@ -35,7 +34,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       select: { orgId: true },
     })
     if (!assessment) throw new NotFoundError('Proctoring session not found')
-    await requireOrgAccess(user, assessment.orgId)
+    const scope = await getScope(user, assessment.orgId)
+    if (!scope.all) await assertStudentsInScope(scope, [row.userId])
 
     return successResponse(await getSessionForAdmin(assessment.orgId, id))
   } catch (error) {

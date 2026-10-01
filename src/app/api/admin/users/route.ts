@@ -14,7 +14,7 @@ import { listUsers } from '@/services/admin'
  */
 
 export const dynamic = 'force-dynamic'
-const ROLES = ['STUDENT', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
+const ROLES = ['STUDENT', 'COLLEGE_HOD', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
 
 export async function GET(request: NextRequest) {
   try {

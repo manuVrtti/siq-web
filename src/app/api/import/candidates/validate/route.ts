@@ -14,8 +14,8 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    const { orgId, bytes } = await readImportUpload(request)
-    return successResponse(await validateCandidateImport(orgId, bytes))
+    const { scope, departmentId, bytes } = await readImportUpload(request)
+    return successResponse(await validateCandidateImport(scope, bytes, departmentId))
   } catch (error) {
     return errorResponse(error)
   }

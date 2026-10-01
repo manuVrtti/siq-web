@@ -2,6 +2,7 @@ import 'server-only'
 
 import { randomUUID } from 'node:crypto'
 
+import { batchWhere, resolveOwningDepartment, type Scope } from '@/lib/auth/scope'
 import { prisma } from '@/lib/prisma'
 import { buildWorkbook, parseSheet } from '@/lib/import/xlsx-parser'
 import { normalizeEmail, normalizePhone } from '@/lib/validators/contact'
@@ -12,7 +13,12 @@ import { normalizeEmail, normalizePhone } from '@/lib/validators/contact'
  *
  * Unlike the paste import (plan 013), each ROW is one person, so a row with
  * both an email and a phone creates one account, not two. Rows may carry a
- * name and a batch; batches are created on demand.
+ * name, a batch and a department; batches are created on demand.
+ *
+ * Departments: a row's `department` (code or name) wins, else the default
+ * chosen in the wizard. HOD imports may only use their own departments, may
+ * not pull in a student who already belongs to another department, and may
+ * not add to another department's batch.
  *
  * Commit is batched: a fixed number of queries regardless of file size
  * (createMany + skipDuplicates), so a 2,000-row roster finishes well inside a
@@ -31,6 +37,8 @@ export type CandidateRowResult =
       email: string | null
       phone: string | null
       batch: string | null
+      departmentId: string | null
+      departmentCode: string | null
       /** 'new' = account will be created; 'existing' = already has an account (joins the org). */
       status: 'new' | 'existing'
       existingId?: string
@@ -41,11 +49,11 @@ export function getCandidateTemplate(): Buffer {
   return buildWorkbook([
     {
       name: 'Candidates',
-      widths: [26, 32, 16, 22],
+      widths: [26, 32, 16, 22, 14],
       rows: [
-        { name: 'Aarav Sharma', email: 'aarav.sharma@college.edu', phone: '9876543210', batch: 'CSE 2026 - A' },
-        { name: 'Diya Patel', email: 'diya.patel@college.edu', phone: '', batch: 'CSE 2026 - A' },
-        { name: 'Kabir Singh', email: '', phone: '+91 98765 43211', batch: 'ECE 2026' },
+        { name: 'Aarav Sharma', email: 'aarav.sharma@college.edu', phone: '9876543210', batch: 'CSE 2026 - A', department: 'CSE' },
+        { name: 'Diya Patel', email: 'diya.patel@college.edu', phone: '', batch: 'CSE 2026 - A', department: 'CSE' },
+        { name: 'Kabir Singh', email: '', phone: '+91 98765 43211', batch: 'ECE 2026', department: 'ECE' },
       ],
     },
     {
@@ -56,6 +64,7 @@ export function getCandidateTemplate(): Buffer {
         { column: 'email', rule: 'The email the candidate will sign in with (Google). Needs email OR phone.' },
         { column: 'phone', rule: '10-digit Indian numbers are assumed +91. Needs email OR phone.' },
         { column: 'batch', rule: 'Optional batch name, e.g. "CSE 2026 - A". Created if it does not exist.' },
+        { column: 'department', rule: 'Optional department code or name, e.g. "CSE". Must already exist in Settings → Departments. Empty = the department chosen in the import wizard.' },
         { column: 'Accounts', rule: 'Candidates sign in with the same email/phone to claim their account. Existing accounts are linked, not duplicated.' },
         { column: 'Limits', rule: 'Up to 2,000 rows and 5 MB per file. Only the first sheet is read.' },
       ],
@@ -63,8 +72,18 @@ export function getCandidateTemplate(): Buffer {
   ])
 }
 
-export async function validateCandidateImport(orgId: string, bytes: ArrayBuffer | Buffer) {
+export async function validateCandidateImport(scope: Scope, bytes: ArrayBuffer | Buffer, defaultDepartmentId: string | null = null) {
+  const orgId = scope.orgId
   const { rows } = parseSheet(bytes, { requiredHeaders: CANDIDATE_REQUIRED_HEADERS })
+  // HODs always import into one of their departments; admins may leave it empty.
+  const fallbackDept = await resolveOwningDepartment(scope, defaultDepartmentId)
+  const departments = await prisma.department.findMany({ where: { orgId }, select: { id: true, code: true, name: true } })
+  const deptByKey = new Map<string, { id: string; code: string }>()
+  for (const d of departments) {
+    deptByKey.set(d.code.toLowerCase(), d)
+    deptByKey.set(d.name.toLowerCase(), d)
+  }
+  const codeById = new Map(departments.map((d) => [d.id, d.code]))
 
   // Normalise every row first so the DB lookup is one query.
   const norm = rows.map((r) => {
@@ -74,6 +93,7 @@ export async function validateCandidateImport(orgId: string, bytes: ArrayBuffer 
       rowNumber: r.rowNumber,
       name: (r.values.name ?? '').slice(0, 200) || null,
       batch: (r.values.batch ?? '').slice(0, 100) || null,
+      rawDept: (r.values.department ?? '').trim(),
       rawEmail,
       rawPhone,
       email: rawEmail ? normalizeEmail(rawEmail) : null,
@@ -92,6 +112,26 @@ export async function validateCandidateImport(orgId: string, bytes: ArrayBuffer 
       : []
   const byEmail = new Map(existing.filter((u) => u.email).map((u) => [u.email!, u]))
   const byPhone = new Map(existing.filter((u) => u.phone).map((u) => [u.phone!, u]))
+  // Existing members' current department here, so an HOD can't take over another department's student.
+  const memberships = existing.length
+    ? await prisma.organizationMember.findMany({
+        where: { orgId, userId: { in: existing.map((u) => u.id) } },
+        select: { userId: true, departmentId: true },
+      })
+    : []
+  const deptOfMember = new Map(memberships.map((m) => [m.userId, m.departmentId]))
+  // Batches the scope may NOT use (another department's).
+  const rowBatchNames = [...new Set(norm.map((n) => n.batch).filter((b): b is string => Boolean(b)))]
+  const foreignBatches = new Set(
+    !scope.all && rowBatchNames.length
+      ? (
+          await prisma.batch.findMany({
+            where: { orgId, name: { in: rowBatchNames }, NOT: batchWhere(scope) },
+            select: { name: true },
+          })
+        ).map((b) => b.name)
+      : [],
+  )
 
   const seenEmail = new Map<string, number>()
   const seenPhone = new Map<string, number>()
@@ -119,6 +159,23 @@ export async function validateCandidateImport(orgId: string, bytes: ArrayBuffer 
       errors.push('This email/phone belongs to a staff account, not a candidate')
     }
 
+    let deptId = fallbackDept
+    if (n.rawDept) {
+      const d = deptByKey.get(n.rawDept.toLowerCase())
+      if (!d) errors.push(`Unknown department "${n.rawDept}" — add it in Settings → Departments first`)
+      else deptId = d.id
+    }
+    if (!scope.all && deptId && !scope.departmentIds.includes(deptId)) {
+      errors.push(`${codeById.get(deptId) ?? 'That department'} isn’t one of your departments`)
+    }
+    if (!scope.all && match && deptOfMember.has(match.id)) {
+      const current = deptOfMember.get(match.id)
+      if (current && !scope.departmentIds.includes(current)) {
+        errors.push(`Already in ${codeById.get(current) ?? 'another department'} — ask your College Admin to move them`)
+      }
+    }
+    if (n.batch && foreignBatches.has(n.batch)) errors.push(`Batch "${n.batch}" belongs to another department`)
+
     if (errors.length) return { rowNumber: n.rowNumber, ok: false, name: n.name, label, errors }
     return {
       rowNumber: n.rowNumber,
@@ -127,6 +184,8 @@ export async function validateCandidateImport(orgId: string, bytes: ArrayBuffer 
       email: n.email,
       phone: n.phone,
       batch: n.batch,
+      departmentId: deptId,
+      departmentCode: deptId ? (codeById.get(deptId) ?? null) : null,
       status: match ? 'existing' : 'new',
       existingId: match?.id,
     }
@@ -152,8 +211,9 @@ export async function validateCandidateImport(orgId: string, bytes: ArrayBuffer 
   }
 }
 
-export async function commitCandidateImport(orgId: string, bytes: ArrayBuffer | Buffer) {
-  const { rows, summary } = await validateCandidateImport(orgId, bytes)
+export async function commitCandidateImport(scope: Scope, bytes: ArrayBuffer | Buffer, defaultDepartmentId: string | null = null) {
+  const orgId = scope.orgId
+  const { rows, summary } = await validateCandidateImport(scope, bytes, defaultDepartmentId)
   const valid = rows.filter((r): r is Extract<CandidateRowResult, { ok: true }> => r.ok)
   if (valid.length === 0) return { created: 0, linked: 0, skipped: summary.invalid, batchesCreated: 0 }
 
@@ -196,17 +256,35 @@ export async function commitCandidateImport(orgId: string, bytes: ArrayBuffer | 
 
       // 3. Org memberships.
       const before = await tx.organizationMember.count({ where: { orgId, userId: { in: rowUser.map((x) => x.id) } } })
+      const seenUser = new Set<string>()
       await tx.organizationMember.createMany({
-        data: [...new Set(rowUser.map((x) => x.id))].map((userId) => ({ orgId, userId })),
+        data: rowUser
+          .filter((x) => (seenUser.has(x.id) ? false : (seenUser.add(x.id), true)))
+          .map((x) => ({ orgId, userId: x.id, departmentId: x.r.departmentId })),
         skipDuplicates: true,
       })
+      // Existing members without a department get the row's; never moved out of one.
+      const byDept = new Map<string, string[]>()
+      for (const x of rowUser) {
+        if (!x.r.departmentId) continue
+        byDept.set(x.r.departmentId, [...(byDept.get(x.r.departmentId) ?? []), x.id])
+      }
+      for (const [departmentId, userIds] of byDept) {
+        await tx.organizationMember.updateMany({
+          where: { orgId, userId: { in: userIds }, departmentId: null },
+          data: { departmentId },
+        })
+      }
 
       // 4. Batches (create missing, then attach members).
       const batchNames = [...new Set(rowUser.map((x) => x.r.batch).filter((b): b is string => Boolean(b)))]
       let batchesCreated = 0
       if (batchNames.length) {
+        // A new batch belongs to the department of its first row (HOD batches always do).
+        const deptForBatch = new Map<string, string | null>()
+        for (const x of rowUser) if (x.r.batch && !deptForBatch.has(x.r.batch)) deptForBatch.set(x.r.batch, x.r.departmentId)
         const made = await tx.batch.createMany({
-          data: batchNames.map((name) => ({ orgId, name })),
+          data: batchNames.map((name) => ({ orgId, name, departmentId: deptForBatch.get(name) ?? null })),
           skipDuplicates: true,
         })
         batchesCreated = made.count

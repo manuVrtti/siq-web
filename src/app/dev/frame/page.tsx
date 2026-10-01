@@ -10,7 +10,7 @@ import { devBypassEnabled } from '@/lib/auth/dev-bypass'
 export default async function DevFrame({ searchParams }: { searchParams: Promise<{ src?: string; w?: string; h?: string }> }) {
   if (!devBypassEnabled()) notFound()
   const { src = '/dev/student', w = '390', h = '2000' } = await searchParams
-  if (!src.startsWith('/dev/')) notFound()
+  if (!src.startsWith('/dev/') && src !== '/login') notFound()
   return (
     <div style={{ padding: 0, margin: 0, background: '#e2e8f0' }}>
       <iframe title="preview" src={src} width={Number(w)} height={Number(h)} style={{ border: 0, display: 'block', background: 'white' }} />

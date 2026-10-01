@@ -180,6 +180,7 @@ export function RemoveMemberButton({ orgId, userId, label }: { orgId: string; us
 const ROLE_OPTIONS = [
   { value: 'STUDENT', label: 'Student' },
   { value: 'COLLEGE_ADMIN', label: 'College admin' },
+  { value: 'COLLEGE_HOD', label: 'College HOD' },
   { value: 'RECRUITER', label: 'Recruiter' },
   { value: 'SUPER_ADMIN', label: 'Super admin' },
 ]

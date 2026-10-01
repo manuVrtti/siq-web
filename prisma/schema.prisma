@@ -28,6 +28,9 @@ datasource db {
 enum UserRole {
   SUPER_ADMIN
   COLLEGE_ADMIN
+  /// Head of department: everything a College Admin can do, limited to the
+  /// department(s) they head (DepartmentHead). Cannot change college settings.
+  COLLEGE_HOD
   RECRUITER
   STUDENT
 }
@@ -45,7 +48,7 @@ enum OrgMemberRole {
 /// Mirror of a Firebase Auth user plus SelectIQ app-level data.
 /// `firebaseUid` is the join key between the Firebase session and this table.
 model User {
-  id String @id @default(cuid())
+  id          String    @id @default(cuid())
   /// Null for phone-OTP-only accounts (MSG91 → Firebase custom token).
   email       String?   @unique
   /// Null for OAuth-only accounts. E.164 format.
@@ -55,6 +58,9 @@ model User {
   role        UserRole  @default(STUDENT)
   firebaseUid String    @unique
   lastLoginAt DateTime?
+  /// When the user finished (or skipped) their role's welcome journey.
+  /// Null = show /[org]/welcome on their next dashboard visit.
+  onboardedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -68,29 +74,34 @@ model User {
   results            Result[]
   proctoringSessions ProctoringSession[]
   candidateProfile   CandidateProfile?
+  headOf             DepartmentHead[]
 
   @@index([role])
 }
 
 /// A college or a hiring company. Users join via OrganizationMember.
 model Organization {
-  id   String  @id @default(cuid())
-  name String
-  type OrgType
+  id                     String   @id @default(cuid())
+  name                   String
+  type                   OrgType
   /// URL-safe tenant identifier: "abes" in selectsiq.in/abes/... (and later
   /// abes.selectsiq.in). Lowercase letters, digits and hyphens only. Required
   /// and permanent — it is the routing key, and changing it breaks every saved
   /// link. (Plan T01 — was nullable before any org existed.)
-  slug String @unique
+  slug                   String   @unique
   /// Email domain used to match students to their college, e.g. "abes.ac.in".
   /// Distinct from `slug`: a college may have several email domains but only
   /// one URL, and dots are not valid in a subdomain label.
-  domain String?
-  logoUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  domain                 String?
+  logoUrl                String?
+  /// Departments: when true, students choose their department at registration
+  /// (admins/HODs can still move them); when false, only the college assigns it.
+  studentsPickDepartment Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   members     OrganizationMember[]
+  departments Department[]
   questions   Question[]
   tags        Tag[]
   assessments Assessment[]
@@ -107,11 +118,51 @@ model OrganizationMember {
   role     OrgMemberRole @default(MEMBER)
   joinedAt DateTime      @default(now())
 
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /// A student's department in THIS college (a student in two colleges has
+  /// one per membership). Null = unassigned: visible to College Admins only.
+  departmentId String?
+
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  department Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@unique([userId, orgId])
   @@index([orgId])
+  @@index([departmentId])
+}
+
+/// An academic department of a college, e.g. "Computer Science & Engineering" (CSE).
+model Department {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  /// Short code shown in chips and filters, e.g. "CSE". Unique per college.
+  code      String
+  createdAt DateTime @default(now())
+
+  org         Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  heads       DepartmentHead[]
+  members     OrganizationMember[]
+  assessments Assessment[]
+  batches     Batch[]
+
+  @@unique([orgId, code])
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+/// Which HOD heads which department. Many-to-many: a College Admin can give
+/// one HOD several departments, or a department several HODs/coordinators.
+model DepartmentHead {
+  departmentId String
+  userId       String
+  assignedAt   DateTime @default(now())
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([departmentId, userId])
+  @@index([userId])
 }
 
 /// Append-only trail of user actions. Never updated, only inserted.
@@ -166,12 +217,12 @@ model Question {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  org       Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org                 Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
   // Restrict, not Cascade: deleting a user must not silently delete the
   // questions they authored — those belong to the org.
-  createdBy User             @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  options   QuestionOption[]
-  tags      QuestionTag[]
+  createdBy           User                 @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  options             QuestionOption[]
+  tags                QuestionTag[]
   assessmentQuestions AssessmentQuestion[]
 
   @@index([orgId])
@@ -237,32 +288,36 @@ enum ScoringPolicy {
 /// A configurable, timed assessment: global config plus ordered sections of
 /// questions. Org-owned; DRAFT until validated and published.
 model Assessment {
-  id               String           @id @default(cuid())
-  orgId            String
-  title            String
-  description      String?          @db.Text
-  status           AssessmentStatus @default(DRAFT)
-  durationMinutes  Int
-  scoringPolicy    ScoringPolicy    @default(STANDARD)
-  maxAttempts      Int              @default(1)
-  shuffleQuestions Boolean          @default(false)
-  shuffleOptions   Boolean          @default(false)
-  passingScore     Float?
-  startAt          DateTime?
-  endAt            DateTime?
+  id                  String           @id @default(cuid())
+  orgId               String
+  title               String
+  description         String?          @db.Text
+  status              AssessmentStatus @default(DRAFT)
+  durationMinutes     Int
+  scoringPolicy       ScoringPolicy    @default(STANDARD)
+  maxAttempts         Int              @default(1)
+  shuffleQuestions    Boolean          @default(false)
+  shuffleOptions      Boolean          @default(false)
+  passingScore        Float?
+  startAt             DateTime?
+  endAt               DateTime?
   /// Plan 018 — turns on webcam capture + activity monitoring during the attempt.
-  proctoringEnabled   Boolean @default(false)
+  proctoringEnabled   Boolean          @default(false)
   /// Snapshot cadence in seconds. Ignored when proctoringEnabled is false.
-  snapshotIntervalSec Int     @default(30)
+  snapshotIntervalSec Int              @default(30)
   /// When false, snapshots are analysed and discarded; only flags persist.
-  storeSnapshots      Boolean @default(true)
+  storeSnapshots      Boolean          @default(true)
   /// Cosine-similarity threshold below which a snapshot triggers FACE_MISMATCH.
-  faceMatchThreshold  Float   @default(0.6)
-  createdById      String
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  faceMatchThreshold  Float            @default(0.6)
+  createdById         String
+  /// Owning department. Null = college-wide (College Admin). HOD-created
+  /// assessments always carry one, so other departments' HODs can't edit them.
+  departmentId        String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
-  org       Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org         Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  department  Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   createdBy   User                   @relation(fields: [createdById], references: [id], onDelete: Restrict)
   sections    AssessmentSection[]
   assignments AssessmentAssignment[]
@@ -317,14 +372,17 @@ enum AssignmentStatus {
 
 /// An org-owned grouping of candidates (e.g. "2026 CSE Batch").
 model Batch {
-  id          String   @id @default(cuid())
-  orgId       String
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  orgId        String
+  name         String
+  description  String?
+  /// Owning department (null = college-wide). Same rule as Assessment.
+  departmentId String?
+  createdAt    DateTime @default(now())
 
-  org     Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  members BatchMember[]
+  org        Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  department Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  members    BatchMember[]
 
   @@unique([orgId, name])
   @@index([orgId])
@@ -385,10 +443,10 @@ model ExamAttempt {
   questionOrder  Json
   currentSection Int       @default(0)
 
-  assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  answers    ExamAnswer[]
-  result     Result?
+  assignment        AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers           ExamAnswer[]
+  result            Result?
   proctoringSession ProctoringSession?
 
   @@index([userId])
@@ -451,16 +509,16 @@ model Result {
 
 /// Per-question breakdown of a Result.
 model QuestionResult {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   resultId     String
   questionId   String
-  scoreAwarded Float   @default(0)
+  scoreAwarded Float    @default(0)
   maxMarks     Float
   isCorrect    Boolean?
   /// True while awaiting manual review (subjective, coding). Prevents result finalisation.
-  needsReview  Boolean @default(false)
+  needsReview  Boolean  @default(false)
   reviewedById String?
-  feedback     String? @db.Text
+  feedback     String?  @db.Text
 
   result Result @relation(fields: [resultId], references: [id], onDelete: Cascade)
 
