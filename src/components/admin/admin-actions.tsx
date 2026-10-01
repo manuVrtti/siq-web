@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Plus, X } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 
 import { Field, SelectInput, TextInput } from '@/components/profile/fields'
 import { Button } from '@/components/ui/button'
@@ -123,57 +123,6 @@ export function EditOrgForm({ id, name, domain }: { id: string; name: string; do
       {error ? <p role="alert" className="text-destructive text-sm sm:col-span-3">{error}</p> : null}
       {saved && !error ? <p role="status" className="text-success text-sm sm:col-span-3">Saved</p> : null}
     </form>
-  )
-}
-
-export function AddMemberForm({ orgId }: { orgId: string }) {
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState('MEMBER')
-  const { busy, error, run } = useAction()
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        void run(() => call(`/api/admin/organizations/${orgId}/members`, 'POST', { email, role }), () => setEmail(''))
-      }}
-      className="flex flex-col gap-2"
-    >
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <TextInput value={email} onChange={setEmail} placeholder="person@college.edu" type="email" aria-label="Email" />
-        <div className="sm:w-44">
-          <SelectInput value={role} onChange={setRole} options={[{ value: 'MEMBER', label: 'Member' }, { value: 'ADMIN', label: 'Org admin' }]} />
-        </div>
-        <Button type="submit" disabled={busy || !email.trim()}>
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />}
-          Add
-        </Button>
-      </div>
-      <p className="text-muted-foreground text-xs">
-        They must have signed in once. To let them manage the college, also set their role to College admin on the Users page.
-      </p>
-      {error ? <p role="alert" className="text-destructive text-sm">{error}</p> : null}
-    </form>
-  )
-}
-
-export function RemoveMemberButton({ orgId, userId, label }: { orgId: string; userId: string; label: string }) {
-  const { busy, error, run } = useAction()
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          if (!window.confirm(`Remove ${label} from this organization?`)) return
-          void run(() => call(`/api/admin/organizations/${orgId}/members?userId=${encodeURIComponent(userId)}`, 'DELETE'))
-        }}
-        disabled={busy}
-        aria-label={`Remove ${label}`}
-        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive grid size-8 place-items-center rounded-lg transition-colors disabled:opacity-40"
-      >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <X className="size-4" aria-hidden />}
-      </button>
-      {error ? <span className="text-destructive text-xs">{error}</span> : null}
-    </>
   )
 }
 

@@ -1,7 +1,7 @@
 # CLAUDE.md — SelectIQ Architecture & Implementation Guide
 
 > **Auto-read by Claude Code on every session.**
-> **Last updated:** 2026-08-12
+> **Last updated:** 2026-10-02
 > **This file is the single source of implementation truth. Follow it exactly.**
 
 ---
@@ -11,6 +11,26 @@
 SelectIQ is an AI-powered Campus Recruitment and Assessment Platform for Indian engineering colleges. It enables companies to conduct secure, proctored online assessments (coding challenges, MCQs, subjective evaluations) within a locked-down Electron-based exam browser.
 
 **Founder:** SG — non-technical ("vibe coder"), uses AI-assisted development as primary engineering approach.
+
+### Production standard (non-negotiable)
+
+SelectIQ is a **real startup with real colleges, real students and real risk**, not a college project.
+Work like it:
+
+- Enforce access on the server, default deny, least privilege. Never trust a client-sent id.
+- Never leak data across colleges or departments. Every manager query goes through `src/lib/auth/scope.ts`.
+- Audit every privileged change (`services/audit.ts`). Prefer reversible actions (suspend, not delete).
+- Prove it works: typecheck, lint, production build, and an end-to-end check of the real flow. Clean up any test data.
+- Dev and prod share one database. Use **additive migrations only**, and never use a new enum value before the code that reads it is live.
+- Every PR targets `main`. No stacked PRs.
+
+### Roles (5) and who manages whom
+
+**Super Admin** → everything (all colleges, College Admins, HODs, students, recruiters).
+**College Admin** → everything in their own college (other admins, HODs, departments, students).
+**College HOD** → students, tests and results of the departments they head.
+**Recruiter** → their company workspace. **Student** → themselves.
+Source of truth: `docs/roles-and-permissions.md` + `src/services/people.ts`. Keep them in sync.
 
 ---
 

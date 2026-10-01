@@ -69,7 +69,11 @@ export default function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       })
-      if (!response.ok) throw new Error('Could not establish a session. Please try again.')
+      if (!response.ok) {
+        const json = await response.json().catch(() => null)
+        // Our own errors (e.g. a suspended account) carry a safe message.
+        throw new Error(response.status === 403 && json?.error?.message ? json.error.message : 'Could not establish a session. Please try again.')
+      }
       // refresh() re-runs the server components so the new cookie is picked up.
       // A temporary-password session is forwarded on to /set-password.
       router.replace('/select-org')

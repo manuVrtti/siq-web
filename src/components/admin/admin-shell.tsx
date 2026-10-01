@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, Building2, LayoutDashboard, Menu, ScrollText, Users } from 'lucide-react'
+import { ArrowLeft, Building2, LayoutDashboard, Menu, ScrollText, ShieldCheck, Users } from 'lucide-react'
 
 import { BrandMark } from '@/components/brand/mark'
 import { Button } from '@/components/ui/button'
@@ -21,8 +21,14 @@ const GROUPS = [
     label: 'Platform',
     items: [
       { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
-      { href: '/admin/organizations', label: 'Organizations', icon: Building2 },
-      { href: '/admin/users', label: 'Users', icon: Users },
+      { href: '/admin/organizations', label: 'Colleges & companies', icon: Building2 },
+    ],
+  },
+  {
+    label: 'People',
+    items: [
+      { href: '/admin/users', label: 'All people', icon: Users },
+      { href: '/admin/platform-admins', label: 'Platform admins', icon: ShieldCheck },
     ],
   },
   {

@@ -21,7 +21,7 @@ export default async function AdminOrganizationsPage({ searchParams }: { searchP
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
-      <ListHeader eyebrow="Platform" title="Organizations" description={`${orgs.length} shown · colleges and hiring companies`} />
+      <ListHeader eyebrow="Platform" title="Colleges & companies" description={`${orgs.length} shown · open one to manage its people, departments and settings`} />
 
       <Panel eyebrow="New" title="Create an organization">
         <CreateOrgForm />
@@ -46,7 +46,9 @@ export default async function AdminOrganizationsPage({ searchParams }: { searchP
             <th className={TH}>Organization</th>
             <th className={TH}>Type</th>
             <th className={TH}>Email domain</th>
-            <th className={`${TH} text-right`}>Members</th>
+            <th className={`${TH} text-right`}>Students</th>
+            <th className={`${TH} text-right`}>Admins</th>
+            <th className={`${TH} text-right`}>Departments</th>
             <th className={`${TH} text-right`}>Assessments</th>
             <th className={`${TH} text-right`}>Created</th>
           </THead>
@@ -64,6 +66,14 @@ export default async function AdminOrganizationsPage({ searchParams }: { searchP
                 </td>
                 <td className={`${TD} text-muted-foreground text-xs`}>{o.domain ?? '—'}</td>
                 <td className={`${TD} siq-numeric text-right`}>{o._count.members}</td>
+                <td className={`${TD} siq-numeric text-right`}>
+                  {o.type === 'COLLEGE' && o.members.length === 0 ? (
+                    <span className="bg-warning/10 text-warning rounded px-1.5 py-0.5 text-[11px] font-semibold">none</span>
+                  ) : (
+                    o.members.length
+                  )}
+                </td>
+                <td className={`${TD} siq-numeric text-right`}>{o._count.departments}</td>
                 <td className={`${TD} siq-numeric text-right`}>{o._count.assessments}</td>
                 <td className={`${TD} text-muted-foreground text-right text-xs whitespace-nowrap`}>{shortDateTime(o.createdAt)}</td>
               </TRow>

@@ -1,6 +1,6 @@
 # SelectIQ — Project Context (Living Document)
 
-> **Last updated:** 2026-08-28
+> **Last updated:** 2026-10-02
 > **Purpose:** Single source of truth for project state. Manually updated after each feature build.
 > **Used by:** Claude (planning), Claude Code (implementation), any new team member onboarding.
 
@@ -17,6 +17,22 @@ SelectIQ is an AI-powered Campus Recruitment and Assessment Platform targeting I
 **Founder:** SG (solo founder, "vibe coder" — not deeply technical, uses AI-assisted development as primary engineering approach)
 
 **Team:** Small founding team of friends at current stage, with a planned hiring roadmap.
+
+### Operating standard — this is a real startup, not a college project
+
+SelectIQ is SG's company and SG's risk. Colleges trust it with students' data, exam integrity and
+placement outcomes. Everyone building it (people and AI tools) works to production standard:
+
+- **Correctness and security before speed.** Server-side enforcement only, default deny, least privilege.
+- **Real users, real data.** Never test against production data without cleaning up. Never leak one
+  college's data to another, or one department's to another.
+- **Every privileged action is audited and reversible** where possible (suspend, not delete).
+- **Verify, don't assume.** Typecheck, lint and production build pass, plus an end-to-end check of the
+  real flow, before anything is called done.
+- **Ship safely.** Additive migrations on the shared database, PRs to `main` only, and nothing that
+  breaks the live product mid-deploy.
+- **Clear ownership.** Super Admin → College Admin → HOD → students. See
+  [`roles-and-permissions.md`](roles-and-permissions.md).
 
 ---
 
@@ -113,26 +129,25 @@ All implementation plans live in `docs/plans/` as three-digit files (`001-…` t
 
 **Highest-risk plan in the MVP:** Plan 025 (competency scoring/rollup engine). Its math (difficulty weighting, cumulative aggregation, cohort baselines) must be hand-verified against paper calculations before anything is built on top of it.
 
-**Access-control spine:** `lib/auth/department-scope.ts` (`scopeStudentsQuery`) — all HOD-scoped queries build on it. Introduced in Plan 022.
+**Access-control spine (as built):** `src/lib/auth/scope.ts` (department scope for every manager query) and `src/services/people.ts` (who may manage whom, plus every guard). The full model is in [`roles-and-permissions.md`](roles-and-permissions.md).
 
 ---
 
-## 7. Current Sprint Status
+## 7. Current Status (2026-10-02)
 
-### Sprint 1 — Foundation (IN PROGRESS)
+**Live in production** (`selectiq-eta.vercel.app`, deployed from `main`):
 
-- [x] **Plan 001 — Next.js Project Scaffolding** (App Router, TypeScript, Tailwind, folder structure, path aliases, Prettier)
-- [x] **Plan 002 — Environment & Configuration System** (Zod-validated env, typed config, `.env.example`)
-- [ ] **Plan 003 — Prisma + Supabase Database Connection** ← **NEXT**
-- [ ] Plan 004 — Firebase Auth (Google & GitHub OAuth)
-- [ ] Plan 005 — MSG91 Phone OTP + Firebase Custom Tokens
-- [ ] Plan 006 — Auth Middleware & Route Protection
-- [ ] Plan 007 — Role-Based Access Control (RBAC)
-- [ ] Plan 008 — UI Foundation & Layout System
-- [ ] Plan 009 — Supabase Storage Integration
-- [ ] Plan 010 — Error Handling, Health Checks & Deployment
+- Foundation: Next.js App Router, Firebase auth (Google, GitHub, **email + password** with college-issued temporary passwords or set-password email), Prisma + Supabase, storage, path-based multi-tenancy (`/[college]/…`).
+- Assessment engine: question bank, builder, candidates and batches, exam runtime, grading, proctoring, analytics, Excel/CSV import and export, PDF candidate reports.
+- **Five roles with department scoping** (College HOD), a departments model, and a role-based welcome journey with story-mode login.
+- Student experience: dashboard, Assessments, Analytics, My results, profile; Mock interviews marked "Soon".
+- Forest & Marigold design system with motion.
 
-**Repo state:** `.env`, `.env.example`, `.env.local` present; `prisma/schema.prisma` scaffolded; `docs/plans/` populated with the full renumbered plan set; `.cursorrules`, `CLAUDE.md`, `docs/project-context.md` in place; GitHub org configured (branch protection, CODEOWNERS, secret scanning, push protection).
+**In progress:** admin panels for each role. Platform console (Super Admin), College admin panel, My department (HOD), account suspension, and Platform admins. See `roles-and-permissions.md`.
+
+**People:** SG's `contactsuyashgupta@gmail.com` is the Super Admin. `suyash.22b0131169@abes.ac.in` is College Admin of ABES (test college).
+
+**On hold, pending SG:** Plan 005 (MSG91 OTP), Plan 014 (Judge0), custom domain `selectsiq.in` (Firebase auth domain + Vercel), private Supabase bucket `resumes`.
 
 ---
 
@@ -173,4 +188,5 @@ All implementation plans live in `docs/plans/` as three-digit files (`001-…` t
 - **Plan → Approve → Execute → Test → Document** — Never skip steps.
 - **No auto-updates to docs** — Claude provides ready-to-paste text; SG pastes manually.
 - **Security by separation** — Production credentials never leave founders; legal agreements are the primary deterrent for contractors.
+- **Production standard, always** — see "Operating standard" in §1. A mistake here costs real colleges and real students.
 - **"Does this look AI-generated?" lens** — For pitch/product materials, prefer fewer words, more whitespace, warm non-techy aesthetics, story-based flow.

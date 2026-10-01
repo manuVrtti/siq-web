@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { errorResponse, successResponse } from '@/lib/api-response'
 import { withRole } from '@/lib/auth/require-role'
 import { ValidationError } from '@/lib/errors'
-import { setUserRole } from '@/services/admin'
+import { setRoleAsSuperAdmin } from '@/services/people'
 import { audit } from '@/services/audit'
 
 /** Change a user's global role — SUPER_ADMIN only, audited. */
@@ -18,7 +18,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     const { id } = await ctx.params
     const parsed = schema.safeParse(await request.json().catch(() => null))
     if (!parsed.success) throw new ValidationError('Choose a valid role')
-    const change = await setUserRole(actor.id, id, parsed.data.role)
+    const change = await setRoleAsSuperAdmin(actor, id, parsed.data.role)
     if (change.from !== change.to) {
       await audit({ userId: actor.id, action: 'user.role.change', entityType: 'User', entityId: id, metadata: change })
     }

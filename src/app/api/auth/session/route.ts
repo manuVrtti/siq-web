@@ -9,7 +9,7 @@ import {
   verifySessionCookie,
 } from '@/lib/auth/session'
 import { errorResponse, successResponse } from '@/lib/api-response'
-import { AppError, AuthError, ValidationError } from '@/lib/errors'
+import { AppError, AuthError, ForbiddenError, ValidationError } from '@/lib/errors'
 import { getAdminAuth } from '@/lib/firebase-admin'
 import { prisma } from '@/lib/prisma'
 
@@ -110,6 +110,10 @@ export async function POST(request: NextRequest) {
           avatarUrl: decoded.picture ?? user.avatarUrl,
         },
       })
+    }
+
+    if (user.suspendedAt) {
+      throw new ForbiddenError('This account is suspended. Contact your placement cell or SelectIQ support.')
     }
 
     const store = await cookies()

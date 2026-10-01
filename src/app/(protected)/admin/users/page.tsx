@@ -9,25 +9,29 @@ import { FilterBar } from '@/components/data/filter-bar'
 import { ListHeader } from '@/components/data/list-header'
 import { parseTableParams, type SearchParams } from '@/components/data/table-params'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
+import { ROLE_LABEL } from '@/constants/labels'
 import { timeAgo } from '@/lib/format'
 import { listUsers } from '@/services/admin'
 
 export const metadata: Metadata = { title: 'Users — Admin — SelectIQ' }
 
 const ROLES = ['STUDENT', 'COLLEGE_HOD', 'COLLEGE_ADMIN', 'RECRUITER', 'SUPER_ADMIN'] as const
+const STATUSES = ['active', 'invited', 'suspended'] as const
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const me = (await getCurrentUser())!
   const p = parseTableParams(await searchParams, { sortable: ['createdAt'] as const, defaultSort: 'createdAt' })
   const role = ROLES.find((r) => r === p.get('role'))
-  const { items, total } = await listUsers({ q: p.q || undefined, role, skip: p.skip, take: p.pageSize })
+  const status = STATUSES.find((s) => s === p.get('status'))
+  const orgId = p.get('org') || undefined
+  const { items, total } = await listUsers({ q: p.q || undefined, role, status, orgId, skip: p.skip, take: p.pageSize })
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
       <ListHeader
         eyebrow="Platform"
-        title="Users"
-        description="Everyone on SelectIQ. Changing a role is audited; you can't change your own."
+        title="All people"
+        description="Everyone on SelectIQ — students, HODs, College Admins, recruiters and Super Admins. Every change is audited."
       />
       <FilterBar
         searchPlaceholder="Search name, email or phone…"
@@ -35,12 +39,21 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           {
             key: 'role',
             label: 'Role',
-            options: ROLES.map((r) => ({ value: r, label: r.replace('_', ' ').toLowerCase() })),
+            options: ROLES.map((r) => ({ value: r, label: ROLE_LABEL[r] ?? r })),
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            options: [
+              { value: 'active', label: 'Active' },
+              { value: 'invited', label: 'Invited' },
+              { value: 'suspended', label: 'Suspended' },
+            ],
           },
         ]}
       />
       {items.length === 0 ? (
-        <TableEmpty filtered={Boolean(p.q || role)} clearHref="/admin/users" icon={<Users className="size-5" aria-hidden />} title="No users yet" />
+        <TableEmpty filtered={Boolean(p.q || role || status || orgId)} clearHref="/admin/users" icon={<Users className="size-5" aria-hidden />} title="No users yet" />
       ) : (
         <DataTable minWidth={820} footer={<Pagination pathname="/admin/users" params={p} total={total} />}>
           <THead>
@@ -57,7 +70,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   <div className="flex items-center gap-3">
                     <Initials name={u.name} email={u.email} />
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{u.name ?? u.email ?? u.phone}</p>
+                      <Link href={`/admin/users/${u.id}`} className="hover:text-primary block truncate font-medium transition-colors">
+                        {u.name ?? u.email ?? u.phone}
+                      </Link>
                       <p className="text-muted-foreground truncate text-xs">{[u.email, u.phone].filter(Boolean).join(' · ')}</p>
                     </div>
                   </div>
@@ -79,7 +94,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   )}
                 </td>
                 <td className={TD}>
-                  {u.claimed ? (
+                  {u.suspendedAt ? (
+                    <Pill tone="danger">Suspended</Pill>
+                  ) : u.claimed ? (
                     <span className="text-muted-foreground text-xs">{u.lastLoginAt ? `Active ${timeAgo(u.lastLoginAt)}` : 'Signed in'}</span>
                   ) : (
                     <Pill tone="muted">Invited</Pill>

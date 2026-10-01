@@ -25,6 +25,17 @@ const ACTIONS = [
   'candidate.update',
   'candidate.remove',
   'candidate.credentials',
+  'candidate.department',
+  'department.create',
+  'department.update',
+  'department.delete',
+  'department.heads',
+  'staff.add',
+  'staff.update',
+  'staff.remove',
+  'user.suspend',
+  'user.reactivate',
+  'superadmin.grant',
 ] as const
 
 /** Who did what, newest first. Read-only; entries are never edited or deleted. */
