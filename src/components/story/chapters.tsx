@@ -1,16 +1,31 @@
-import type { Chapter } from '@/components/story/story-player'
 import {
-  SceneAssigned,
-  SceneBuild,
-  SceneDepartments,
-  SceneHodTeam,
-  SceneImport,
-  SceneInsights,
-  SceneResult,
-  SceneSecureBrowser,
-} from '@/components/story/scenes'
+  SceneBatchProgress,
+  SceneCandidatePool,
+  SceneCollegeDashboard,
+  SceneCollegeTree,
+  SceneCompanyTest,
+  SceneDepartmentTest,
+  SceneGovernance,
+  SceneGradingQueue,
+  SceneHealthMonitor,
+  SceneInviteTeam,
+  SceneMyDepartment,
+  SceneOnboardWizard,
+  ScenePlatformMap,
+  SceneRosterUpload,
+  SceneShortlist,
+  type DeptStat,
+} from '@/components/story/role-scenes'
+import type { Chapter } from '@/components/story/story-player'
+import { SceneAssigned, SceneInsights, SceneResult, SceneSecureBrowser } from '@/components/story/scenes'
 
-/** The login page's story: the product in four beats, from a student's seat. */
+/**
+ * Story chapters, one set per role. No scene is shared between roles, and
+ * each builder takes the person's real context (college, departments,
+ * counts) so the story is about *their* world.
+ */
+
+/** Login page: the product in four beats, from a student's seat (nobody is signed in yet). */
 export const LOGIN_CHAPTERS: Chapter[] = [
   {
     id: 'assigned',
@@ -42,59 +57,164 @@ export const LOGIN_CHAPTERS: Chapter[] = [
   },
 ]
 
-export const STUDENT_CHAPTERS: Chapter[] = [
-  { ...LOGIN_CHAPTERS[0]!, title: 'Tests come to you.', body: 'When your college assigns a test it appears on your dashboard and in Assessments, with a countdown to when it opens.' },
-  { ...LOGIN_CHAPTERS[1]!, title: 'Take it in the secure browser.', body: 'Tests open in the SelectIQ app. Your answers save automatically — a dropped connection never loses work.' },
-  { ...LOGIN_CHAPTERS[2]!, title: 'Results, the moment they’re graded.', body: 'Score, pass mark and where you stand in your batch — all under My results.' },
-  { ...LOGIN_CHAPTERS[3]!, title: 'Your Analytics tab coaches you.', body: 'Strong topics, weak topics and your trend over time, updated after every test.' },
-]
+export function studentChapters({ orgName, deptCode }: { orgName: string; deptCode?: string | null }): Chapter[] {
+  return [
+    {
+      id: 'assigned',
+      eyebrow: 'Your tests',
+      title: `${orgName} sends you tests.`,
+      body: `When your placement cell${deptCode ? ` or your ${deptCode} HOD` : ''} assigns a test, it appears on your dashboard and in Assessments with a countdown.`,
+      art: <SceneAssigned from={`${orgName}`} />,
+    },
+    {
+      id: 'secure',
+      eyebrow: 'Take it',
+      title: 'Take it in the secure browser.',
+      body: 'Tests open in the SelectIQ app. Your answers save automatically — a dropped connection never loses work.',
+      art: <SceneSecureBrowser />,
+    },
+    {
+      id: 'result',
+      eyebrow: 'Results',
+      title: 'Results, the moment they’re graded.',
+      body: 'Score, pass mark and where you stand in your batch — all under My results.',
+      art: <SceneResult />,
+    },
+    {
+      id: 'insights',
+      eyebrow: 'Improve',
+      title: 'Your Analytics tab coaches you.',
+      body: 'Strong topics, weak topics and your trend over time, updated after every test.',
+      art: <SceneInsights />,
+    },
+  ]
+}
 
-export const ADMIN_CHAPTERS: Chapter[] = [
-  {
-    id: 'departments',
-    eyebrow: 'Organise',
-    title: 'Set up departments and HODs.',
-    body: 'Create CSE, IT, ECE… and give each an HOD. HODs run their department; you see the whole college.',
-    art: <SceneDepartments />,
-  },
-  {
-    id: 'import',
-    eyebrow: 'Students',
-    title: 'Bring in your students in one go.',
-    body: 'Upload the roster spreadsheet. Students sign in with the same email — or you hand out passwords.',
-    art: <SceneImport />,
-  },
-  {
-    id: 'build',
-    eyebrow: 'Test',
-    title: 'Build, publish, assign.',
-    body: 'Pick questions from the shared bank, set a pass mark, and assign to a batch or a whole department.',
-    art: <SceneBuild />,
-  },
-  {
-    id: 'results',
-    eyebrow: 'Results',
-    title: 'Results and analytics, live.',
-    body: 'Pass rates, score spreads and the topics your students struggle with — by test, batch and department.',
-    art: <SceneResult />,
-  },
-]
+export function collegeAdminChapters({ orgName, departments }: { orgName: string; departments: DeptStat[] }): Chapter[] {
+  const codes = departments.map((x) => x.code)
+  return [
+    {
+      id: 'structure',
+      eyebrow: 'Organise',
+      title: departments.length ? `${orgName}, organised.` : 'Set up your departments.',
+      body: departments.length
+        ? `${codes.join(', ')} — each with its own HOD, students and tests. You see all of it.`
+        : 'Create CSE, IT, ECE… HODs and students are organised by department; you see the whole college.',
+      art: <SceneCollegeTree orgName={orgName} departments={departments} />,
+    },
+    {
+      id: 'roster',
+      eyebrow: 'Students',
+      title: 'Bring your whole roster in.',
+      body: 'Upload the spreadsheet once. Students land in their departments and sign in with the same email — or you hand out passwords.',
+      art: <SceneRosterUpload codes={codes} />,
+    },
+    {
+      id: 'team',
+      eyebrow: 'Your team',
+      title: 'Invite your HODs and co-admins.',
+      body: 'Give each HOD their department. Add a second College Admin so the college is never locked out.',
+      art: <SceneInviteTeam codes={codes} />,
+    },
+    {
+      id: 'dashboard',
+      eyebrow: 'Results',
+      title: 'Placement readiness, college-wide.',
+      body: 'Compare departments, batches and tests — and know which topics to fix before the real drives.',
+      art: <SceneCollegeDashboard codes={codes} />,
+    },
+  ]
+}
 
-export const HOD_CHAPTERS: Chapter[] = [
-  {
-    id: 'team',
-    eyebrow: 'Your department',
-    title: 'Everything here is your department.',
-    body: 'Students, batches, tests and results — scoped to the departments your College Admin gave you.',
-    art: <SceneHodTeam />,
-  },
-  { ...ADMIN_CHAPTERS[2]!, title: 'Run your own tests.', body: 'Build department tests from the shared question bank and assign them to your students or batches.' },
-  { ...ADMIN_CHAPTERS[3]!, title: 'Track your students.', body: 'Results, grading and analytics for your department — including college-wide tests your students took.' },
-  {
-    id: 'improve',
-    eyebrow: 'Improve',
-    title: 'See what to teach next.',
-    body: 'Topic-level analytics show where your department is strong and where it needs practice.',
-    art: <SceneInsights />,
-  },
-]
+export function hodChapters({ departments }: { departments: DeptStat[] }): Chapter[] {
+  const code = departments[0]?.code ?? 'CSE'
+  return [
+    {
+      id: 'mine',
+      eyebrow: departments.length > 1 ? 'Your departments' : 'Your department',
+      title: departments.length ? `Everything here is ${departments.map((x) => x.code).join(' + ')}.` : 'Everything here is your department.',
+      body: 'Students, batches, tests and results — only for the departments your College Admin gave you.',
+      art: <SceneMyDepartment departments={departments} />,
+    },
+    {
+      id: 'test',
+      eyebrow: 'Tests',
+      title: 'Run your own department tests.',
+      body: 'Build from the shared question bank and assign to your batches. Only your department’s HODs can change them.',
+      art: <SceneDepartmentTest code={code} />,
+    },
+    {
+      id: 'grade',
+      eyebrow: 'Grading',
+      title: 'Review what needs a human.',
+      body: 'Subjective answers from your students queue up for you. Grade them and results update straight away.',
+      art: <SceneGradingQueue />,
+    },
+    {
+      id: 'progress',
+      eyebrow: 'Progress',
+      title: 'Watch your batches improve.',
+      body: 'Batch-by-batch trends and the weakest topics, so you know what to teach next.',
+      art: <SceneBatchProgress code={code} />,
+    },
+  ]
+}
+
+export function superAdminChapters({ colleges }: { colleges: number }): Chapter[] {
+  return [
+    {
+      id: 'platform',
+      eyebrow: 'Platform',
+      title: 'Every college, one console.',
+      body: 'You run SelectIQ: every college, every admin, HOD, student and recruiter — from the Platform console.',
+      art: <ScenePlatformMap colleges={colleges} />,
+    },
+    {
+      id: 'onboard',
+      eyebrow: 'Onboard',
+      title: 'A new college, live in minutes.',
+      body: 'One wizard: the college, its first College Admins and its departments. They take it from there.',
+      art: <SceneOnboardWizard />,
+    },
+    {
+      id: 'health',
+      eyebrow: 'Monitor',
+      title: 'Spot problems before colleges do.',
+      body: 'Colleges without an admin, without departments or gone quiet — counted, filtered and one click away.',
+      art: <SceneHealthMonitor />,
+    },
+    {
+      id: 'govern',
+      eyebrow: 'Govern',
+      title: 'Full control, fully recorded.',
+      body: 'Suspend an account or a whole college, grant Super Admin, change roles — reversible, and all in the audit log.',
+      art: <SceneGovernance />,
+    },
+  ]
+}
+
+export function recruiterChapters({ orgName }: { orgName: string }): Chapter[] {
+  return [
+    {
+      id: 'test',
+      eyebrow: 'Assess',
+      title: 'Your screening test, your way.',
+      body: 'Coding, fundamentals and aptitude in one proctored test, with your own pass mark.',
+      art: <SceneCompanyTest orgName={orgName} />,
+    },
+    {
+      id: 'pool',
+      eyebrow: 'Reach',
+      title: 'Candidates from many campuses.',
+      body: 'The same test across colleges gives you one fair ranking instead of a pile of résumés.',
+      art: <SceneCandidatePool />,
+    },
+    {
+      id: 'shortlist',
+      eyebrow: 'Shortlist',
+      title: 'Shortlist on evidence.',
+      body: 'Scores, topic strengths and integrity flags side by side — pick who goes to interview.',
+      art: <SceneShortlist />,
+    },
+  ]
+}

@@ -1,15 +1,16 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ArrowRight, Check } from 'lucide-react'
 
 import { Ring } from '@/components/motion/animated'
-import { ADMIN_CHAPTERS, HOD_CHAPTERS, STUDENT_CHAPTERS } from '@/components/story/chapters'
+import { collegeAdminChapters, hodChapters, recruiterChapters, studentChapters } from '@/components/story/chapters'
 import { StoryPlayer } from '@/components/story/story-player'
 import { FinishOnboarding } from '@/components/story/finish-onboarding'
 import { ROLE_LABEL, labelOf } from '@/constants/labels'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { getScope, listScopeDepartments } from '@/lib/auth/scope'
+import { prisma } from '@/lib/prisma'
 import { firstName } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { managerChecklist, studentChecklist, type Step } from '@/services/onboarding'
@@ -25,6 +26,8 @@ export const metadata: Metadata = { title: 'Welcome — SelectIQ' }
 export default async function WelcomePage({ params }: { params: Promise<{ org: string }> }) {
   const { org: slug } = await params
   const user = (await getCurrentUser())!
+  // Super Admins run the platform, not one college: their journey lives in the console.
+  if (user.role === 'SUPER_ADMIN') redirect('/admin/welcome')
   const org = await getOrgBySlug(slug)
   if (!org) notFound()
 
@@ -34,7 +37,25 @@ export default async function WelcomePage({ params }: { params: Promise<{ org: s
     isStudent ? studentChecklist(user.id, org.id, slug) : managerChecklist(user, scope!, slug),
     scope && !scope.all ? listScopeDepartments(scope) : Promise.resolve([]),
   ])
-  const chapters = isStudent ? STUDENT_CHAPTERS : user.role === 'COLLEGE_HOD' ? HOD_CHAPTERS : ADMIN_CHAPTERS
+  // Real context for the story: this college's departments (with student
+  // counts), the HOD's own departments, the student's department.
+  const deptRows = await prisma.department.findMany({
+    where: { orgId: org.id, ...(scope && !scope.all ? { id: { in: scope.departmentIds } } : {}) },
+    orderBy: { code: 'asc' },
+    select: { code: true, _count: { select: { members: { where: { user: { role: 'STUDENT' } } } } } },
+  })
+  const deptStats = deptRows.map((x) => ({ code: x.code, students: x._count.members }))
+  const myDept = isStudent
+    ? (await prisma.organizationMember.findFirst({ where: { orgId: org.id, userId: user.id }, select: { department: { select: { code: true } } } }))
+        ?.department?.code ?? null
+    : null
+  const chapters = isStudent
+    ? studentChapters({ orgName: org.name, deptCode: myDept })
+    : user.role === 'COLLEGE_HOD'
+      ? hodChapters({ departments: deptStats })
+      : user.role === 'RECRUITER'
+        ? recruiterChapters({ orgName: org.name })
+        : collegeAdminChapters({ orgName: org.name, departments: deptStats })
   const done = steps.filter((s) => s.done).length
   const pct = Math.round((done / steps.length) * 100)
   const name = firstName(user.name)
