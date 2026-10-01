@@ -22,6 +22,8 @@ const ACTIONS = [
   'import.candidates',
   'import.questions',
   'batch.delete',
+  'candidate.update',
+  'candidate.remove',
 ] as const
 
 /** Who did what, newest first. Read-only; entries are never edited or deleted. */

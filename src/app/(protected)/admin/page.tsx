@@ -25,6 +25,8 @@ const ACTION_LABEL: Record<string, string> = {
   'import.candidates': 'imported candidates',
   'import.questions': 'imported questions',
   'batch.delete': 'deleted a batch',
+  'candidate.update': 'edited a candidate',
+  'candidate.remove': 'removed candidates',
 }
 
 /** Console overview — platform KPIs, activity, and who just joined. */

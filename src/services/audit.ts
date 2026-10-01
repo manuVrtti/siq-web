@@ -24,6 +24,8 @@ export type AuditAction =
   | 'import.candidates'
   | 'import.questions'
   | 'batch.delete'
+  | 'candidate.update'
+  | 'candidate.remove'
 
 export async function audit(entry: {
   userId: string
