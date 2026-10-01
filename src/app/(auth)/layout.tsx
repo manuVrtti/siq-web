@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 
 import { BrandMark } from '@/components/brand/mark'
 import { LOGIN_CHAPTERS } from '@/components/story/chapters'
+import { MobileIntro } from '@/components/story/mobile-intro'
 import { StoryPlayer } from '@/components/story/story-player'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 
@@ -25,7 +26,10 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           <BrandMark className="size-8" />
           <span className="font-display text-base font-semibold tracking-tight">SelectIQ</span>
         </div>
-        <div className="flex flex-1 items-center justify-center py-10">{children}</div>
+        <div className="flex flex-1 flex-col items-center justify-center py-10">
+          {children}
+          <MobileIntro chapters={LOGIN_CHAPTERS} />
+        </div>
         <p className="text-muted-foreground text-xs">© {new Date().getFullYear()} SelectIQ · Assessment platform for engineering colleges</p>
       </div>
 
