@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, Lock, MoreHorizontal, Pencil, Trash2, UserRound } from 'lucide-react'
+import { KeyRound, Loader2, Lock, MoreHorizontal, Pencil, Trash2, UserRound } from 'lucide-react'
+
+import { CredentialsDialog } from '@/components/candidates/credentials-dialog'
 
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -32,6 +34,7 @@ export type RowCandidate = {
 export function CandidateRowActions({ candidate: c, profileHref }: { candidate: RowCandidate; profileHref: string }) {
   const [editing, setEditing] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [creds, setCreds] = useState(false)
   const label = c.name ?? c.email ?? c.phone ?? 'this candidate'
 
   return (
@@ -61,6 +64,11 @@ export function CandidateRowActions({ candidate: c, profileHref }: { candidate: 
               </span>
             </DropdownMenuItem>
           )}
+          {!c.claimed && c.email ? (
+            <DropdownMenuItem onClick={() => setCreds(true)}>
+              <KeyRound aria-hidden /> Password sign-in…
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={() => setRemoving(true)}>
             <Trash2 aria-hidden /> Remove from college
@@ -68,6 +76,7 @@ export function CandidateRowActions({ candidate: c, profileHref }: { candidate: 
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {creds ? <CredentialsDialog ids={[c.id]} onClose={() => setCreds(false)} /> : null}
       {editing ? <EditSheet candidate={c} onClose={() => setEditing(false)} /> : null}
       <RemoveDialog
         open={removing}

@@ -26,6 +26,7 @@ export default async function AttemptPage({
   const { token } = await params
   const user = await getCurrentUser()
   if (!user) redirect(`/login`)
+  if (user.mustChangePassword) redirect('/set-password')
 
   const state = await getAttemptState(token, user.id).catch(() => null)
   if (!state) redirect(`/exam/${token}`)

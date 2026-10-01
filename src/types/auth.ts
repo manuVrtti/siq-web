@@ -21,4 +21,6 @@ export interface CurrentUser {
   role: UserRole
   /** Firebase Auth uid — the join key to `User.firebaseUid`. */
   firebaseUid: string
+  /** Signed in with a college-issued temporary password that must be replaced first. */
+  mustChangePassword?: boolean
 }

@@ -57,6 +57,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       avatarUrl: user.avatarUrl,
       role: user.role,
       firebaseUid: user.firebaseUid,
+      mustChangePassword: decoded.mustChangePassword === true,
     }
   } catch {
     // Expired, revoked or malformed cookie — indistinguishable from signed out.
