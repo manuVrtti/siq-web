@@ -1,16 +1,11 @@
 import {
   Bell,
-  Building2,
   CalendarClock,
   Camera,
-  Check,
-  FileSpreadsheet,
   Lock,
-  Send,
   Sparkles,
   TrendingUp,
   Trophy,
-  UserRound,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -27,7 +22,7 @@ const card = 'rounded-2xl bg-white text-foreground shadow-2xl shadow-black/25'
 
 /* ---------------------------------------------------------------- student */
 
-export function SceneAssigned() {
+export function SceneAssigned({ from = 'ABES Placement Cell' }: { from?: string }) {
   return (
     <div className="relative mx-auto h-[300px] w-full max-w-sm">
       {[
@@ -39,7 +34,7 @@ export function SceneAssigned() {
             <Bell className="size-5" />
           </span>
           <div className="min-w-0">
-            <p className="text-muted-foreground text-[11px] font-medium">ABES Placement Cell · now</p>
+            <p className="text-muted-foreground truncate text-[11px] font-medium">{from} · now</p>
             <p className="truncate text-sm font-semibold">{n.t}</p>
             <p className="text-muted-foreground text-xs">{n.s}</p>
           </div>
@@ -186,141 +181,3 @@ export function SceneInsights() {
   )
 }
 
-/* ------------------------------------------------------- college admin */
-
-export function SceneDepartments() {
-  const depts = [
-    { c: 'CSE', x: 'left-0', h: 'Dr. Iyer' },
-    { c: 'IT', x: 'left-1/2 -translate-x-1/2', h: 'Dr. Rao' },
-    { c: 'ECE', x: 'right-0', h: 'Dr. Khan' },
-  ]
-  return (
-    <div className="relative mx-auto h-[300px] w-full max-w-sm">
-      <div className={cn(card, 'siq-in-scale absolute top-0 left-1/2 flex -translate-x-1/2 items-center gap-2 px-4 py-3')} style={d(100)}>
-        <Building2 className="text-primary size-5" />
-        <span className="text-sm font-semibold">ABES Engineering College</span>
-      </div>
-      <svg className="absolute inset-x-0 top-[52px] h-16 w-full" viewBox="0 0 384 64" fill="none" preserveAspectRatio="none">
-        {['M192 0 V24 H48 V64', 'M192 0 V64', 'M192 0 V24 H336 V64'].map((path, i) => (
-          <path key={path} d={path} stroke="white" strokeOpacity="0.5" strokeWidth="2" className="siq-draw" style={{ '--len': '260', ...d(400 + i * 150) } as React.CSSProperties} />
-        ))}
-      </svg>
-      {depts.map((x, i) => (
-        <div key={x.c} className={cn('absolute top-[118px] flex w-[30%] flex-col items-center gap-2', x.x)}>
-          <div className={cn(card, 'siq-in-scale w-full px-2 py-3 text-center')} style={d(900 + i * 150)}>
-            <p className="bg-primary mx-auto w-fit rounded-md px-2 py-0.5 text-xs font-bold text-white">{x.c}</p>
-            <p className="text-muted-foreground mt-1.5 text-[10px]">{[412, 380, 296][i]} students</p>
-          </div>
-          <div className="siq-in-up flex items-center gap-1.5 rounded-full bg-white/15 py-1 pr-2.5 pl-1 text-[11px] font-medium backdrop-blur-sm" style={d(1400 + i * 150)}>
-            <span className="bg-highlight text-highlight-foreground grid size-5 place-items-center rounded-full">
-              <UserRound className="size-3" />
-            </span>
-            {x.h}
-          </div>
-        </div>
-      ))}
-      <p className="siq-in-fade absolute inset-x-0 bottom-0 text-center text-xs text-white/70" style={d(1900)}>
-        Each HOD sees only their department
-      </p>
-    </div>
-  )
-}
-
-export function SceneImport() {
-  const rows = ['Aarav Sharma', 'Diya Patel', 'Kabir Singh', 'Meera Nair', 'Rohan Gupta']
-  return (
-    <div className="relative mx-auto h-[300px] w-full max-w-sm">
-      <div className={cn(card, 'siq-in-up absolute inset-x-0 top-0 overflow-hidden')} style={d(100)}>
-        <div className="bg-muted flex items-center gap-2 border-b px-3 py-2 text-xs font-semibold">
-          <FileSpreadsheet className="text-success size-4" /> CSE-2026-roster.xlsx
-        </div>
-        <ul className="divide-y text-xs">
-          {rows.map((n, i) => (
-            <li key={n} className="siq-in-left flex items-center gap-3 px-3 py-2" style={d(350 + i * 140)}>
-              <span className="w-28 truncate font-medium">{n}</span>
-              <span className="bg-muted h-1.5 flex-1 rounded" />
-              <span className="bg-accent text-accent-foreground rounded px-1.5 text-[10px] font-semibold">CSE</span>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8.5 6.5 12 13 4.5" stroke="var(--success)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="siq-draw" style={{ '--len': '20', ...d(800 + i * 140) } as React.CSSProperties} />
-              </svg>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="siq-in-scale absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold whitespace-nowrap text-[var(--primary)] shadow-xl" style={d(1600)}>
-        <Check className="size-4" /> 412 students imported
-      </div>
-    </div>
-  )
-}
-
-export function SceneBuild() {
-  return (
-    <div className="relative mx-auto h-[300px] w-full max-w-sm">
-      <div className={cn(card, 'siq-in-up absolute inset-x-0 top-0 p-4')} style={d(100)}>
-        <p className="text-sm font-semibold">Infosys Aptitude Practice</p>
-        <p className="text-muted-foreground text-[11px]">45 min · 30 questions · pass at 60%</p>
-        <div className="mt-3 flex flex-col gap-2">
-          {['Quantitative · 12 q', 'Logical reasoning · 10 q', 'Verbal ability · 8 q'].map((s, i) => (
-            <div key={s} className="siq-in-right flex items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={d(400 + i * 180)}>
-              <span className="bg-primary/15 text-primary grid size-5 place-items-center rounded text-[10px] font-bold">{i + 1}</span>
-              <span className="font-medium">{s}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 flex justify-end">
-          <span className="bg-primary siq-in-scale inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={d(1200)}>
-            <Send className="size-3.5" /> Publish &amp; assign
-          </span>
-        </div>
-      </div>
-      <div className="siq-in-up absolute right-0 bottom-2 left-6 flex items-center gap-2 rounded-xl bg-white/15 px-3 py-2.5 text-xs font-medium backdrop-blur-sm" style={d(1600)}>
-        <span className="bg-highlight text-highlight-foreground grid size-6 place-items-center rounded-full">
-          <Check className="size-3.5" />
-        </span>
-        Assigned to CSE 2026 · 412 invites sent
-      </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------- HOD */
-
-export function SceneHodTeam() {
-  return (
-    <div className="relative mx-auto h-[300px] w-full max-w-sm">
-      <div className={cn(card, 'siq-in-up absolute inset-x-0 top-0 p-5')} style={d(100)}>
-        <div className="flex items-center gap-2">
-          <span className="bg-primary rounded-md px-2 py-0.5 text-xs font-bold text-white">CSE</span>
-          <p className="text-sm font-semibold">Your department</p>
-        </div>
-        <div className="mt-4 grid grid-cols-6 gap-2">
-          {Array.from({ length: 18 }, (_, i) => (
-            <span
-              key={i}
-              className={cn(
-                'siq-in-scale grid aspect-square place-items-center rounded-full text-[10px] font-semibold',
-                i % 5 === 3 ? 'bg-highlight text-highlight-foreground' : 'bg-accent text-accent-foreground',
-              )}
-              style={d(300 + i * 45)}
-            >
-              {'ADKMRSPNVT'[i % 10]}
-            </span>
-          ))}
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          {[
-            ['412', 'students'],
-            ['74%', 'avg score'],
-            ['6', 'tests'],
-          ].map(([v, l], i) => (
-            <div key={l} className="bg-muted/60 siq-in-up rounded-lg py-2" style={d(1300 + i * 120)}>
-              <p className="font-display text-base font-semibold">{v}</p>
-              <p className="text-muted-foreground text-[10px]">{l}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}

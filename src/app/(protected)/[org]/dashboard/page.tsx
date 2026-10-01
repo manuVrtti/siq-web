@@ -34,7 +34,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ org:
   if (!org) notFound()
 
   // First visit: the role's welcome journey (story + checklist) comes first.
-  if (!user.onboarded) redirect(`/${slug}/welcome`)
+  if (!user.onboarded) redirect(user.role === 'SUPER_ADMIN' ? '/admin/welcome' : `/${slug}/welcome`)
 
   const isManager = hasPermission(user, PERMISSIONS.VIEW_ORG_RESULTS)
   const name = firstName(user.name)

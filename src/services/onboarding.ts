@@ -144,6 +144,50 @@ export async function studentChecklist(userId: string, orgId: string, slug: stri
   ]
 }
 
+/** Super Admin journey: what a platform owner should have in place. */
+export async function platformChecklist(): Promise<Step[]> {
+  const [colleges, noAdmin, noDepts, supers] = await Promise.all([
+    prisma.organization.count({ where: { type: 'COLLEGE' } }),
+    prisma.organization.count({ where: { type: 'COLLEGE', members: { none: { user: { role: 'COLLEGE_ADMIN', suspendedAt: null } } } } }),
+    prisma.organization.count({ where: { type: 'COLLEGE', departments: { none: {} } } }),
+    prisma.user.count({ where: { role: 'SUPER_ADMIN', suspendedAt: null } }),
+  ])
+  return [
+    {
+      key: 'onboard',
+      title: 'Onboard your first college',
+      body: 'The college, its first College Admins and departments — one wizard.',
+      href: '/admin/organizations/new',
+      cta: 'Onboard a college',
+      done: colleges > 0,
+    },
+    {
+      key: 'admins',
+      title: 'Every college has a College Admin',
+      body: !colleges ? 'Each college needs someone to run it.' : noAdmin ? `${noAdmin} of ${colleges} college${colleges === 1 ? '' : 's'} still ${noAdmin === 1 ? 'needs' : 'need'} one.` : 'All set.',
+      href: '/admin/organizations?health=no-admin',
+      cta: 'Review colleges',
+      done: colleges > 0 && noAdmin === 0,
+    },
+    {
+      key: 'departments',
+      title: 'Every college has departments',
+      body: !colleges ? 'HODs and students are organised by department.' : noDepts ? `${noDepts} college${noDepts === 1 ? '' : 's'} without departments.` : 'All set.',
+      href: '/admin/organizations?health=no-departments',
+      cta: 'Review colleges',
+      done: colleges > 0 && noDepts === 0,
+    },
+    {
+      key: 'second',
+      title: 'Add a second Super Admin',
+      body: 'So the platform is never locked out if one account is lost.',
+      href: '/admin/platform-admins',
+      cta: 'Platform admins',
+      done: supers >= 2,
+    },
+  ]
+}
+
 export async function markOnboarded(userId: string) {
   await prisma.user.update({ where: { id: userId }, data: { onboardedAt: new Date() } })
 }
