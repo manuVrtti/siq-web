@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { MockDriveStatus, Prisma } from '@prisma/client'
 
-import { assessmentWhere, type Scope } from '@/lib/auth/scope'
+import { assessmentWhere, canEditAssessment, type Scope } from '@/lib/auth/scope'
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import type { DriveInput } from '@/lib/validators/mock-drive'
@@ -235,9 +235,7 @@ export function driveBlockers(drive: Awaited<ReturnType<typeof getDrive>>): stri
   if (drive.rounds.length === 0) out.push('Add at least one round')
   const unpublished = drive.rounds.filter((r) => r.assessment.status !== 'PUBLISHED')
   if (unpublished.length) out.push(`Publish the test${unpublished.length === 1 ? '' : 's'} for ${unpublished.map((r) => `round ${r.order}`).join(', ')}`)
-  // Plan 018b — every round is identity-checked and camera-proctored.
-  const unproctored = drive.rounds.filter((r) => !r.assessment.proctoringEnabled)
-  if (unproctored.length) out.push(`Turn on proctoring for ${unproctored.map((r) => `round ${r.order}`).join(', ')} (identity check + camera)`)
+  // Proctoring is optional per round (SG, 2026-10-03): staff switch it on or off.
   if (drive.mode === 'SAMPLE_COMPANY' && !drive.sampleCompanyOrgId) out.push('The sample company is no longer available')
   return out
 }
@@ -264,4 +262,27 @@ export async function updateStatus(scope: Scope, id: string, next: MockDriveStat
   }
   if (next === 'IN_PROGRESS' && drive._count.registrations === 0) throw new ValidationError('Register at least one student before starting')
   return prisma.mockDrive.update({ where: { id }, data: { status: next }, include: driveInclude })
+}
+
+/**
+ * Plan 017b — turn proctoring (identity check + camera) on or off for some
+ * rounds, or all. Only rounds not opened yet; the round's test must be one
+ * this scope may edit.
+ */
+export async function setRoundProctoring(scope: Scope, driveId: string, target: string[] | 'ALL', enabled: boolean) {
+  const drive = await getDriveForManage(scope, driveId)
+  if (drive.status === 'COMPLETED' || drive.status === 'ARCHIVED') throw new ValidationError('This drive has finished')
+  const rounds = target === 'ALL' ? drive.rounds : drive.rounds.filter((r) => target.includes(r.id))
+  if (target !== 'ALL' && rounds.length !== new Set(target).size) throw new NotFoundError('Round not found')
+  const opened = rounds.filter((r) => r.activatedAt)
+  if (target !== 'ALL' && opened.length) throw new ValidationError(`${opened.map((r) => r.name).join(', ')} already opened — its settings are final`)
+  const pending = rounds.filter((r) => !r.activatedAt && r.assessment.proctoringEnabled !== enabled)
+  if (pending.length === 0) return { changed: 0 }
+  const tests = await prisma.assessment.findMany({
+    where: { id: { in: pending.map((r) => r.assessmentId) }, orgId: scope.orgId },
+    select: { id: true, departmentId: true },
+  })
+  if (tests.some((t) => !canEditAssessment(scope, t))) throw new ForbiddenError('A round uses a test from another department — ask a College Admin')
+  await prisma.assessment.updateMany({ where: { id: { in: tests.map((t) => t.id) } }, data: { proctoringEnabled: enabled } })
+  return { changed: tests.length }
 }

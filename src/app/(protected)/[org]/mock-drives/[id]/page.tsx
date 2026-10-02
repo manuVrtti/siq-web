@@ -75,6 +75,7 @@ export default async function DrivePage({ params }: { params: Promise<{ org: str
           <RoundsEditor
             driveId={drive.id}
             editable={canManage && !started}
+            canProctor={canManage && !['COMPLETED', 'ARCHIVED'].includes(drive.status)}
             tests={tests}
             rounds={drive.rounds.map((r) => ({
               id: r.id,
@@ -85,6 +86,7 @@ export default async function DrivePage({ params }: { params: Promise<{ org: str
               cutoff: r.cutoffScore,
               activated: Boolean(r.activatedAt),
               evaluated: Boolean(r.evaluatedAt),
+              proctored: r.assessment.proctoringEnabled,
             }))}
           />
         </section>
