@@ -6,6 +6,8 @@ import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import type { QuestionInput } from '@/lib/validators/question'
 import { setQuestionTagging, untaggedWhere, validateTagging } from '@/services/taxonomy'
+import { recomputeForQuestions } from '@/services/competency/rollup'
+import { safely } from '@/services/notifications/events'
 
 /**
  * Plan 011 — question business logic.
@@ -126,13 +128,13 @@ export async function updateQuestion(
   await getQuestion(orgId, id)
   const skillIds = data.topicId ? await validateTagging(orgId, data.topicId, data.skillIds) : []
 
-  return prisma.$transaction(async (tx) => {
+  const question = await prisma.$transaction(async (tx) => {
     await tx.questionOption.deleteMany({ where: { questionId: id } })
     await tx.questionTag.deleteMany({ where: { questionId: id } })
 
     await setQuestionTagging(tx, id, data.topicId ?? null, skillIds)
 
-    return tx.question.update({
+    const saved = await tx.question.update({
       where: { id },
       data: {
         type: data.type,
@@ -147,7 +149,13 @@ export async function updateQuestion(
       },
       include: questionInclude,
     })
+    return saved
   })
+  // Plan 025 — difficulty or topic may have changed for already-graded answers.
+  await safely(async () => {
+    await recomputeForQuestions([id])
+  })
+  return question
 }
 
 export async function deleteQuestion(orgId: string, id: string) {

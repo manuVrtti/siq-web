@@ -71,6 +71,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   'taxonomy.skill.update': 'edited a skill',
   'taxonomy.skill.delete': 'deleted a skill',
   'question.tag': 'tagged questions',
+  'competency.recompute': 'recomputed student analytics',
 }
 
 export function labelOf(map: Record<string, string>, value: string): string {

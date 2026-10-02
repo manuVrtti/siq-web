@@ -12,6 +12,7 @@ import {
 } from '@/lib/validators/assessment'
 import { notifyAssignedOnPublish, safely } from '@/services/notifications/events'
 import { untaggedWhere } from '@/services/taxonomy'
+import { recomputeAssessment } from '@/services/competency/rollup'
 
 /**
  * Plan 012 — assessment assembly.
@@ -99,8 +100,8 @@ export async function createAssessment(
 }
 
 export async function updateAssessment(orgId: string, id: string, data: AssessmentInput) {
-  await getAssessment(orgId, id) // scope check
-  return prisma.assessment.update({
+  const before = await getAssessment(orgId, id) // scope check
+  const updated = await prisma.assessment.update({
     where: { id },
     data: {
       title: data.title,
@@ -132,6 +133,13 @@ export async function updateAssessment(orgId: string, id: string, data: Assessme
     },
     include: fullInclude,
   })
+  // Plan 025 — counting toward analytics was switched: rebuild its students' profiles.
+  if (data.countsForAnalytics !== undefined && data.countsForAnalytics !== before.countsForAnalytics) {
+    await safely(async () => {
+      await recomputeAssessment(id)
+    })
+  }
+  return updated
 }
 
 export async function deleteAssessment(orgId: string, id: string) {

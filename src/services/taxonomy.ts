@@ -4,6 +4,8 @@ import type { Prisma } from '@prisma/client'
 
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { recomputeForQuestions } from '@/services/competency/rollup'
+import { safely } from '@/services/notifications/events'
 import { assertCollegeAdminOf } from '@/services/people'
 import type { CurrentUser } from '@/types/auth'
 
@@ -252,6 +254,10 @@ export async function bulkTag(orgId: string, questionIds: string[], sectionId: s
   if (owned !== ids.length) throw new NotFoundError('One or more questions are not in this college')
   await prisma.$transaction(async (tx) => {
     for (const id of ids) await setQuestionTagging(tx, id, sectionId, skills)
+  })
+  // Plan 025 — graded answers to these questions now count toward new topics.
+  await safely(async () => {
+    await recomputeForQuestions(ids)
   })
   return ids.length
 }
