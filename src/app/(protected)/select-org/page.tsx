@@ -20,6 +20,9 @@ export const metadata: Metadata = { title: 'Choose organization — SelectIQ' }
  */
 export default async function SelectOrgPage() {
   const user = (await getCurrentUser())!
+  // The Super Admin runs the platform, not one college: their home is the
+  // console. They open any college from there (Colleges → Open workspace).
+  if (user.role === 'SUPER_ADMIN') redirect('/admin')
   // Registration gate: students finish the registration step once, first.
   if (user.role === 'STUDENT' && !(await isRegistered(user.id))) redirect('/register')
   const orgs = await getUserOrgs(user.id)
