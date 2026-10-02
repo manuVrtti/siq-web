@@ -71,7 +71,7 @@ export async function assignToCandidates(
     data: userIds.map((userId) => ({ assessmentId, userId })),
     skipDuplicates: true, // (assessmentId, userId) is unique — quiet no-op
   })
-  // Bell + email for the newly assigned (dedupe makes a race harmless).
+  // Bell notification for the newly assigned (dedupe makes a race harmless).
   await safely(() => notifyAssigned(assessmentId, userIds.filter((id) => !existing.has(id))))
   return res.count
 }

@@ -156,10 +156,12 @@ export function AnnouncementsManager({
               className={`${control} h-10`}
               value={href}
               onChange={(e) => setHref(e.target.value)}
-              placeholder="/abes/my-assessments or https://…"
+              placeholder={platform ? 'A SelectIQ page (/…) or https://…' : 'A SelectIQ page, e.g. /…/my-assessments'}
               maxLength={300}
             />
-            <span className="text-muted-foreground text-xs font-normal">Must start with / or https://</span>
+            <span className="text-muted-foreground text-xs font-normal">
+              {platform ? 'Starts with / (a SelectIQ page) or https://' : 'Must be a SelectIQ page, starting with /. Outside links aren’t allowed.'}
+            </span>
           </label>
           <label className="flex flex-col gap-1.5 text-sm font-medium">
             <span>

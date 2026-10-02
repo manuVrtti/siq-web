@@ -19,16 +19,24 @@ import { audit } from '@/services/audit'
  * Every change is audited.
  */
 
-const hrefSchema = z
+/**
+ * Links: workspace announcements (College Admins, HODs) may only point inside
+ * SelectIQ — an in-app path, never "//host" (protocol-relative) — so nobody
+ * can send students an official-looking link to a phishing site. Only Super
+ * Admin platform announcements may also link to an https:// page.
+ */
+const IN_APP = /^\/(?![\/\\])/
+const inAppHref = z.string().trim().max(300).refine((v) => IN_APP.test(v), 'Link must be a SelectIQ page, starting with /')
+const platformHref = z
   .string()
   .trim()
   .max(300)
-  .refine((v) => v.startsWith('/') || v.startsWith('https://'), 'Link must start with / or https://')
+  .refine((v) => IN_APP.test(v) || /^https:\/\/[^\s/]+\.[^\s]+$/.test(v), 'Link must start with / or https://')
 
 export const announcementInput = z.object({
   title: z.string().trim().min(1, 'Title is required').max(120),
   body: z.string().trim().max(500).optional(),
-  href: z.union([hrefSchema, z.literal('')]).optional(),
+  href: z.union([inAppHref, z.literal('')]).optional(),
   category: z.enum(['GENERAL', 'ASSESSMENT', 'RESULT', 'REVIEW', 'SYSTEM']).default('GENERAL'),
   audience: z.enum(['ALL', 'STUDENTS', 'STAFF']).default('ALL'),
   departmentId: z.string().min(1).nullable().optional(),
@@ -87,8 +95,10 @@ function toRow(n: Prisma.NotificationGetPayload<{ select: typeof announcementSel
   }
 }
 
-function parseInput(raw: unknown): AnnouncementInput {
-  const r = announcementInput.safeParse(raw)
+const platformAnnouncementInput = announcementInput.extend({ href: z.union([platformHref, z.literal('')]).optional() })
+
+function parseInput(raw: unknown, platform = false): AnnouncementInput {
+  const r = (platform ? platformAnnouncementInput : announcementInput).safeParse(raw)
   if (!r.success) throw new ValidationError(r.error.issues[0]?.message ?? 'Invalid announcement')
   return r.data
 }
@@ -169,7 +179,7 @@ export async function listPlatformAnnouncements(): Promise<AnnouncementRow[]> {
 }
 
 export async function createPlatformAnnouncement(authorId: string, raw: unknown): Promise<AnnouncementRow> {
-  const input = parseInput(raw)
+  const input = parseInput(raw, true)
   if (input.departmentId) throw new ValidationError('Platform announcements cannot target a department')
   const created = await prisma.notification.create({
     data: {

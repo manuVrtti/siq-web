@@ -61,6 +61,9 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   'org.reactivate': 'reactivated an organization',
   'org.member.add': 'added an org member',
   'org.member.remove': 'removed an org member',
+  'announcement.create': 'posted an announcement',
+  'announcement.deactivate': 'deactivated an announcement',
+  'announcement.reactivate': 'restored an announcement',
 }
 
 export function labelOf(map: Record<string, string>, value: string): string {

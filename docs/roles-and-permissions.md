@@ -50,6 +50,7 @@ Super Admin
 | Build, publish, assign tests | ✅ | own college | own departments' tests |
 | Results, grading, proctoring review, analytics, exports | ✅ | own college | own students only |
 | Question bank | ✅ | shared college-wide | shared college-wide |
+| Post announcements (bell) | ✅ every college | own college (or one department) | own departments only |
 | Suspend / reactivate accounts | ✅ | — | — |
 | Suspend / reactivate a whole college (contract, payment…) | ✅ | — | — |
 | Onboard colleges, export directories, global search | ✅ | — | — |
@@ -76,6 +77,14 @@ Super Admin
    the console, and audited. (Lesson from ABtalks plan 169: a grant made from the environment comes
    back after it was revoked.)
 
+### Notifications (the header bell)
+- Each person sees only their own feed for the workspace they're in: announcements for their audience
+  (students / staff) and department, live items (an open test; answers awaiting their review, within
+  their scope), and personal events (test assigned, result ready).
+- Workspace announcement links must stay inside SelectIQ (in-app paths). Only Super Admin platform
+  announcements may link to an external `https://` page.
+- Announcements are deactivated, never deleted. Every change is audited.
+
 ## 4. Where it lives in code
 
 | Concern | File |
@@ -86,6 +95,7 @@ Super Admin
 | Departments & HOD assignment | `src/services/departments.ts` |
 | Suspension enforcement | `src/lib/auth/get-current-user.ts`, `src/app/api/auth/session/route.ts` |
 | "Who can do what" shown in the product | `src/components/people/access-matrix.tsx` |
+| Notifications & announcements | `src/services/notifications/*` |
 
 ## 5. The panels
 

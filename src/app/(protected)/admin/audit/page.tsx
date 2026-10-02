@@ -39,6 +39,9 @@ const ACTIONS = [
   'superadmin.grant',
   'org.suspend',
   'org.reactivate',
+  'announcement.create',
+  'announcement.deactivate',
+  'announcement.reactivate',
 ] as const
 
 /** Who did what, newest first. Read-only; entries are never edited or deleted. */
