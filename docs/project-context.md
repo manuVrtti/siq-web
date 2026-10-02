@@ -145,11 +145,13 @@ All implementation plans live in `docs/plans/` as three-digit files (`001-…` t
 
 **Admin panels (live):** Platform console for Super Admin, built to run hundreds of colleges (directory with health/filters/export, onboarding wizard, college suspension, global search); College admin panel; My department (HOD). See `roles-and-permissions.md`.
 
-**Next infrastructure step:** separate development from production. See [`environments.md`](environments.md) (`npm run db:which`, `npm run db:setup-dev`).
+**⏳ Pending (deferred by SG, 2026-10-02):** separate development from production with a free `selectiq-dev` Supabase project. Until then dev, tests and PR previews use the **production** database, so migrations must only add things and tests use throwaway users only. Steps and status: [`environments.md`](environments.md). Claude Code reminds SG before database-heavy work.
 
 **People:** SG's `contactsuyashgupta@gmail.com` is the Super Admin. `suyash.22b0131169@abes.ac.in` is College Admin of ABES (test college).
 
-**On hold, pending SG:** Plan 005 (MSG91 OTP), Plan 014 (Judge0), custom domain `selectsiq.in` (Firebase auth domain + Vercel), private Supabase bucket `resumes`.
+**On hold, pending SG:** Plan 005 (MSG91 OTP), Plan 014 (Judge0), custom domain `selectsiq.in` (Firebase auth domain + Vercel), dev/prod database separation (above).
+
+**Done 2026-10-02:** Firebase Email/Password sign-in enabled; private `resumes` storage bucket created.
 
 ---
 
