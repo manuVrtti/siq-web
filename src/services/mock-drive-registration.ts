@@ -121,7 +121,7 @@ export async function listRegistrations(scope: Scope, driveId: string) {
           memberships: { where: { orgId: scope.orgId }, select: { department: { select: { code: true } } } },
         },
       },
-      roundResults: { select: { id: true, roundId: true, score: true, outcome: true, decidedById: true, overrideReason: true } },
+      roundResults: { select: { id: true, roundId: true, assignmentId: true, score: true, outcome: true, decidedById: true, overrideReason: true } },
     },
   })
 }

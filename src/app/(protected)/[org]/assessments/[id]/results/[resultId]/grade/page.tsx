@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import ManualGradingPanel from '@/components/results/manual-grading-panel'
-import { ProctoringReview } from '@/components/proctoring/proctoring-review'
+import { ExamIntegrityPanel } from '@/components/proctoring/exam-integrity-panel'
 import PageHeader from '@/components/ui/page-header'
 import { PERMISSIONS } from '@/constants/permissions'
 import { requireAssessmentPage } from '@/lib/auth/page-guard'
@@ -103,6 +103,11 @@ export default async function GradeResultPage({
         </a>
       </PageHeader>
 
+      {/* Plan 018b — staff-only exam integrity, first thing on the page. */}
+      <div className="mb-6">
+        <ExamIntegrityPanel session={proctoring} />
+      </div>
+
       <ManualGradingPanel
         resultId={result.id}
         status={result.status}
@@ -115,19 +120,6 @@ export default async function GradeResultPage({
         questionResults={enriched}
       />
 
-      {proctoring ? (
-        <section className="mt-8">
-          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Proctoring
-          </h2>
-          <ProctoringReview
-            referenceSignedUrl={proctoring.referenceSignedUrl}
-            flags={proctoring.flags}
-            flagCount={proctoring.flagCount}
-            snapshotCount={proctoring.snapshotCount}
-          />
-        </section>
-      ) : null}
     </>
   )
 }

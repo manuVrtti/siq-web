@@ -3,24 +3,45 @@
 import { useEffect, useRef } from 'react'
 
 /**
- * Plan 018 — client-side activity monitor.
+ * Plans 018 / 018b — client-side activity monitor, mounted on EVERY exam.
  *
- * Wires DOM lifecycle events (tab visibility, window focus, fullscreen) to a
- * single `onFlag` callback. Events are debounced so a quick blur → focus
- * bounce (common on macOS when a notification appears) does not fire twice.
+ * Watches the page for things a proctor would want to know and hands each
+ * to `onFlag`; the parent posts it. Recorded:
+ *   tab switch · window blur / focus loss (with duration) · fullscreen exit
+ *   copy / cut / paste / right-click — also BLOCKED during the exam
+ *   PrintScreen key — a screenshot attempt
+ *   events forwarded by the SelectIQ exam browser (blocked shortcuts,
+ *   second screen, OS-level screenshot) via window.postMessage
  *
- * The monitor never uploads on its own; the parent decides whether the flag
- * warrants a POST. This keeps this hook cheap enough to leave mounted for
- * the whole exam even when proctoring is off.
+ * Debounced per type, so one long absence or a held key isn't a flood.
  */
 
-const DEBOUNCE_MS = 500
+const DEBOUNCE_MS = 1500
 
 export type ActivityFlagType =
   | 'TAB_SWITCH'
   | 'FOCUS_LOSS'
   | 'FULLSCREEN_EXIT'
   | 'WINDOW_BLUR'
+  | 'COPY'
+  | 'CUT'
+  | 'PASTE'
+  | 'CONTEXT_MENU'
+  | 'SCREENSHOT_ATTEMPT'
+  | 'SHORTCUT_BLOCKED'
+  | 'SECOND_SCREEN'
+
+/** Events the exam browser may forward into the page. */
+const SHELL_EVENTS: Record<string, ActivityFlagType> = {
+  'screenshot-attempt': 'SCREENSHOT_ATTEMPT',
+  'shortcut-blocked': 'SHORTCUT_BLOCKED',
+  'second-screen': 'SECOND_SCREEN',
+  'tab-switch': 'TAB_SWITCH',
+  'window-blur': 'WINDOW_BLUR',
+}
+
+/** Origins the exam browser's own UI runs on (packaged app / its dev server). */
+const SHELL_ORIGINS = ['app://-', 'http://localhost:5173']
 
 export function useActivityMonitor({
   enabled,
@@ -29,9 +50,6 @@ export function useActivityMonitor({
   enabled: boolean
   onFlag: (type: ActivityFlagType, metadata?: Record<string, unknown>) => void
 }) {
-  // Ref to keep the effect body stable across re-renders — otherwise every
-  // onFlag identity change would rebind listeners. Sync inside a no-dep
-  // effect so we don't touch the ref during render.
   const onFlagRef = useRef(onFlag)
   useEffect(() => {
     onFlagRef.current = onFlag
@@ -40,11 +58,11 @@ export function useActivityMonitor({
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return
 
-    let lastFire = 0
+    const last = new Map<ActivityFlagType, number>()
     const fire = (type: ActivityFlagType, metadata?: Record<string, unknown>) => {
       const now = Date.now()
-      if (now - lastFire < DEBOUNCE_MS) return
-      lastFire = now
+      if (now - (last.get(type) ?? 0) < DEBOUNCE_MS) return
+      last.set(type, now)
       onFlagRef.current(type, metadata)
     }
 
@@ -60,24 +78,54 @@ export function useActivityMonitor({
       }
     }
     const onVisibility = () => {
-      // 'hidden' fires when the tab is switched, minimized, or the OS lock
-      // screen appears — all worth logging as TAB_SWITCH.
       if (document.visibilityState === 'hidden') fire('TAB_SWITCH')
     }
     const onFullscreen = () => {
       if (!document.fullscreenElement) fire('FULLSCREEN_EXIT')
+    }
+    // Clipboard + right-click: blocked during the exam, and logged.
+    const block = (type: ActivityFlagType) => (e: Event) => {
+      e.preventDefault()
+      fire(type)
+    }
+    const onCopy = block('COPY')
+    const onCut = block('CUT')
+    const onPaste = block('PASTE')
+    const onContext = block('CONTEXT_MENU')
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'PrintScreen') fire('SCREENSHOT_ATTEMPT', { key: 'PrintScreen' })
+    }
+    const onShell = (e: MessageEvent) => {
+      if (e.source !== window.parent || window.parent === window) return
+      if (!SHELL_ORIGINS.includes(e.origin)) return
+      const data = e.data as { source?: string; type?: string; details?: Record<string, unknown> } | null
+      if (data?.source !== 'selectiq-shell' || typeof data.type !== 'string') return
+      const type = SHELL_EVENTS[data.type]
+      if (type) fire(type, { from: 'exam-browser', ...(data.details ?? {}) })
     }
 
     window.addEventListener('blur', onBlur)
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
     document.addEventListener('fullscreenchange', onFullscreen)
+    document.addEventListener('copy', onCopy)
+    document.addEventListener('cut', onCut)
+    document.addEventListener('paste', onPaste)
+    document.addEventListener('contextmenu', onContext)
+    window.addEventListener('keyup', onKey)
+    window.addEventListener('message', onShell)
 
     return () => {
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
       document.removeEventListener('fullscreenchange', onFullscreen)
+      document.removeEventListener('copy', onCopy)
+      document.removeEventListener('cut', onCut)
+      document.removeEventListener('paste', onPaste)
+      document.removeEventListener('contextmenu', onContext)
+      window.removeEventListener('keyup', onKey)
+      window.removeEventListener('message', onShell)
     }
   }, [enabled])
 }

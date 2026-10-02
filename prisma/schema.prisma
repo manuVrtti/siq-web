@@ -97,6 +97,8 @@ model User {
   practiceRecommendations PracticeRecommendation[]
   mockDrivesCreated       MockDrive[]              @relation("DriveCreator")
   mockRegistrations       MockDriveRegistration[]
+  identityPhotos          IdentityPhoto[]
+  identityChecks          IdentityCheck[]
 
   @@index([role])
 }
@@ -467,9 +469,10 @@ model AssessmentAssignment {
   submittedAt  DateTime?
   expiresAt    DateTime?
 
-  assessment Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempt    ExamAttempt?
+  assessment    Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt       ExamAttempt?
+  identityCheck IdentityCheck?
 
   @@unique([assessmentId, userId])
   @@index([token])
@@ -593,6 +596,15 @@ enum ProctoringFlagType {
   FULLSCREEN_EXIT
   WINDOW_BLUR
   WEBCAM_DENIED
+  // Plan 018b
+  COPY
+  CUT
+  PASTE
+  CONTEXT_MENU
+  SCREENSHOT_ATTEMPT
+  SHORTCUT_BLOCKED
+  SECOND_SCREEN
+  IDENTITY_MISMATCH
 }
 
 enum FlagSeverity {
@@ -615,9 +627,10 @@ model ProctoringSession {
   flagCount         Int      @default(0)
   createdAt         DateTime @default(now())
 
-  attempt ExamAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt ExamAttempt       @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   flags   ProctoringFlag[]
+  checks  ProctoringCheck[]
 
   @@index([userId])
 }
@@ -1221,4 +1234,67 @@ model MockRoundResult {
 
   @@unique([registrationId, roundId])
   @@index([roundId])
+}
+
+// ============================================================
+// Plan 018b — exam integrity: identity photo, identity check, random checks
+// ============================================================
+
+/// A student's ID photo. The active one is the latest APPROVED row.
+/// source: "SELFIE" (first verified exam selfie) | "STUDENT_UPLOAD" | "COLLEGE_UPLOAD"
+/// status: "APPROVED" | "PENDING" | "REJECTED"
+model IdentityPhoto {
+  id           String   @id @default(cuid())
+  userId       String
+  /// Private proctoring bucket path.
+  storagePath  String
+  source       String
+  status       String   @default("APPROVED")
+  /// College that uploaded / approved it (null for an exam selfie).
+  orgId        String?
+  reviewedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checks IdentityCheck[]
+
+  @@index([userId, status])
+}
+
+/// The pre-exam identity step of one assignment.
+/// outcome: "ENROLLED" (no ID photo yet — this selfie became it) | "MATCHED" | "MISMATCH"
+model IdentityCheck {
+  id           String   @id @default(cuid())
+  assignmentId String   @unique
+  userId       String
+  outcome      String
+  /// 1 − face distance (0–1); null when ENROLLED.
+  matchScore   Float?
+  attempts     Int      @default(1)
+  /// The live photo taken at the check (always kept for human review).
+  snapshotPath String
+  photoId      String?
+  createdAt    DateTime @default(now())
+
+  assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photo      IdentityPhoto?       @relation(fields: [photoId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+/// A random in-exam identity check (snapshot + score), separate from flags.
+model ProctoringCheck {
+  id           String   @id @default(cuid())
+  sessionId    String
+  matched      Boolean
+  matchScore   Float?
+  faceCount    Int
+  snapshotPath String?
+  occurredAt   DateTime @default(now())
+
+  session ProctoringSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }

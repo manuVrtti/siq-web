@@ -34,6 +34,14 @@ const FLAG_TYPES = [
   'FULLSCREEN_EXIT',
   'WINDOW_BLUR',
   'WEBCAM_DENIED',
+  // Plan 018b — activity on every exam, and events forwarded by the exam browser.
+  'COPY',
+  'CUT',
+  'PASTE',
+  'CONTEXT_MENU',
+  'SCREENSHOT_ATTEMPT',
+  'SHORTCUT_BLOCKED',
+  'SECOND_SCREEN',
 ] as const
 
 const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH'] as const

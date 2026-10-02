@@ -2,337 +2,212 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { useActivityMonitor, type ActivityFlagType } from '@/hooks/use-activity-monitor'
-import { analyze, similarity } from '@/lib/proctoring/face-detection'
+import { identityRefKey } from '@/components/exam/identity-gate'
+import { useActivityMonitor } from '@/hooks/use-activity-monitor'
+import { initActivitySession, postActivityFlag } from '@/lib/proctoring/activity'
+import { analyze } from '@/lib/proctoring/face-detection'
+import { describe, isMatch, matchScore } from '@/lib/proctoring/face-identity'
+import { RANDOM_CHECKS_MAX, RANDOM_CHECKS_MIN } from '@/lib/proctoring/identity-rules'
 
 /**
- * Plan 018 — client-side proctoring monitor.
+ * Plans 018 / 018b — in-exam proctoring for a camera-proctored test.
  *
- * Lifecycle inside the exam attempt page:
+ *   activity   — from the first second (tab switch, copy/paste, screenshot…)
+ *   presence   — MediaPipe at RANDOM intervals (intervalSec × 0.5–1.5):
+ *                no face → NO_FACE, more than one → MULTIPLE_FACES
+ *   identity   — 4–6 checks at random moments before the deadline: face-api
+ *                compares the live face with the ID photo (cached by the
+ *                identity gate); each check stores a snapshot for staff, and a
+ *                different face raises FACE_MISMATCH (server side)
  *
- *   1. Ask for webcam. If the candidate denies, flag WEBCAM_DENIED (HIGH)
- *      once and stop.
- *   2. Take a reference photo → POST it to /init to create the session
- *      → run MediaPipe on it locally → cache the descriptor for the run.
- *   3. Loop: every `intervalSec`, grab a frame, count faces, compute
- *      similarity vs the reference. Anomalies fire a flag POST.
- *   4. In parallel, `useActivityMonitor` posts activity flags.
- *
- * All ML runs in the browser (no video frames leave the device except the
- * reference photo + any snapshots the assessment opts to store). This is
- * the privacy promise for candidates.
- *
- * Rendered as a tiny PiP indicator so the candidate can see their webcam
- * is active — hiding it would feel worse than making it visible.
+ * Face maths runs on this device. Uploaded: flags, scores, and snapshots.
  */
 
 type Props = {
   token: string
   intervalSec: number
   storeSnapshots: boolean
-  faceMatchThreshold: number
+  deadlineAtIso: string
 }
 
-type Status =
-  | { kind: 'idle' }
-  | { kind: 'requesting-camera' }
-  | { kind: 'capturing-reference' }
-  | { kind: 'monitoring' }
-  | { kind: 'denied' }
-  | { kind: 'error'; message: string }
+type Status = 'starting' | 'camera' | 'monitoring' | 'denied' | 'error'
 
-const CAPTURE_WIDTH = 320
-const CAPTURE_HEIGHT = 240
-const JPEG_QUALITY = 0.7
+const W = 320
+const H = 240
 
-/** LocalStorage key for the reference descriptor, keyed by token. */
-function referenceStorageKey(token: string) {
-  return `siq.proctoring.ref.${token}`
-}
-
-export default function ProctoringMonitor({
-  token,
-  intervalSec,
-  storeSnapshots,
-  faceMatchThreshold,
-}: Props) {
-  const [status, setStatus] = useState<Status>({ kind: 'idle' })
+export default function ProctoringMonitor({ token, intervalSec, storeSnapshots, deadlineAtIso }: Props) {
+  const [status, setStatus] = useState<Status>('starting')
+  const [activityOn, setActivityOn] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const referenceDescriptorRef = useRef<Float32Array | null>(null)
-  const loopTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const refDescriptor = useRef<Float32Array | null>(null)
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
 
-  // Rehydrate reference descriptor from localStorage in case of a page refresh
-  // mid-exam. `useEffect` (not lazy state) because localStorage is a browser API.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(referenceStorageKey(token))
-      if (!raw) return
-      const parsed = JSON.parse(raw) as number[]
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        referenceDescriptorRef.current = Float32Array.from(parsed)
-      }
-    } catch {
-      // Corrupt cache — no harm, we'll re-capture the reference.
-    }
-  }, [token])
+  useActivityMonitor({
+    enabled: activityOn,
+    onFlag: (type, metadata) => void postActivityFlag(token, type, metadata),
+  })
+
+  const grab = useCallback(async (): Promise<Blob | null> => {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas || video.readyState < 2) return null
+    canvas.width = W
+    canvas.height = H
+    canvas.getContext('2d')?.drawImage(video, 0, 0, W, H)
+    return new Promise((r) => canvas.toBlob((b) => r(b), 'image/jpeg', 0.7))
+  }, [])
 
   const postFlag = useCallback(
-    async (
-      type:
-        | 'NO_FACE'
-        | 'MULTIPLE_FACES'
-        | 'FACE_MISMATCH'
-        | 'WEBCAM_DENIED'
-        | ActivityFlagType,
-      opts: {
-        severity?: 'LOW' | 'MEDIUM' | 'HIGH'
-        similarity?: number
-        metadata?: Record<string, unknown>
-        snapshotBlob?: Blob | null
-      } = {},
-    ) => {
-      const severity = opts.severity ?? 'LOW'
-      const includeSnapshot = storeSnapshots && opts.snapshotBlob
+    async (type: 'NO_FACE' | 'MULTIPLE_FACES' | 'WEBCAM_DENIED', severity: 'MEDIUM' | 'HIGH', snapshot: Blob | null, metadata?: Record<string, unknown>) => {
       try {
-        if (includeSnapshot && opts.snapshotBlob) {
+        if (snapshot && storeSnapshots) {
           const form = new FormData()
-          form.append(
-            'flag',
-            JSON.stringify({
-              type,
-              severity,
-              similarity: opts.similarity ?? null,
-              metadata: opts.metadata ?? null,
-            }),
-          )
-          form.append('snapshot', opts.snapshotBlob, 'snapshot.jpg')
-          await fetch(`/api/exam/${token}/proctoring/flag`, {
-            method: 'POST',
-            body: form,
-          })
+          form.append('flag', JSON.stringify({ type, severity, metadata: metadata ?? null }))
+          form.append('snapshot', snapshot, 'snapshot.jpg')
+          await fetch(`/api/exam/${token}/proctoring/flag`, { method: 'POST', body: form })
         } else {
           await fetch(`/api/exam/${token}/proctoring/flag`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type,
-              severity,
-              similarity: opts.similarity ?? null,
-              metadata: opts.metadata ?? null,
-            }),
+            body: JSON.stringify({ type, severity, metadata: metadata ?? null }),
           })
         }
       } catch {
-        // Network hiccups are non-fatal; the next tick will try again.
+        /* next check will try again */
       }
     },
     [storeSnapshots, token],
   )
 
-  useActivityMonitor({
-    enabled: status.kind === 'monitoring',
-    onFlag: (type, metadata) => {
-      void postFlag(type, { severity: 'MEDIUM', metadata })
-    },
-  })
-
-  /** Draw the current video frame into the offscreen canvas and return a JPEG blob. */
-  const grabSnapshot = useCallback(async (): Promise<Blob | null> => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas) return null
-    if (video.readyState < 2) return null
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    canvas.width = CAPTURE_WIDTH
-    canvas.height = CAPTURE_HEIGHT
-    ctx.drawImage(video, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT)
-    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', JPEG_QUALITY))
-  }, [])
-
-  /** One iteration of the monitor loop. */
-  const tick = useCallback(async () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    try {
-      const observation = await analyze(canvas)
-      if (observation.faceCount === 0) {
-        const snap = storeSnapshots ? await grabSnapshot() : null
-        await postFlag('NO_FACE', { severity: 'MEDIUM', snapshotBlob: snap })
-        return
+  /** One presence check (MediaPipe). Scheduled at random intervals by start(). */
+  const presence = useCallback(async () => {
+    const snap = await grab()
+    if (snap && canvasRef.current) {
+      try {
+        const o = await analyze(canvasRef.current)
+        if (o.faceCount === 0) await postFlag('NO_FACE', 'MEDIUM', snap)
+        else if (o.faceCount > 1) await postFlag('MULTIPLE_FACES', 'HIGH', snap, { faceCount: o.faceCount })
+      } catch {
+        /* frame-level failure: ignore */
       }
-      if (observation.faceCount > 1) {
-        const snap = storeSnapshots ? await grabSnapshot() : null
-        await postFlag('MULTIPLE_FACES', {
-          severity: 'HIGH',
-          metadata: { faceCount: observation.faceCount },
-          snapshotBlob: snap,
-        })
-        return
-      }
-      // Exactly one face — check similarity if we have a reference.
-      const ref = referenceDescriptorRef.current
-      if (ref && observation.descriptor) {
-        const sim = similarity(ref, observation.descriptor)
-        if (sim < faceMatchThreshold) {
-          const snap = storeSnapshots ? await grabSnapshot() : null
-          await postFlag('FACE_MISMATCH', {
-            severity: 'HIGH',
-            similarity: sim,
-            snapshotBlob: snap,
-          })
-        }
-      }
-    } catch {
-      // Frame-level failure is not fatal. Next tick tries again.
     }
-  }, [faceMatchThreshold, grabSnapshot, postFlag, storeSnapshots])
+  }, [grab, postFlag])
 
-  /** Full bring-up: camera → reference photo → init API → start loop. */
+  /** One random identity check (face-api) — always keeps its snapshot for staff. */
+  const identity = useCallback(async () => {
+    const snap = await grab()
+    if (!snap || !canvasRef.current) return
+    try {
+      const live = await describe(canvasRef.current)
+      const ref = refDescriptor.current
+      const score = live.descriptor && ref ? matchScore(live.descriptor, ref) : null
+      const form = new FormData()
+      form.append('matched', String(live.faceCount === 1 && (score === null || isMatch(score))))
+      form.append('matchScore', score === null ? '' : String(Math.round(score * 1000) / 1000))
+      form.append('faceCount', String(live.faceCount))
+      form.append('snapshot', snap, 'check.jpg')
+      await fetch(`/api/exam/${token}/proctoring/check`, { method: 'POST', body: form })
+    } catch {
+      /* model or network hiccup: skip this one */
+    }
+  }, [grab, token])
+
   const start = useCallback(async () => {
-    setStatus({ kind: 'requesting-camera' })
+    // 1. Activity from the very first second.
+    if (await initActivitySession(token)) setActivityOn(true)
+
+    // 2. Camera.
     let stream: MediaStream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 },
-        audio: false,
-      })
+      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
     } catch {
-      setStatus({ kind: 'denied' })
-      await postFlag('WEBCAM_DENIED', { severity: 'HIGH' })
+      setStatus('denied')
+      await postFlag('WEBCAM_DENIED', 'HIGH', null)
       return
     }
     streamRef.current = stream
-
+    setStatus('camera')
     const video = videoRef.current
     if (!video) return
     video.srcObject = stream
     await video.play().catch(() => {})
-
-    // Wait for the first frame so getUserMedia isn't racing analysis.
     await new Promise<void>((resolve) => {
       if (video.readyState >= 2) return resolve()
-      const onLoaded = () => {
-        video.removeEventListener('loadeddata', onLoaded)
-        resolve()
-      }
-      video.addEventListener('loadeddata', onLoaded)
+      video.addEventListener('loadeddata', () => resolve(), { once: true })
     })
 
-    setStatus({ kind: 'capturing-reference' })
-    const referenceBlob = await grabSnapshot()
-    if (!referenceBlob) {
-      setStatus({ kind: 'error', message: 'Could not capture reference photo' })
-      return
-    }
-
-    // Compute descriptor client-side — never leaves the device.
-    try {
-      const canvas = canvasRef.current
-      if (canvas) {
-        const obs = await analyze(canvas)
-        if (obs.descriptor) {
-          referenceDescriptorRef.current = obs.descriptor
-          try {
-            localStorage.setItem(
-              referenceStorageKey(token),
-              JSON.stringify(Array.from(obs.descriptor)),
-            )
-          } catch {
-            /* quota — non-fatal */
-          }
-        }
-      }
-    } catch {
-      // We can still run without a descriptor; presence checks still work.
-    }
-
-    // Upload the reference photo. The server's `initSession` is idempotent
-    // per attempt, so a retry after refresh is safe.
-    try {
+    // 3. Exam-start reference photo (kept on the session for staff).
+    const reference = await grab()
+    if (reference) {
       const form = new FormData()
-      form.append('photo', referenceBlob, 'reference.jpg')
-      const res = await fetch(`/api/exam/${token}/proctoring/init`, {
-        method: 'POST',
-        body: form,
-      })
-      if (!res.ok) {
-        setStatus({ kind: 'error', message: 'Could not initialise proctoring' })
-        return
-      }
-    } catch {
-      setStatus({ kind: 'error', message: 'Could not initialise proctoring' })
-      return
+      form.append('photo', reference, 'reference.jpg')
+      await fetch(`/api/exam/${token}/proctoring/init`, { method: 'POST', body: form }).catch(() => null)
     }
 
-    setStatus({ kind: 'monitoring' })
-    loopTimerRef.current = setInterval(() => {
-      void tick()
-    }, intervalSec * 1000)
-  }, [grabSnapshot, intervalSec, postFlag, tick, token])
+    // 4. Who to compare with: the ID photo from the identity gate, else this start photo.
+    try {
+      const raw = sessionStorage.getItem(identityRefKey(token))
+      if (raw) refDescriptor.current = Float32Array.from(JSON.parse(raw) as number[])
+    } catch {
+      /* no cached ID descriptor */
+    }
+    if (!refDescriptor.current && canvasRef.current) {
+      try {
+        refDescriptor.current = (await describe(canvasRef.current)).descriptor
+      } catch {
+        /* identity checks will still record faces and snapshots */
+      }
+    }
+
+    setStatus('monitoring')
+
+    // 5. Random presence loop + 4–6 identity checks at random moments.
+    const loop = () => {
+      const delay = intervalSec * 1000 * (0.5 + Math.random())
+      timers.current.push(
+        setTimeout(() => {
+          void presence().finally(loop)
+        }, delay),
+      )
+    }
+    loop()
+    const remaining = new Date(deadlineAtIso).getTime() - Date.now()
+    if (remaining > 60_000) {
+      const k = RANDOM_CHECKS_MIN + Math.floor(Math.random() * (RANDOM_CHECKS_MAX - RANDOM_CHECKS_MIN + 1))
+      for (let i = 0; i < k; i++) {
+        // Spread across the exam: one random moment inside each of k slices.
+        const at = remaining * ((i + 0.1 + Math.random() * 0.8) / k)
+        timers.current.push(setTimeout(() => void identity(), at))
+      }
+    }
+  }, [deadlineAtIso, grab, identity, intervalSec, postFlag, presence, token])
 
   useEffect(() => {
-    // `start` calls setStatus BEFORE its first await, which the React 19
-    // linter flags as "setState in effect". Defer with queueMicrotask so
-    // the first state change happens outside the effect body.
-    queueMicrotask(() => {
-      void start()
-    })
+    queueMicrotask(() => void start())
+    const pending = timers.current
     return () => {
-      if (loopTimerRef.current) clearInterval(loopTimerRef.current)
-      loopTimerRef.current = null
-      if (streamRef.current) {
-        for (const t of streamRef.current.getTracks()) t.stop()
-        streamRef.current = null
-      }
+      for (const t of pending) clearTimeout(t)
+      for (const t of streamRef.current?.getTracks() ?? []) t.stop()
+      streamRef.current = null
     }
-    // start is stable enough — depends only on constant props.
+    // start once per mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
-    <div
-      aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-1"
-    >
-      <video
-        ref={videoRef}
-        muted
-        playsInline
-        className="border-border pointer-events-none h-24 w-32 rounded-md border object-cover shadow"
-      />
+    <div aria-live="polite" className="fixed right-4 bottom-4 z-50 flex flex-col items-end gap-1">
+      <video ref={videoRef} muted playsInline className="border-border pointer-events-none h-24 w-32 rounded-md border object-cover shadow" />
       <canvas ref={canvasRef} className="hidden" />
       <span
         className={
           'rounded-full px-2 py-0.5 text-[10px] font-medium ' +
-          (status.kind === 'monitoring'
-            ? 'bg-success/10 text-success'
-            : status.kind === 'denied' || status.kind === 'error'
-              ? 'bg-destructive/10 text-destructive'
-              : 'bg-muted text-muted-foreground')
+          (status === 'monitoring' ? 'bg-success/10 text-success' : status === 'denied' || status === 'error' ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground')
         }
       >
-        {statusLabel(status)}
+        {status === 'monitoring' ? 'proctoring active' : status === 'denied' ? 'camera denied' : status === 'error' ? 'proctoring error' : 'starting…'}
       </span>
     </div>
   )
-}
-
-function statusLabel(s: Status): string {
-  switch (s.kind) {
-    case 'idle':
-      return 'starting…'
-    case 'requesting-camera':
-      return 'requesting camera…'
-    case 'capturing-reference':
-      return 'capturing reference…'
-    case 'monitoring':
-      return 'proctoring active'
-    case 'denied':
-      return 'camera denied'
-    case 'error':
-      return s.message
-  }
 }

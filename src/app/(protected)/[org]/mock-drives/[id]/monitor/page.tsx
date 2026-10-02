@@ -10,6 +10,8 @@ import { Bar } from '@/components/motion/animated'
 import { requireDrivePage } from '@/lib/auth/drive-page'
 import { cn } from '@/lib/utils'
 import { listRegistrations } from '@/services/mock-drive-registration'
+import { integrityByAssignment } from '@/services/proctoring'
+import { IntegrityBadge } from '@/components/proctoring/integrity-badge'
 import { getDriveStandings } from '@/services/mock-drive-runtime'
 import { canManageDrive, getDrive } from '@/services/mock-drives'
 
@@ -22,6 +24,8 @@ export default async function MonitorPage({ params }: { params: Promise<{ org: s
   const drive = await getDrive(scope, id).catch(() => null)
   if (!drive) notFound()
   const [standings, regs] = await Promise.all([getDriveStandings(scope, id), listRegistrations(scope, id)])
+  // Plan 018b — integrity per student per round (staff only).
+  const integrity = await integrityByAssignment(regs.flatMap((g) => g.roundResults.map((r) => r.assignmentId).filter((x): x is string => Boolean(x))))
   const canRun = canManageDrive(scope, drive) && drive.status === 'IN_PROGRESS'
   const st = DRIVE_STATUS[drive.status]!
   const max = Math.max(1, standings.registrations)
@@ -141,6 +145,15 @@ export default async function MonitorPage({ params }: { params: Promise<{ org: s
                                   {rr.outcome === 'SHORTLISTED' ? ' ✓' : rr.outcome === 'ELIMINATED' ? ' ✗' : ''}
                                 </span>
                                 {rr.overrideReason ? <span className="text-muted-foreground max-w-40 truncate text-[11px]" title={rr.overrideReason}>{rr.overrideReason}</span> : null}
+                                {rr.assignmentId && integrity.get(rr.assignmentId) ? (
+                                  <span className="mt-0.5">
+                                    <IntegrityBadge
+                                      risk={integrity.get(rr.assignmentId)!.risk}
+                                      flags={integrity.get(rr.assignmentId)!.flags}
+                                      href={integrity.get(rr.assignmentId)!.resultId ? `/${slug}/assessments/${r.assessmentId}/results/${integrity.get(rr.assignmentId)!.resultId}/grade` : null}
+                                    />
+                                  </span>
+                                ) : null}
                                 {canOverride && id ? <OverrideButton roundResultId={id} outcome={rr.outcome as 'SHORTLISTED' | 'ELIMINATED'} studentName={name} /> : null}
                               </div>
                             )}

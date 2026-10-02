@@ -20,7 +20,7 @@ import type { DriveInput } from '@/lib/validators/mock-drive'
 export const driveInclude = {
   rounds: {
     orderBy: { order: 'asc' },
-    include: { assessment: { select: { id: true, title: true, status: true, countsForAnalytics: true, durationMinutes: true } } },
+    include: { assessment: { select: { id: true, title: true, status: true, countsForAnalytics: true, durationMinutes: true, proctoringEnabled: true } } },
   },
   targets: { include: { department: { select: { id: true, code: true, name: true } } } },
   sampleCompany: { select: { id: true, name: true, logoUrl: true } },
@@ -235,6 +235,9 @@ export function driveBlockers(drive: Awaited<ReturnType<typeof getDrive>>): stri
   if (drive.rounds.length === 0) out.push('Add at least one round')
   const unpublished = drive.rounds.filter((r) => r.assessment.status !== 'PUBLISHED')
   if (unpublished.length) out.push(`Publish the test${unpublished.length === 1 ? '' : 's'} for ${unpublished.map((r) => `round ${r.order}`).join(', ')}`)
+  // Plan 018b — every round is identity-checked and camera-proctored.
+  const unproctored = drive.rounds.filter((r) => !r.assessment.proctoringEnabled)
+  if (unproctored.length) out.push(`Turn on proctoring for ${unproctored.map((r) => `round ${r.order}`).join(', ')} (identity check + camera)`)
   if (drive.mode === 'SAMPLE_COMPANY' && !drive.sampleCompanyOrgId) out.push('The sample company is no longer available')
   return out
 }

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import ExamRuntime from '@/components/exam/exam-runtime'
+import ActivityMonitor from '@/components/exam/activity-monitor'
 import ProctoringMonitor from '@/components/exam/proctoring-monitor'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { getAttemptState } from '@/services/exam-session'
@@ -65,14 +66,17 @@ export default async function AttemptPage({
         deadlineAtIso={state.attempt.deadlineAt.toISOString()}
         serverNowIso={state.now.toISOString()}
       />
+      {/* Plan 018b — every exam is activity-monitored; proctored ones also use the camera. */}
       {a.proctoringEnabled ? (
         <ProctoringMonitor
           token={token}
           intervalSec={a.snapshotIntervalSec}
           storeSnapshots={a.storeSnapshots}
-          faceMatchThreshold={a.faceMatchThreshold}
+          deadlineAtIso={state.attempt.deadlineAt.toISOString()}
         />
-      ) : null}
+      ) : (
+        <ActivityMonitor token={token} />
+      )}
     </>
   )
 }
