@@ -145,7 +145,8 @@ Super Admin
 - **Proctored exams** add an **identity check before Start** (live photo vs the student's ID photo; the first verified
   selfie becomes the ID photo) and **random checks** during the exam (presence at random intervals; 4–6 identity
   re-checks with stored snapshots). On a mismatch the exam continues and staff see a HIGH alert.
-  The server refuses to start a proctored exam without the identity step. Mock-drive rounds must be proctored.
+  The server refuses to start a proctored exam without the identity step. Proctoring is optional: College Admins,
+  HODs (their departments) and Super Admins switch it on per test or per mock-drive round ("Proctor all rounds").
 - Face matching runs on the student's device (face-api, MediaPipe); only scores and photos are uploaded, to the private
   `proctoring` bucket, shown to staff via 5-minute signed links.
 - **Only staff** see integrity: the College Admin, Super Admin, and the HOD of the student's department (grade page panel,

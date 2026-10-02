@@ -605,6 +605,8 @@ enum ProctoringFlagType {
   SHORTCUT_BLOCKED
   SECOND_SCREEN
   IDENTITY_MISMATCH
+  // Plan 017b — a blocked app was found (and closed) by the exam browser
+  BLOCKED_APP
 }
 
 enum FlagSeverity {

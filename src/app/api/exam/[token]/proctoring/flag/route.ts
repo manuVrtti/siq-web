@@ -42,6 +42,7 @@ const FLAG_TYPES = [
   'SCREENSHOT_ATTEMPT',
   'SHORTCUT_BLOCKED',
   'SECOND_SCREEN',
+  'BLOCKED_APP',
 ] as const
 
 const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH'] as const

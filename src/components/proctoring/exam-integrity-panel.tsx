@@ -152,6 +152,12 @@ export function ExamIntegrityPanel({ session }: { session: Session | null }) {
                   {f.type === 'FOCUS_LOSS' && typeof (f.metadata as { durationMs?: number } | null)?.durationMs === 'number' ? (
                     <span className="text-muted-foreground"> · {Math.round((f.metadata as { durationMs: number }).durationMs / 1000)}s</span>
                   ) : null}
+                  {typeof (f.metadata as { app?: string } | null)?.app === 'string' ? (
+                    <span className="font-medium"> · {(f.metadata as { app: string }).app}</span>
+                  ) : null}
+                  {typeof (f.metadata as { shortcut?: string } | null)?.shortcut === 'string' ? (
+                    <span className="text-muted-foreground"> · {(f.metadata as { shortcut: string }).shortcut}</span>
+                  ) : null}
                   {(f.metadata as { from?: string } | null)?.from === 'exam-browser' ? <span className="text-muted-foreground"> · reported by exam browser</span> : null}
                 </span>
                 {f.snapshotSignedUrl ? (

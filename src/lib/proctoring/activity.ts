@@ -17,6 +17,7 @@ export const ACTIVITY_SEVERITY: Record<ActivityFlagType, 'LOW' | 'MEDIUM' | 'HIG
   SCREENSHOT_ATTEMPT: 'HIGH',
   SHORTCUT_BLOCKED: 'LOW',
   SECOND_SCREEN: 'HIGH',
+  BLOCKED_APP: 'HIGH',
 }
 
 /** Start (or resume) the attempt's activity session. Safe to call repeatedly. */

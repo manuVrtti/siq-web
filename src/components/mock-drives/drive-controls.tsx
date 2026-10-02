@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Check, Flag, Loader2, Play, Plus, Trash2, Users, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Flag, Loader2, Play, Plus, ShieldCheck, Trash2, Users, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -117,6 +117,8 @@ export type RoundRow = {
   cutoff: number | null
   activated: boolean
   evaluated: boolean
+  /** Plan 017b — identity check + camera on this round's test. */
+  proctored: boolean
 }
 
 export function RoundsEditor({
@@ -124,11 +126,14 @@ export function RoundsEditor({
   rounds,
   tests,
   editable,
+  canProctor,
 }: {
   driveId: string
   rounds: RoundRow[]
   tests: { id: string; title: string; status: string }[]
   editable: boolean
+  /** May change proctoring of rounds not opened yet. */
+  canProctor: boolean
 }) {
   const { busy, error, note, run } = useAction()
   const [assessmentId, setAssessmentId] = useState('')
@@ -136,8 +141,31 @@ export function RoundsEditor({
   const [edits, setEdits] = useState<Record<string, string>>({})
   const available = tests.filter((t) => !rounds.some((r) => r.testTitle === t.title))
 
+  const unproctored = rounds.filter((r) => !r.proctored && !r.activated)
+  const setProctoring = (body: Record<string, unknown>, key: string) =>
+    run(key, () => call(`/api/mock-drives/${driveId}/proctoring`, 'PATCH', body), (d) => {
+      const n = (d as { changed: number }).changed
+      return n ? `Proctoring updated for ${n} round${n === 1 ? '' : 's'}` : 'Nothing to change'
+    })
+
   return (
     <div className="flex flex-col gap-3">
+      {canProctor && rounds.length > 0 ? (
+        <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-xs">
+          <ShieldCheck className="text-primary size-4" aria-hidden />
+          <span className="flex-1">
+            {unproctored.length
+              ? `Proctoring is optional. ${unproctored.length} round${unproctored.length === 1 ? ' is' : 's are'} off. On = identity check before the exam + camera checks during it. Activity is logged either way.`
+              : 'Every round is proctored: identity check before the exam + camera checks during it.'}
+          </span>
+          {unproctored.length ? (
+            <Button size="sm" disabled={busy !== null} onClick={() => setProctoring({ all: true, enabled: true }, 'all')}>
+              {busy === 'all' ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ShieldCheck className="size-3.5" aria-hidden />}
+              Proctor all rounds
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {rounds.length === 0 ? (
         <p className="text-muted-foreground rounded-xl border border-dashed px-4 py-6 text-center text-sm">
           No rounds yet. Each round is one of your tests — e.g. Aptitude → Technical → Coding.
@@ -150,6 +178,7 @@ export function RoundsEditor({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{r.name}</p>
                 <p className="text-muted-foreground text-xs">
+                  {r.proctored ? <span className="text-primary font-medium">Proctored · </span> : <span className="text-muted-foreground">Not proctored · </span>}
                   Test: {r.testTitle}
                   {r.testStatus !== 'PUBLISHED' ? <span className="text-warning font-medium"> · not published yet</span> : null}
                   {r.evaluated ? ' · closed' : r.activated ? ' · open now' : ''}
@@ -174,6 +203,17 @@ export function RoundsEditor({
                 />
                 %
               </label>
+              {canProctor ? (
+                <label className={cn('flex items-center gap-1.5 text-xs', r.activated && 'opacity-50')} title={r.activated ? 'Opened rounds can’t change' : undefined}>
+                  <input
+                    type="checkbox"
+                    checked={r.proctored}
+                    disabled={r.activated || busy !== null}
+                    onChange={(e) => setProctoring({ roundIds: [r.id], enabled: e.target.checked }, `p-${r.id}`)}
+                  />
+                  Proctored
+                </label>
+              ) : null}
               {editable ? (
                 <div className="flex gap-1">
                   <Button size="icon" variant="ghost" className="size-8" disabled={i === 0 || busy !== null} aria-label="Move up" onClick={() => run(`up-${r.id}`, () => call(`/api/mock-drives/${driveId}/rounds/${r.id}`, 'PATCH', { move: 'up' }))}>

@@ -29,6 +29,7 @@ export const FLAG_LABEL: Record<string, string> = {
   FACE_MISMATCH: 'Different face',
   IDENTITY_MISMATCH: 'Identity not confirmed',
   WEBCAM_DENIED: 'Camera turned off / denied',
+  BLOCKED_APP: 'Blocked app (closed by the exam browser)',
 }
 
 /** Display groups for the counts grid (order = importance). */
@@ -36,6 +37,7 @@ export const FLAG_GROUPS: { label: string; types: string[] }[] = [
   { label: 'Other person in camera', types: ['MULTIPLE_FACES'] },
   { label: 'Different face', types: ['FACE_MISMATCH', 'IDENTITY_MISMATCH'] },
   { label: 'Screenshot attempts', types: ['SCREENSHOT_ATTEMPT'] },
+  { label: 'Blocked apps closed', types: ['BLOCKED_APP'] },
   { label: 'Tab / window switches', types: ['TAB_SWITCH', 'WINDOW_BLUR'] },
   { label: 'Copy / cut / paste', types: ['COPY', 'CUT', 'PASTE'] },
   { label: 'No face in camera', types: ['NO_FACE'] },

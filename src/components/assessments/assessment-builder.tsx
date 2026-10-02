@@ -231,7 +231,7 @@ export default function AssessmentBuilder({
           <p className="text-muted-foreground text-xs">
             Before the exam the student verifies their identity with the camera (their first verified photo becomes
             their ID photo). During the exam the camera checks at random moments that the same single person is
-            there. Required for mock-drive rounds. Activity — tab switches, copy-paste, screenshot attempts — is
+            there. Optional — switch it on per test or per mock-drive round. Activity — tab switches, copy-paste, screenshot attempts — is
             recorded on every test, proctored or not, and only staff can see it.
           </p>
           {proctoringEnabled ? (

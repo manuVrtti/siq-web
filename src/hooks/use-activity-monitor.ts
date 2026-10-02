@@ -30,6 +30,7 @@ export type ActivityFlagType =
   | 'SCREENSHOT_ATTEMPT'
   | 'SHORTCUT_BLOCKED'
   | 'SECOND_SCREEN'
+  | 'BLOCKED_APP'
 
 /** Events the exam browser may forward into the page. */
 const SHELL_EVENTS: Record<string, ActivityFlagType> = {
@@ -38,6 +39,7 @@ const SHELL_EVENTS: Record<string, ActivityFlagType> = {
   'second-screen': 'SECOND_SCREEN',
   'tab-switch': 'TAB_SWITCH',
   'window-blur': 'WINDOW_BLUR',
+  'blocked-app': 'BLOCKED_APP',
 }
 
 /** Origins the exam browser's own UI runs on (packaged app / its dev server). */
