@@ -51,7 +51,7 @@ function describeAuthError(error: unknown): string {
   }
 }
 
-export default function LoginForm() {
+export default function LoginForm({ next = null }: { next?: string | null }) {
   const router = useRouter()
   const [pending, setPending] = useState<Pending>(null)
   const [error, setError] = useState<string | null>(null)
@@ -76,10 +76,10 @@ export default function LoginForm() {
       }
       // refresh() re-runs the server components so the new cookie is picked up.
       // A temporary-password session is forwarded on to /set-password.
-      router.replace('/select-org')
+      router.replace(next ?? '/select-org')
       router.refresh()
     },
-    [router],
+    [router, next],
   )
 
   const fail = useCallback((err: unknown) => {
