@@ -57,6 +57,7 @@ Super Admin
 | Rebuild a college's analytics (full recompute) | ✅ | own college | — |
 | Weak spots & "students needing attention" | ✅ | own college | own departments |
 | Open a question for student practice | ✅ | own college | own college |
+| Create / run mock drives (rounds, cutoffs, enrol, open/close rounds, overrides) | ✅ | own college (incl. college-wide) | drives aimed only at own departments |
 | Post announcements (bell) | ✅ every college | own college (or one department) | own departments only |
 | Suspend / reactivate accounts | ✅ | — | — |
 | Suspend / reactivate a whole college (contract, payment…) | ✅ | — | — |
@@ -124,6 +125,19 @@ Super Admin
   counts toward analytics **cannot be published** while it contains one, so real exam questions never leak.
 - Students see only their own insights; HODs see weak spots and the attention list for their departments only.
 
+### Mock drives (plans 023–024)
+- A mock drive is **orchestration over ordinary tests**: each round is an existing assessment (same exam browser,
+  proctoring and grading), with an optional cutoff (%). No real company or hiring is involved; "sample company" mode
+  only borrows a company organisation's name and logo.
+- **Eligibility:** target departments (none = whole college), batches (graduation year) and a minimum CGPA. Students
+  register themselves while registration is open, or staff enrol everyone eligible; nobody ineligible is forced in.
+- **HODs** see drives that include their departments and run only drives aimed solely at their departments.
+- **Funnel:** opening a round assigns its test to everyone still in; a graded result decides the round immediately
+  (score ≥ cutoff → shortlisted). Closing a round eliminates no-shows and is refused while answers await grading.
+  Overrides need a reason, are audited, notify the student, and are only possible until the next round opens.
+- Eligibility can't change once a drive starts; tests used by a drive can't be deleted; archived drives stay in
+  participants' history. Drive results also feed competency as a per-drive snapshot (`scope = DRIVE`).
+
 ## 4. Where it lives in code
 
 | Concern | File |
@@ -138,6 +152,7 @@ Super Admin
 | Topics & skills, question tagging rules | `src/services/taxonomy.ts` |
 | Competency scoring, cohort baselines, who may read a profile | `src/services/competency/*`, `src/lib/competency/weighting.ts` |
 | Insight thresholds (tiers, trends, priorities) | `src/constants/competency-thresholds.ts` |
+| Mock drives: set-up, eligibility, runtime, student journey | `src/services/mock-drives.ts`, `mock-drive-registration.ts`, `mock-drive-runtime.ts`, `mock-drive-student.ts` |
 
 ## 5. The panels
 

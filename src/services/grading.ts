@@ -6,6 +6,7 @@ import { ForbiddenError, NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { userInScope, type Scope } from '@/lib/auth/scope'
 import { recomputeForStudent } from '@/services/competency/rollup'
+import { onResultGraded } from '@/services/mock-drive-runtime'
 import { notifyResultGraded, safely } from '@/services/notifications/events'
 
 /**
@@ -203,6 +204,8 @@ export async function gradeAttempt(attemptId: string) {
     await safely(() => notifyResultGraded(created.id))
     // Plan 025 — fold the new scores into the student's competency profile.
     await safely(() => recomputeForStudent(created.userId, created.assessmentId))
+    // Plan 024 — a mock drive round decides on the graded score.
+    await safely(() => onResultGraded(created.userId, created.assessmentId))
   }
   return created
 }
@@ -301,7 +304,10 @@ export async function recomputeResult(resultId: string) {
     await safely(() => notifyResultGraded(resultId))
   }
   // Plan 025 — a final (or re-graded) result changes the competency profile.
-  if (status === 'GRADED') await safely(() => recomputeForStudent(updated.userId, updated.assessmentId))
+  if (status === 'GRADED') {
+    await safely(() => recomputeForStudent(updated.userId, updated.assessmentId))
+    await safely(() => onResultGraded(updated.userId, updated.assessmentId))
+  }
   return updated
 }
 

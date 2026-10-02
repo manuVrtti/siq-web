@@ -13,6 +13,7 @@ export type EventTypeConfig = {
 export const EVENT_TYPE_REGISTRY = {
   'assessment.assigned': { key: 'assessment.assigned', label: 'New test assigned', category: 'ASSESSMENT' },
   'result.graded': { key: 'result.graded', label: 'Result ready', category: 'RESULT' },
+  'drive.outcome': { key: 'drive.outcome', label: 'Mock drive update', category: 'RESULT' },
 } as const satisfies Record<string, EventTypeConfig>
 
 export type EventType = keyof typeof EVENT_TYPE_REGISTRY

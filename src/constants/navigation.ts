@@ -6,6 +6,7 @@ import {
   LineChart,
   Megaphone,
   MessagesSquare,
+  Rocket,
   UserRound,
   Shield,
   ShieldCheck,
@@ -43,12 +44,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // Student tabs. Their own routes (my-*) rather than the manager pages, which
   // are permission-gated and show org-wide data.
   { label: 'Assessments', href: '/my-assessments', icon: ClipboardCheck, roles: ['STUDENT'] },
+  { label: 'Mock drives', href: '/my-drives', icon: Rocket, roles: ['STUDENT'] },
   { label: 'Mock interviews', href: '/mock-interviews', icon: MessagesSquare, roles: ['STUDENT'], badge: 'Soon' },
   { label: 'Analytics', href: '/my-analytics', icon: LineChart, roles: ['STUDENT'] },
   { label: 'My results', href: '/my-results', icon: FileCheck2, roles: ['STUDENT'], absolute: true },
   { label: 'My profile', href: '/profile', icon: UserRound, roles: ['STUDENT'] },
   { label: 'Assessments', href: '/assessments', icon: ClipboardCheck, roles: MANAGERS },
   { label: 'Question bank', href: '/questions', icon: LibraryBig, roles: MANAGERS },
+  { label: 'Mock drives', href: '/mock-drives', icon: Rocket, roles: ['COLLEGE_ADMIN', 'COLLEGE_HOD', 'SUPER_ADMIN'] },
   { label: 'Candidates', href: '/candidates', icon: Users, roles: MANAGERS },
   // Students see their own results on the dashboard and at /my-results; the
   // org-wide results page is manager-only (Plan 016 gates it server-side).
