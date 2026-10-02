@@ -52,6 +52,7 @@ export default async function EditQuestionPage({
           tagIds: question.tags.map((t) => t.tag.id),
           topicId: question.topic?.sectionId ?? '',
           skillIds: question.skills.map((s) => s.skillId),
+          practiceEnabled: question.practiceEnabled,
         }}
       />
     </>

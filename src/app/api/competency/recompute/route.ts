@@ -5,7 +5,7 @@ import { withRole } from '@/lib/auth/require-role'
 import { ValidationError } from '@/lib/errors'
 import { requireOrgAccess } from '@/lib/auth/org-access'
 import { audit } from '@/services/audit'
-import { computeBaselines } from '@/services/competency/cohort-baseline'
+import { refreshOrgInsights } from '@/services/competency/refresh'
 import { recomputeOrg } from '@/services/competency/rollup'
 import { assertCollegeAdminOf } from '@/services/people'
 
@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
     await requireOrgAccess(user, body.orgId)
     await assertCollegeAdminOf(user, body.orgId)
     const res = await recomputeOrg(body.orgId)
-    const baselines = await computeBaselines(body.orgId)
+    const refreshed = await refreshOrgInsights(body.orgId)
     await audit({ userId: user.id, action: 'competency.recompute', entityType: 'Organization', entityId: body.orgId, metadata: { orgId: body.orgId, ...res } })
-    return successResponse({ ...res, baselines: baselines.rows })
+    return successResponse({ ...res, baselines: refreshed.baselines })
   } catch (error) {
     return errorResponse(error)
   }

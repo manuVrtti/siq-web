@@ -38,7 +38,19 @@ const TYPE_ALIASES: Record<string, (typeof QUESTION_TYPES)[number]> = {
 export const QUESTION_REQUIRED_HEADERS = ['type', 'title', 'body', 'marks']
 
 export type QuestionRowResult =
-  | { rowNumber: number; ok: true; title: string; type: string; input: QuestionInput; tagNames: string[] }
+  | {
+      rowNumber: number
+      ok: true
+      title: string
+      type: string
+      input: QuestionInput
+      tagNames: string[]
+      /** Plan 026 — raw topic / skills cells; resolved against the taxonomy in validateQuestionImport. */
+      topicRaw: string
+      skillRaws: string[]
+      topicId?: string
+      skillIds?: string[]
+    }
   | { rowNumber: number; ok: false; title: string; errors: string[] }
 
 export function getQuestionTemplate(): Buffer {
@@ -57,12 +69,14 @@ export function getQuestionTemplate(): Buffer {
     option_f: '',
     correct: '',
     tags: '',
+    topic: '',
+    skills: '',
     explanation: '',
   }
   return buildWorkbook([
     {
       name: 'Questions',
-      widths: [12, 36, 60, 11, 7, 14, 22, 22, 22, 22, 16, 16, 9, 24, 40],
+      widths: [12, 36, 60, 11, 7, 14, 22, 22, 22, 22, 16, 16, 9, 24, 10, 28, 40],
       rows: [
         {
           ...header,
@@ -78,6 +92,8 @@ export function getQuestionTemplate(): Buffer {
           option_d: 'O(1)',
           correct: 'B',
           tags: 'DSA, Searching',
+          topic: 'DSA',
+          skills: 'Binary search',
           explanation: 'The search space halves each step.',
         },
         {
@@ -93,6 +109,8 @@ export function getQuestionTemplate(): Buffer {
           option_d: 'Heap sort',
           correct: 'A, C',
           tags: 'DSA, Sorting',
+          topic: 'DSA',
+          skills: 'Sorting & Searching',
         },
         {
           ...header,
@@ -102,6 +120,8 @@ export function getQuestionTemplate(): Buffer {
           marks: 1,
           correct: 'True',
           tags: 'Networking',
+          topic: 'CN',
+          skills: 'HTTP & DNS',
         },
         {
           ...header,
@@ -111,6 +131,8 @@ export function getQuestionTemplate(): Buffer {
           difficulty: 'HARD',
           marks: 5,
           tags: 'DBMS',
+          topic: 'DBMS',
+          skills: 'Normalization',
         },
       ],
     },
@@ -127,6 +149,8 @@ export function getQuestionTemplate(): Buffer {
         { column: 'option_a … option_f', rule: 'Answer choices for MCQ questions. Leave blank for SUBJECTIVE / CODING. TRUE_FALSE fills True / False automatically.' },
         { column: 'correct', rule: 'Letter(s) of the correct option: "B", or "A, C" for multi-select. For TRUE_FALSE you may write True or False.' },
         { column: 'tags', rule: 'Comma-separated tag names. Missing tags are created.' },
+        { column: 'topic', rule: 'What the question measures, by code or name: DSA, DBMS, OS, CN, OOP, APT, LR, VERBAL, CODING, or one of your college’s own topics. Leave blank to tag it later (Question bank → Tag questions).' },
+        { column: 'skills', rule: 'Comma-separated skills under that topic, by name or common spelling ("dp", "Dynamic Programming"). Required when a topic is given. See Question bank → Topics & skills for the full list.' },
         { column: 'explanation', rule: 'Optional. Shown to reviewers.' },
         { column: 'Limits', rule: 'Up to 2,000 rows and 5 MB per file. Only the first sheet is read.' },
       ],
@@ -201,7 +225,12 @@ function rowToInput(row: SheetRow): QuestionRowResult {
   if (errors.length > 0 || !parsed.success) {
     return { rowNumber: row.rowNumber, ok: false, title, errors: [...new Set(errors)] }
   }
-  return { rowNumber: row.rowNumber, ok: true, title, type: parsed.data.type, input: parsed.data, tagNames }
+  const topicRaw = (v.topic ?? '').trim()
+  const skillRaws = [...new Set((v.skills ?? '').split(',').map((t) => t.trim()).filter(Boolean))]
+  if (!topicRaw && skillRaws.length > 0) {
+    return { rowNumber: row.rowNumber, ok: false, title, errors: ['Skills need a topic — fill in the topic column'] }
+  }
+  return { rowNumber: row.rowNumber, ok: true, title, type: parsed.data.type, input: parsed.data, tagNames, topicRaw, skillRaws }
 }
 
 /**
@@ -219,6 +248,15 @@ export async function validateQuestionImport(orgId: string, bytes: ArrayBuffer |
   })
   const existingSet = new Set(existing.map((e) => e.title.trim().toLowerCase()))
   const seen = new Set<string>()
+  const taxonomy = await prisma.topicSection.findMany({
+    where: { OR: [{ orgId: null }, { orgId }] },
+    select: { id: true, code: true, name: true, skills: { where: { OR: [{ orgId: null }, { orgId }] }, select: { id: true, name: true, aliases: true } } },
+  })
+  const topicByKey = new Map<string, (typeof taxonomy)[number]>()
+  for (const t of taxonomy) {
+    topicByKey.set(t.code.toLowerCase(), t)
+    topicByKey.set(t.name.toLowerCase(), t)
+  }
 
   const checked: QuestionRowResult[] = results.map((r) => {
     const key = r.title.trim().toLowerCase()
@@ -226,7 +264,24 @@ export async function validateQuestionImport(orgId: string, bytes: ArrayBuffer |
     if (key && existingSet.has(key)) extra.push('A question with this title is already in your bank')
     if (key && seen.has(key)) extra.push('Duplicate title earlier in this file')
     if (key) seen.add(key)
-    if (extra.length === 0) return r
+    // Plan 026 — topic + skills must exist in this college's taxonomy.
+    let resolved: { topicId?: string; skillIds?: string[] } = {}
+    if (r.ok && r.topicRaw) {
+      const topic = topicByKey.get(r.topicRaw.toLowerCase())
+      if (!topic) extra.push(`Unknown topic "${r.topicRaw}" — see Question bank → Topics & skills`)
+      else if (r.skillRaws.length === 0) extra.push(`List at least one ${topic.code} skill in the skills column`)
+      else {
+        const ids: string[] = []
+        for (const raw of r.skillRaws) {
+          const k = raw.toLowerCase()
+          const skill = topic.skills.find((s) => s.name.toLowerCase() === k || s.aliases.includes(k))
+          if (skill) ids.push(skill.id)
+          else extra.push(`"${raw}" isn’t a ${topic.code} skill`)
+        }
+        resolved = { topicId: topic.id, skillIds: [...new Set(ids)] }
+      }
+    }
+    if (extra.length === 0) return r.ok ? { ...r, ...resolved } : r
     return {
       rowNumber: r.rowNumber,
       ok: false as const,
@@ -257,6 +312,8 @@ export async function validateQuestionImport(orgId: string, bytes: ArrayBuffer |
       valid: validRows.length,
       invalid: checked.length - validRows.length,
       newTags: allTags.filter((t) => !existingTagSet.has(t.toLowerCase())),
+      /** Plan 026 — valid rows that arrive with a topic + skills (the rest go to the tagging queue). */
+      tagged: validRows.filter((r) => r.topicId).length,
     },
   }
 }
@@ -304,6 +361,9 @@ export async function commitQuestionImport(orgId: string, userId: string, bytes:
             negativeMarks: r.input.negativeMarks,
             explanation: r.input.explanation ?? null,
             options: { create: r.input.options },
+            ...(r.topicId && r.skillIds?.length
+              ? { topic: { create: { sectionId: r.topicId } }, skills: { create: r.skillIds.map((skillId) => ({ skillId })) } }
+              : {}),
             tags: {
               create: r.tagNames
                 .map((n) => tagIdByName.get(n.toLowerCase()))
@@ -318,5 +378,5 @@ export async function commitQuestionImport(orgId: string, userId: string, bytes:
     created += chunk.length
   }
 
-  return { created, skipped: summary.invalid, newTags: summary.newTags.length }
+  return { created, skipped: summary.invalid, newTags: summary.newTags.length, tagged: summary.tagged }
 }

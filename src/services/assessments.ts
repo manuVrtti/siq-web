@@ -273,6 +273,14 @@ export async function publishAssessment(orgId: string, id: string) {
   // not be attributed to topics and skills.
   if (a.countsForAnalytics) {
     const untagged = await countUntagged(id)
+    const practice = await prisma.question.count({
+      where: { practiceEnabled: true, assessmentQuestions: { some: { section: { assessmentId: id } } } },
+    })
+    if (practice > 0) {
+      blockers.push(
+        `${practice} question${practice === 1 ? ' is' : 's are'} open for student practice — students can already see the answer`,
+      )
+    }
     if (untagged > 0) {
       blockers.push(
         `${untagged} question${untagged === 1 ? '' : 's'} need${untagged === 1 ? 's' : ''} a topic and skill (it counts toward analytics)`,

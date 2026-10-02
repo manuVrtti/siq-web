@@ -188,6 +188,11 @@ export default async function QuestionsPage({
                   >
                     {q.title}
                   </Link>
+                  {q.practiceEnabled ? (
+                    <span className="bg-warning/15 text-warning mt-1 mr-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium">
+                      Practice
+                    </span>
+                  ) : null}
                   {q.tags.length > 0 ? (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {q.tags.slice(0, 4).map(({ tag }) => (

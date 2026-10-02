@@ -7,6 +7,8 @@ import { TrendLine } from '@/components/analytics/trend-line'
 import { StatusPill } from '@/components/dashboard/bits'
 import { Bar, CountUp, Ring } from '@/components/motion/animated'
 import { PageIntro } from '@/components/student/page-intro'
+import { FocusAreas, StrengthsCard, TopicList } from '@/components/competency/strengths-weaknesses'
+import { getStudentCompetencyView } from '@/services/competency/student-view'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { cn } from '@/lib/utils'
 import {
@@ -33,15 +35,24 @@ function band(p: number) {
  * cards: every topic (not just the top three), the full score history, and
  * an exam-by-exam breakdown. Own data only; membership is the gate.
  */
-export default async function MyAnalyticsPage({ params }: { params: Promise<{ org: string }> }) {
+export default async function MyAnalyticsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>
+  searchParams: Promise<{ compare?: string }>
+}) {
   const { org: slug } = await params
+  const compare = (await searchParams).compare === '1'
   const [user, org] = await Promise.all([getCurrentUser(), getOrgBySlug(slug)])
   if (!org || !user) notFound()
 
-  const [o, insights, exams] = await Promise.all([
+  const [o, insights, exams, view] = await Promise.all([
     getStudentOverview(org.id, user.id),
     getStudentInsights(org.id, user.id),
     getStudentAssessments(org.id, user.id),
+    // Plan 027 — own data only: always the signed-in user's id.
+    getStudentCompetencyView(user.id, org.id, { compare }),
   ])
 
   const graded = o.trend.length
@@ -129,7 +140,7 @@ export default async function MyAnalyticsPage({ params }: { params: Promise<{ or
       ) : null}
 
       {/* ---- Trend + standing -------------------------------------------- */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         <section className="siq-card siq-rise p-6" style={{ animationDelay: '120ms' }}>
           <h2 className="mb-4 text-[15px] font-semibold">Scores over time</h2>
           <TrendLine
@@ -171,7 +182,19 @@ export default async function MyAnalyticsPage({ params }: { params: Promise<{ or
         </section>
       </div>
 
-      {/* ---- Topic mastery ----------------------------------------------- */}
+      {/* ---- Strengths & weaknesses (plan 027) --------------------------- */}
+      {view.hasProfile ? (
+        <>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <FocusAreas view={view} slug={slug} />
+            <StrengthsCard view={view} />
+          </div>
+          <TopicList view={view} slug={slug} compare={compare} />
+        </>
+      ) : null}
+
+      {/* ---- Topic mastery (free-form tags; until tests are topic-tagged) -- */}
+      {view.hasProfile ? null : (
       <section className="siq-card siq-rise p-6" style={{ animationDelay: '240ms' }}>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -217,6 +240,7 @@ export default async function MyAnalyticsPage({ params }: { params: Promise<{ or
           </ul>
         )}
       </section>
+      )}
 
       {/* ---- Exam by exam ------------------------------------------------- */}
       {exams.done.length > 0 ? (

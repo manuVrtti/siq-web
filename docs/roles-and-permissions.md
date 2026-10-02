@@ -55,6 +55,8 @@ Super Admin
 | Tag questions with a topic + skills (incl. bulk backfill) | ✅ | own college | own college |
 | Read a student's strengths & weaknesses (competency profile) | ✅ | own college | own departments' students |
 | Rebuild a college's analytics (full recompute) | ✅ | own college | — |
+| Weak spots & "students needing attention" | ✅ | own college | own departments |
+| Open a question for student practice | ✅ | own college | own college |
 | Post announcements (bell) | ✅ every college | own college (or one department) | own departments only |
 | Suspend / reactivate accounts | ✅ | — | — |
 | Suspend / reactivate a whole college (contract, payment…) | ✅ | — | — |
@@ -110,7 +112,17 @@ Super Admin
 - Profiles update automatically when a result is graded or reviewed, when a graded question is retagged or edited,
   and when a test's "counts toward analytics" setting changes. College Admins can rebuild a whole college (audited).
 - Cohort comparisons need **at least 5 students**; the narrowest cohort (department × batch → department → batch →
-  college) is used.
+  college) is used. Batch comparisons and insights are refreshed **nightly** (Vercel Cron → `/api/cron/analytics`,
+  guarded by `CRON_SECRET`), and on demand when viewed.
+
+### Insights, focus areas & practice (plans 026–027)
+- Every topic/skill is classified: **Critical gap** (<40) · **Needs work** (40–59) · **On track** (60–79) · **Strong**
+  (80+); trend = latest test vs the earlier ones (±5 points). Priorities weigh severity, how foundational the topic is
+  (DSA highest), being below the batch's bottom quarter, and slipping. Rules live in
+  `src/constants/competency-thresholds.ts` — deterministic, so every insight can be explained.
+- **Practice uses only questions staff marked "Open for student practice"** — students see their answers. A test that
+  counts toward analytics **cannot be published** while it contains one, so real exam questions never leak.
+- Students see only their own insights; HODs see weak spots and the attention list for their departments only.
 
 ## 4. Where it lives in code
 
@@ -125,6 +137,7 @@ Super Admin
 | Notifications & announcements | `src/services/notifications/*` |
 | Topics & skills, question tagging rules | `src/services/taxonomy.ts` |
 | Competency scoring, cohort baselines, who may read a profile | `src/services/competency/*`, `src/lib/competency/weighting.ts` |
+| Insight thresholds (tiers, trends, priorities) | `src/constants/competency-thresholds.ts` |
 
 ## 5. The panels
 

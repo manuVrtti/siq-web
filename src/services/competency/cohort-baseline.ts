@@ -62,3 +62,54 @@ export async function ensureFreshBaselines(orgId: string) {
   const newest = Math.max(newestSection?.computedAt.getTime() ?? 0, newestSkill?.computedAt.getTime() ?? 0)
   if (!last ? newest > 0 : newest > last.computedAt.getTime()) await computeBaselines(orgId)
 }
+
+/** Smallest cohort a comparison is shown against — below this, stats mislead. */
+export const MIN_COHORT = 5
+
+export type CohortKind = 'DEPARTMENT_BATCH' | 'DEPARTMENT' | 'BATCH' | 'COLLEGE'
+export type BaselineRef = { cohort: CohortKind; sampleSize: number; avg: number; median: number; p25: number; p75: number }
+
+/**
+ * The baseline a student is compared with, per dimension ("SECTION:<id>" /
+ * "SKILL:<id>"): the narrowest cohort with at least MIN_COHORT students —
+ * department × batch, then department, then batch, then the whole college.
+ */
+export async function baselineLookup(userId: string, orgId: string): Promise<Map<string, BaselineRef>> {
+  const member = await prisma.organizationMember.findFirst({
+    where: { userId, orgId },
+    select: { departmentId: true, user: { select: { candidateProfile: { select: { graduationYear: true } } } } },
+  })
+  const dept = member?.departmentId ?? null
+  const year = member?.user.candidateProfile?.graduationYear ?? null
+  const rows = await prisma.cohortBaseline.findMany({
+    where: {
+      orgId,
+      sampleSize: { gte: MIN_COHORT },
+      OR: [
+        { departmentId: null, batchYear: null },
+        ...(dept ? [{ departmentId: dept, batchYear: null }] : []),
+        ...(year ? [{ departmentId: null, batchYear: year }] : []),
+        ...(dept && year ? [{ departmentId: dept, batchYear: year }] : []),
+      ],
+    },
+  })
+  const rank = (b: { departmentId: string | null; batchYear: number | null }) => (b.departmentId ? 2 : 0) + (b.batchYear ? 1 : 0)
+  const best = new Map<string, (typeof rows)[number]>()
+  for (const b of rows) {
+    const k = `${b.dimensionType}:${b.dimensionId}`
+    const cur = best.get(k)
+    if (!cur || rank(b) > rank(cur)) best.set(k, b)
+  }
+  const out = new Map<string, BaselineRef>()
+  for (const [k, b] of best) {
+    out.set(k, {
+      cohort: b.departmentId && b.batchYear ? 'DEPARTMENT_BATCH' : b.departmentId ? 'DEPARTMENT' : b.batchYear ? 'BATCH' : 'COLLEGE',
+      sampleSize: b.sampleSize,
+      avg: b.avgAccuracy,
+      median: b.medianAccuracy,
+      p25: b.p25Accuracy,
+      p75: b.p75Accuracy,
+    })
+  }
+  return out
+}
