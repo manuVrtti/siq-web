@@ -81,7 +81,8 @@ export default function AssessmentBuilder({
   const [proctoringEnabled, setProctoringEnabled] = useState(assessment.proctoringEnabled)
   const [snapshotIntervalSec, setSnapshotIntervalSec] = useState(assessment.snapshotIntervalSec)
   const [storeSnapshots, setStoreSnapshots] = useState(assessment.storeSnapshots)
-  const [faceMatchThreshold, setFaceMatchThreshold] = useState(assessment.faceMatchThreshold)
+  // Plan 018b — kept for the API payload; identity matching now uses a calibrated rule.
+  const [faceMatchThreshold] = useState(assessment.faceMatchThreshold)
   const [countsForAnalytics, setCountsForAnalytics] = useState(assessment.countsForAnalytics)
 
   const [newSection, setNewSection] = useState('')
@@ -228,10 +229,10 @@ export default function AssessmentBuilder({
             <span className="font-medium">Enable proctoring</span>
           </label>
           <p className="text-muted-foreground text-xs">
-            Requests webcam access when the candidate enters the exam,
-            captures a reference photo, and periodically checks for face
-            presence and match. Activity events (tab switch, focus loss) are
-            also logged.
+            Before the exam the student verifies their identity with the camera (their first verified photo becomes
+            their ID photo). During the exam the camera checks at random moments that the same single person is
+            there. Required for mock-drive rounds. Activity — tab switches, copy-paste, screenshot attempts — is
+            recorded on every test, proctored or not, and only staff can see it.
           </p>
           {proctoringEnabled ? (
             <div className="mt-2 flex flex-wrap gap-3">
@@ -243,18 +244,6 @@ export default function AssessmentBuilder({
                   max={300}
                   value={snapshotIntervalSec}
                   onChange={(e) => setSnapshotIntervalSec(Number(e.target.value))}
-                  className="w-28"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                Face match threshold
-                <Input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={faceMatchThreshold}
-                  onChange={(e) => setFaceMatchThreshold(Number(e.target.value))}
                   className="w-28"
                 />
               </label>

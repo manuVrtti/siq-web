@@ -6,6 +6,9 @@ import { ForbiddenError, NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { deleteFile, getSignedUrl, uploadFile } from '@/lib/storage'
 import { FILE_LIMITS } from '@/lib/validators/file'
+import { MAX_CHECKS_PER_ATTEMPT } from '@/lib/proctoring/identity-rules'
+import { getIdentityForReview } from '@/services/identity'
+import { assessRisk, type Risk } from '@/lib/proctoring/integrity'
 
 /**
  * Plan 018 — server-side proctoring.
@@ -51,19 +54,33 @@ async function resolveAttemptForUser(token: string, userId: string) {
 export async function initSession(input: {
   token: string
   userId: string
-  photo: Buffer
-  contentType: string
+  /** Absent for an activity-only session (test without camera proctoring). */
+  photo?: Buffer | null
+  contentType?: string
 }): Promise<{
   sessionId: string
   referencePhotoPath: string | null
 }> {
-  const { attemptId } = await resolveAttemptForUser(input.token, input.userId)
+  const { attemptId, assignmentId } = await resolveAttemptForUser(input.token, input.userId)
 
   const existing = await prisma.proctoringSession.findUnique({
     where: { attemptId },
   })
   if (existing) {
+    // An activity-only session gains its camera reference later (same attempt).
+    if (!existing.referencePhotoUrl && input.photo && input.contentType) {
+      const path = `attempts/${attemptId}/reference.${extensionForContentType(input.contentType)}`
+      await uploadFile(PROCTORING_BUCKET, path, input.photo, input.contentType)
+      await prisma.proctoringSession.update({ where: { id: existing.id }, data: { referencePhotoUrl: path } })
+      return { sessionId: existing.id, referencePhotoPath: path }
+    }
     return { sessionId: existing.id, referencePhotoPath: existing.referencePhotoUrl }
+  }
+
+  if (!input.photo || !input.contentType) {
+    const session = await prisma.proctoringSession.create({ data: { attemptId, userId: input.userId } })
+    await carryIdentityMismatch(session.id, assignmentId)
+    return { sessionId: session.id, referencePhotoPath: null }
   }
 
   // Store reference photo under a stable, attempt-scoped path so we can find
@@ -79,7 +96,57 @@ export async function initSession(input: {
       referencePhotoUrl: path,
     },
   })
+  await carryIdentityMismatch(session.id, assignmentId)
   return { sessionId: session.id, referencePhotoPath: path }
+}
+
+/** A failed pre-exam identity check becomes a HIGH alert in the attempt's log. */
+async function carryIdentityMismatch(sessionId: string, assignmentId: string) {
+  const check = await prisma.identityCheck.findUnique({ where: { assignmentId }, select: { outcome: true, matchScore: true, attempts: true } })
+  if (check?.outcome !== 'MISMATCH') return
+  await prisma.$transaction([
+    prisma.proctoringFlag.create({
+      data: { sessionId, type: 'IDENTITY_MISMATCH', severity: 'HIGH', similarity: check.matchScore, metadata: { attempts: check.attempts, stage: 'pre-exam' } },
+    }),
+    prisma.proctoringSession.update({ where: { id: sessionId }, data: { flagCount: { increment: 1 } } }),
+  ])
+}
+
+/**
+ * Plan 018b — one random in-exam identity check. Stored with its snapshot
+ * for human review; a different (single) face also raises FACE_MISMATCH.
+ */
+export async function recordCheck(input: {
+  token: string
+  userId: string
+  matched: boolean
+  matchScore: number | null
+  faceCount: number
+  snapshot: { buffer: Buffer; contentType: string } | null
+}) {
+  const { attemptId } = await resolveAttemptForUser(input.token, input.userId)
+  const session = await prisma.proctoringSession.findUnique({ where: { attemptId }, select: { id: true, _count: { select: { checks: true } } } })
+  if (!session) throw new NotFoundError('Proctoring session not initialised')
+  if (session._count.checks >= MAX_CHECKS_PER_ATTEMPT) return { id: null, capped: true }
+
+  let snapshotPath: string | null = null
+  if (input.snapshot) {
+    snapshotPath = `attempts/${attemptId}/checks/${Date.now()}-${cryptoRandom(4)}.${extensionForContentType(input.snapshot.contentType)}`
+    await uploadFile(PROCTORING_BUCKET, snapshotPath, input.snapshot.buffer, input.snapshot.contentType)
+  }
+  const check = await prisma.proctoringCheck.create({
+    data: { sessionId: session.id, matched: input.matched, matchScore: input.matchScore, faceCount: input.faceCount, snapshotPath },
+  })
+  await prisma.proctoringSession.update({ where: { id: session.id }, data: { snapshotCount: snapshotPath ? { increment: 1 } : undefined } })
+  if (!input.matched && input.faceCount === 1) {
+    await prisma.$transaction([
+      prisma.proctoringFlag.create({
+        data: { sessionId: session.id, type: 'FACE_MISMATCH', severity: 'HIGH', similarity: input.matchScore, snapshotUrl: snapshotPath, metadata: { stage: 'random-check' } },
+      }),
+      prisma.proctoringSession.update({ where: { id: session.id }, data: { flagCount: { increment: 1 } } }),
+    ])
+  }
+  return { id: check.id, capped: false }
 }
 
 /**
@@ -152,7 +219,8 @@ export async function getSessionForAdmin(orgId: string, sessionId: string) {
     include: {
       user: { select: { id: true, name: true, email: true } },
       flags: { orderBy: { occurredAt: 'asc' } },
-      attempt: { select: { id: true, assessmentId: true } },
+      checks: { orderBy: { occurredAt: 'asc' } },
+      attempt: { select: { id: true, assessmentId: true, assignmentId: true } },
     },
   })
   if (!session) throw new NotFoundError('Proctoring session not found')
@@ -167,7 +235,7 @@ export async function getSessionForAdmin(orgId: string, sessionId: string) {
 
   // Sign each snapshot URL + the reference photo. 5-minute TTL is long enough
   // for the whole review page to render without being generous with links.
-  const [referenceSignedUrl, flagsWithSignedUrls] = await Promise.all([
+  const [referenceSignedUrl, flagsWithSignedUrls, checksWithSignedUrls, identity] = await Promise.all([
     session.referencePhotoUrl
       ? getSignedUrl(PROCTORING_BUCKET, session.referencePhotoUrl, 300)
       : Promise.resolve(null),
@@ -179,6 +247,13 @@ export async function getSessionForAdmin(orgId: string, sessionId: string) {
           : null,
       })),
     ),
+    Promise.all(
+      session.checks.map(async (c) => ({
+        ...c,
+        snapshotSignedUrl: c.snapshotPath ? await getSignedUrl(PROCTORING_BUCKET, c.snapshotPath, 300).catch(() => null) : null,
+      })),
+    ),
+    getIdentityForReview(session.attempt.assignmentId),
   ])
 
   return {
@@ -191,6 +266,8 @@ export async function getSessionForAdmin(orgId: string, sessionId: string) {
     referenceSignedUrl,
     assessment: { title: assessment.title, storeSnapshots: assessment.storeSnapshots },
     flags: flagsWithSignedUrls,
+    checks: checksWithSignedUrls,
+    identity,
   }
 }
 
@@ -260,4 +337,35 @@ function cryptoRandom(bytes: number): string {
   const arr = new Uint8Array(bytes)
   crypto.getRandomValues(arr)
   return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Plan 018b — integrity at a glance for many assignments (mock-drive monitor,
+ * results list): risk level, flag count and the result to open.
+ */
+export async function integrityByAssignment(assignmentIds: string[]) {
+  const ids = [...new Set(assignmentIds)]
+  if (ids.length === 0) return new Map<string, { risk: Risk; flags: number; resultId: string | null }>()
+  const [sessions, identities] = await Promise.all([
+    prisma.proctoringSession.findMany({
+      where: { attempt: { assignmentId: { in: ids } } },
+      select: {
+        attempt: { select: { assignmentId: true, result: { select: { id: true } } } },
+        flags: { select: { type: true, severity: true } },
+        checks: { where: { matched: false }, select: { id: true } },
+      },
+    }),
+    prisma.identityCheck.findMany({ where: { assignmentId: { in: ids } }, select: { assignmentId: true, outcome: true } }),
+  ])
+  const outcome = new Map(identities.map((i) => [i.assignmentId, i.outcome]))
+  const out = new Map<string, { risk: Risk; flags: number; resultId: string | null }>()
+  for (const s of sessions) {
+    const aid = s.attempt.assignmentId
+    out.set(aid, {
+      risk: assessRisk({ flags: s.flags, identityOutcome: outcome.get(aid), checksFailed: s.checks.length }),
+      flags: s.flags.length,
+      resultId: s.attempt.result?.id ?? null,
+    })
+  }
+  return out
 }

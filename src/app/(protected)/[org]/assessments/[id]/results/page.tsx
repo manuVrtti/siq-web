@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { BarChart3, Download, FileCheck2, FileText, Hourglass, Target, Trophy } from 'lucide-react'
 
+import { IntegrityBadge } from '@/components/proctoring/integrity-badge'
+import { integrityByAssignment } from '@/services/proctoring'
+import { prisma } from '@/lib/prisma'
 import { StatCard } from '@/components/analytics/stat-card'
 import { Initials, StatusPill } from '@/components/dashboard/bits'
 import {
@@ -66,6 +69,11 @@ export default async function AssessmentResultsPage({
     skip: p.skip,
     take: p.pageSize,
   })
+
+  // Plan 018b — integrity marker per submission (staff only).
+  const attempts = await prisma.examAttempt.findMany({ where: { id: { in: items.map((r) => r.attemptId) } }, select: { id: true, assignmentId: true } })
+  const assignmentOf = new Map(attempts.map((a) => [a.id, a.assignmentId]))
+  const integrity = await integrityByAssignment(attempts.map((a) => a.assignmentId))
 
   const base = `/${slug}/assessments/${id}`
   const pathname = `${base}/results`
@@ -164,7 +172,7 @@ export default async function AssessmentResultsPage({
             />
           ) : (
             <DataTable
-              minWidth={720}
+              minWidth={820}
               footer={<Pagination pathname={pathname} params={p} total={total} />}
             >
               <THead>
@@ -172,6 +180,7 @@ export default async function AssessmentResultsPage({
                 <SortHeader label="Candidate" field="name" pathname={pathname} params={p} />
                 <SortHeader label="Score" field="percentage" pathname={pathname} params={p} align="right" />
                 <th className={TH}>Outcome</th>
+                <th className={TH}>Integrity</th>
                 <SortHeader label="Submitted" field="createdAt" pathname={pathname} params={p} align="right" />
                 <th className={`${TH} text-right`}>
                   <span className="sr-only">Actions</span>
@@ -208,6 +217,12 @@ export default async function AssessmentResultsPage({
                     </td>
                     <td className={TD}>
                       <StatusPill status={r.status} percentage={null} passed={r.passed} />
+                    </td>
+                    <td className={TD}>
+                      {(() => {
+                        const g = integrity.get(assignmentOf.get(r.attemptId) ?? '')
+                        return g ? <IntegrityBadge risk={g.risk} flags={g.flags} /> : <span className="text-muted-foreground text-xs">—</span>
+                      })()}
                     </td>
                     <td className={`${TD} text-muted-foreground text-right text-xs whitespace-nowrap`}>
                       {timeAgo(r.createdAt)}

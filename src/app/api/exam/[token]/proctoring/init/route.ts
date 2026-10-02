@@ -29,9 +29,14 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ token:
     requireSecureBrowser(request.headers)
     const user = await requireAuth()
 
-    const form = await request.formData().catch(() => null)
+    // Plan 018b — no photo = activity-only session (test without camera proctoring).
+    const isForm = (request.headers.get('content-type') ?? '').startsWith('multipart/form-data')
+    const form = isForm ? await request.formData().catch(() => null) : null
     const photo = form?.get('photo')
-    if (!(photo instanceof File)) throw new ValidationError('photo file is required')
+    if (!(photo instanceof File)) {
+      const result = await initSession({ token, userId: user.id })
+      return successResponse({ sessionId: result.sessionId })
+    }
 
     const check = validateFile({ size: photo.size, type: photo.type }, 'proctoring')
     if (!check.valid) throw new ValidationError(check.error)

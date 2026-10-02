@@ -156,6 +156,12 @@ export async function startAttempt(token: string, userId: string) {
 
   if (assignment.attempt) return assignment.attempt
 
+  // Plan 018b — a proctored test starts only after the identity step.
+  if (assignment.assessment.proctoringEnabled) {
+    const checked = await prisma.identityCheck.count({ where: { assignmentId: assignment.id } })
+    if (!checked) throw new ForbiddenError('IDENTITY_CHECK_REQUIRED')
+  }
+
   const shouldShuffleQuestions = assignment.assessment.shuffleQuestions
   const order: QuestionOrder = {
     sections: assignment.assessment.sections.map((s) => {

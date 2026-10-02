@@ -5,8 +5,9 @@ import { redirect } from 'next/navigation'
 
 import { BrandMark } from '@/components/brand/mark'
 import ExamEntryOpenInSeb from '@/components/exam/exam-entry-open-in-seb'
-import ExamEntryStart from '@/components/exam/exam-entry-start'
+import ExamEntryGatedStart from '@/components/exam/exam-entry-gated-start'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { SEB_DOWNLOAD_URL, isSecureExamBrowserRequest } from '@/lib/seb'
 import { validateToken } from '@/services/exam-session'
@@ -67,6 +68,12 @@ export default async function ExamEntryPage({
 
   const a = result.assignment.assessment
   const started = result.assignment.status === 'STARTED'
+  // Plan 018b — proctored tests verify identity before Start (server enforces it too).
+  const gate = await prisma.assessmentAssignment.findUnique({
+    where: { token },
+    select: { assessment: { select: { proctoringEnabled: true } }, identityCheck: { select: { id: true } } },
+  })
+  const needsIdentity = Boolean(gate?.assessment.proctoringEnabled && !gate.identityCheck && !started)
 
   return (
     <ExamShell>
@@ -96,11 +103,12 @@ export default async function ExamEntryPage({
               <li>The timer begins the moment you click Start. It cannot be paused.</li>
               <li>Answers are saved automatically as you work.</li>
               <li>You may not sign in on another device — access is tied to this account.</li>
+              <li>Activity is monitored: switching tabs or windows, copy-paste and screenshots are recorded for your college.</li>
             </ul>
           </div>
 
           {inSeb ? (
-            <ExamEntryStart token={token} started={started} />
+            <ExamEntryGatedStart token={token} started={started} needsIdentity={needsIdentity} />
           ) : (
             <ExamEntryOpenInSeb
               token={token}

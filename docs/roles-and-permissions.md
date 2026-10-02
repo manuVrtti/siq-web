@@ -57,6 +57,7 @@ Super Admin
 | Rebuild a college's analytics (full recompute) | ✅ | own college | — |
 | Weak spots & "students needing attention" | ✅ | own college | own departments |
 | Open a question for student practice | ✅ | own college | own college |
+| See exam integrity (identity photos, random checks, activity log) | ✅ | own college | own departments' students |
 | Create / run mock drives (rounds, cutoffs, enrol, open/close rounds, overrides) | ✅ | own college (incl. college-wide) | drives aimed only at own departments |
 | Post announcements (bell) | ✅ every college | own college (or one department) | own departments only |
 | Suspend / reactivate accounts | ✅ | — | — |
@@ -138,6 +139,18 @@ Super Admin
 - Eligibility can't change once a drive starts; tests used by a drive can't be deleted; archived drives stay in
   participants' history. Drive results also feed competency as a per-drive snapshot (`scope = DRIVE`).
 
+### Exam integrity (plan 018b)
+- **Every exam** records activity: tab / window switches, leaving full screen, copy / cut / paste and right-click
+  (blocked and logged), screenshot-key attempts, and events reported by the exam browser.
+- **Proctored exams** add an **identity check before Start** (live photo vs the student's ID photo; the first verified
+  selfie becomes the ID photo) and **random checks** during the exam (presence at random intervals; 4–6 identity
+  re-checks with stored snapshots). On a mismatch the exam continues and staff see a HIGH alert.
+  The server refuses to start a proctored exam without the identity step. Mock-drive rounds must be proctored.
+- Face matching runs on the student's device (face-api, MediaPipe); only scores and photos are uploaded, to the private
+  `proctoring` bucket, shown to staff via 5-minute signed links.
+- **Only staff** see integrity: the College Admin, Super Admin, and the HOD of the student's department (grade page panel,
+  results list and drive monitor badges). Students never see it.
+
 ## 4. Where it lives in code
 
 | Concern | File |
@@ -152,6 +165,7 @@ Super Admin
 | Topics & skills, question tagging rules | `src/services/taxonomy.ts` |
 | Competency scoring, cohort baselines, who may read a profile | `src/services/competency/*`, `src/lib/competency/weighting.ts` |
 | Insight thresholds (tiers, trends, priorities) | `src/constants/competency-thresholds.ts` |
+| Exam integrity: identity, random checks, activity, risk | `src/services/identity.ts`, `src/services/proctoring.ts`, `src/lib/proctoring/*` |
 | Mock drives: set-up, eligibility, runtime, student journey | `src/services/mock-drives.ts`, `mock-drive-registration.ts`, `mock-drive-runtime.ts`, `mock-drive-student.ts` |
 
 ## 5. The panels
