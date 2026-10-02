@@ -114,3 +114,21 @@ export async function notifyDriveOutcome(e: {
     },
   ])
 }
+
+/** Plan 016b — staff allowed a fresh attempt. */
+export async function notifyRetakeGranted(e: { userId: string; assessmentId: string; title: string; key: string }): Promise<void> {
+  const a = await prisma.assessment.findUnique({ where: { id: e.assessmentId }, select: { orgId: true, org: { select: { slug: true } } } })
+  if (!a) return
+  await notify([
+    {
+      eventType: 'assessment.retake' as const,
+      recipientUserId: e.userId,
+      orgId: a.orgId,
+      primaryEntityId: e.assessmentId,
+      title: `Retake allowed: ${e.title}`,
+      body: 'Your college gave you a fresh attempt. Your earlier attempt no longer counts.',
+      href: `/${a.org.slug}/my-assessments`,
+      dedupeKey: `assessment.retake:${e.userId}:${e.key}`,
+    },
+  ])
+}

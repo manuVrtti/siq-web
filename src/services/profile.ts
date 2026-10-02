@@ -259,7 +259,7 @@ export async function getCandidateForManager(scope: Scope, userId: string) {
   const [full, results, assignments, batches] = await Promise.all([
     getProfile(userId),
     prisma.result.findMany({
-      where: { userId, assessment: { orgId } },
+      where: { status: { not: 'SUPERSEDED' as const }, userId, assessment: { orgId } },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

@@ -46,7 +46,7 @@ export default function ManualGradingPanel({
   questionResults,
 }: {
   resultId: string
-  status: 'PENDING_REVIEW' | 'GRADED'
+  status: 'PENDING_REVIEW' | 'GRADED' | 'SUPERSEDED'
   passed: boolean | null
   totalScore: number
   maxScore: number

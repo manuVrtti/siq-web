@@ -51,6 +51,7 @@ export type AuditAction =
   | 'taxonomy.skill.delete'
   | 'question.tag'
   | 'competency.recompute'
+  | 'result.retake'
   | 'drive.create'
   | 'drive.update'
   | 'drive.delete'

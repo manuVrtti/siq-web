@@ -193,6 +193,8 @@ export async function startAttempt(token: string, userId: string) {
         data: { status: 'STARTED', startedAt: now },
       }),
     ])
+    // Plan 016b — the identity check belongs to this attempt (kept if a retake follows).
+    await prisma.identityCheck.updateMany({ where: { assignmentId: assignment.id, attemptId: null }, data: { attemptId: attempt.id } })
     return attempt
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

@@ -113,9 +113,9 @@ export async function submitIdentityCheck(input: {
 }
 
 /** Staff review: the ID photo used and the live photo, side by side. */
-export async function getIdentityForReview(assignmentId: string) {
-  const c = await prisma.identityCheck.findUnique({
-    where: { assignmentId },
+export async function getIdentityForReview(ref: { attemptId: string; assignmentId: string | null }) {
+  const c = await prisma.identityCheck.findFirst({
+    where: { OR: [{ attemptId: ref.attemptId }, ...(ref.assignmentId ? [{ assignmentId: ref.assignmentId, attemptId: null }] : [])] },
     select: {
       outcome: true,
       matchScore: true,

@@ -253,7 +253,7 @@ export async function getSessionForAdmin(orgId: string, sessionId: string) {
         snapshotSignedUrl: c.snapshotPath ? await getSignedUrl(PROCTORING_BUCKET, c.snapshotPath, 300).catch(() => null) : null,
       })),
     ),
-    getIdentityForReview(session.attempt.assignmentId),
+    getIdentityForReview({ attemptId: session.attempt.id, assignmentId: session.attempt.assignmentId }),
   ])
 
   return {
@@ -361,6 +361,7 @@ export async function integrityByAssignment(assignmentIds: string[]) {
   const out = new Map<string, { risk: Risk; flags: number; resultId: string | null }>()
   for (const s of sessions) {
     const aid = s.attempt.assignmentId
+    if (!aid) continue // an earlier attempt replaced by a retake
     out.set(aid, {
       risk: assessRisk({ flags: s.flags, identityOutcome: outcome.get(aid), checksFailed: s.checks.length }),
       flags: s.flags.length,

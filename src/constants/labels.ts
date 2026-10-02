@@ -72,6 +72,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   'taxonomy.skill.delete': 'deleted a skill',
   'question.tag': 'tagged questions',
   'competency.recompute': 'recomputed student analytics',
+  'result.retake': 'allowed a retake',
   'drive.create': 'created a mock drive',
   'drive.update': 'edited a mock drive',
   'drive.delete': 'deleted a mock drive',

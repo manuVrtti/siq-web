@@ -41,7 +41,7 @@ export const getStudentOverview = cache(async (orgId: string, userId: string) =>
       },
     }),
     prisma.result.findMany({
-      where: { userId, assessment: { orgId } },
+      where: { status: { not: 'SUPERSEDED' as const }, userId, assessment: { orgId } },
       orderBy: { createdAt: 'asc' },
       select: {
         id: true,

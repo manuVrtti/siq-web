@@ -54,7 +54,7 @@ export type StudentDashboardData = {
   passed: number
   decided: number
   trend: { title: string; percentage: number }[]
-  recent: { id: string; title: string; status: 'GRADED' | 'PENDING_REVIEW'; percentage: number; passed: boolean | null; createdAt: string }[]
+  recent: { id: string; title: string; status: 'GRADED' | 'PENDING_REVIEW' | 'SUPERSEDED'; percentage: number; passed: boolean | null; createdAt: string }[]
   standing: { resultId: string; title: string; percentage: number; betterThan: number; cohort: number }[]
   strengths: { tag: string; percentage: number; questions: number }[]
   focus: { tag: string; percentage: number; questions: number }[]

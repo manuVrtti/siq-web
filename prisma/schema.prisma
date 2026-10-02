@@ -99,6 +99,8 @@ model User {
   mockRegistrations       MockDriveRegistration[]
   identityPhotos          IdentityPhoto[]
   identityChecks          IdentityCheck[]
+  retakesReceived         AttemptRetake[]          @relation("RetakeStudent")
+  retakesGranted          AttemptRetake[]          @relation("RetakeGrantedBy")
 
   @@index([role])
 }
@@ -469,10 +471,12 @@ model AssessmentAssignment {
   submittedAt  DateTime?
   expiresAt    DateTime?
 
-  assessment    Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempt       ExamAttempt?
-  identityCheck IdentityCheck?
+  assessment       Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt          ExamAttempt?    @relation("CurrentAttempt")
+  identityCheck    IdentityCheck?
+  archivedAttempts ExamAttempt[]   @relation("ArchivedAttempts")
+  retakes          AttemptRetake[]
 
   @@unique([assessmentId, userId])
   @@index([token])
@@ -489,23 +493,29 @@ model AssessmentAssignment {
 /// every save/submit. questionOrder pins the shuffle so refreshes see the
 /// same order.
 model ExamAttempt {
-  id             String    @id @default(cuid())
-  assignmentId   String    @unique
-  userId         String
-  assessmentId   String
-  startedAt      DateTime  @default(now())
-  deadlineAt     DateTime
-  submittedAt    DateTime?
+  id                   String    @id @default(cuid())
+  /// Null once a retake replaced this attempt (see archivedAssignmentId).
+  assignmentId         String?   @unique
+  /// Plan 016b — the assignment this attempt belonged to before a retake.
+  archivedAssignmentId String?
+  userId               String
+  assessmentId         String
+  startedAt            DateTime  @default(now())
+  deadlineAt           DateTime
+  submittedAt          DateTime?
   /// { sections: [{ sectionId, questionIds: string[] }] }
-  questionOrder  Json
-  currentSection Int       @default(0)
+  questionOrder        Json
+  currentSection       Int       @default(0)
 
-  assignment        AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  answers           ExamAnswer[]
-  result            Result?
-  proctoringSession ProctoringSession?
+  assignment         AssessmentAssignment? @relation("CurrentAttempt", fields: [assignmentId], references: [id], onDelete: Cascade)
+  archivedAssignment AssessmentAssignment? @relation("ArchivedAttempts", fields: [archivedAssignmentId], references: [id], onDelete: Cascade)
+  identityCheck      IdentityCheck?
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers            ExamAnswer[]
+  result             Result?
+  proctoringSession  ProctoringSession?
 
+  @@index([archivedAssignmentId])
   @@index([userId])
   @@index([assessmentId])
 }
@@ -537,6 +547,8 @@ enum ResultStatus {
   PENDING_REVIEW
   /// Fully scored; totalScore and passed are final.
   GRADED
+  /// Plan 016b — replaced by a staff-granted retake; kept as evidence, excluded from every aggregate.
+  SUPERSEDED
 }
 
 /// One graded outcome per exam attempt. Auto-created when the attempt is
@@ -558,6 +570,8 @@ model Result {
   assessment      Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   questionResults QuestionResult[]
+  /// Plan 016b — when a retake replaced this result.
+  supersededAt    DateTime?
 
   @@index([assessmentId])
   @@index([userId])
@@ -1268,7 +1282,10 @@ model IdentityPhoto {
 /// outcome: "ENROLLED" (no ID photo yet — this selfie became it) | "MATCHED" | "MISMATCH"
 model IdentityCheck {
   id           String   @id @default(cuid())
-  assignmentId String   @unique
+  /// Null once a retake replaced the attempt (the check stays on attemptId).
+  assignmentId String?  @unique
+  /// Plan 016b — the attempt this check led to (set when the attempt starts).
+  attemptId    String?  @unique
   userId       String
   outcome      String
   /// 1 − face distance (0–1); null when ENROLLED.
@@ -1279,9 +1296,10 @@ model IdentityCheck {
   photoId      String?
   createdAt    DateTime @default(now())
 
-  assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  photo      IdentityPhoto?       @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  assignment AssessmentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  attempt    ExamAttempt?          @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photo      IdentityPhoto?        @relation(fields: [photoId], references: [id], onDelete: SetNull)
 
   @@index([userId])
 }
@@ -1299,4 +1317,29 @@ model ProctoringCheck {
   session ProctoringSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+}
+
+// ============================================================
+// Plan 016b — staff-granted retakes
+// ============================================================
+
+/// A fresh attempt granted by staff. The earlier attempt and result are kept
+/// (result status SUPERSEDED) and linked here for the history.
+model AttemptRetake {
+  id                String   @id @default(cuid())
+  assignmentId      String
+  userId            String
+  assessmentId      String
+  previousAttemptId String
+  previousResultId  String?
+  grantedById       String
+  reason            String
+  createdAt         DateTime @default(now())
+
+  assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user       User                 @relation("RetakeStudent", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy  User                 @relation("RetakeGrantedBy", fields: [grantedById], references: [id])
+
+  @@index([assignmentId])
+  @@index([userId])
 }

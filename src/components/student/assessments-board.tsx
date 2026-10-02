@@ -25,7 +25,7 @@ export type BoardItem = {
   startAt: string | null
   endAt: string | null
   submittedAt: string | null
-  result: { id: string; status: 'GRADED' | 'PENDING_REVIEW'; percentage: number; passed: boolean | null } | null
+  result: { id: string; status: 'GRADED' | 'PENDING_REVIEW' | 'SUPERSEDED'; percentage: number; passed: boolean | null } | null
 }
 
 const TABS = [

@@ -48,7 +48,7 @@ export async function getAssessmentAnalytics(scope: Scope, assessmentId: string)
         select: { startedAt: true, submittedAt: true, deadlineAt: true },
       }),
       prisma.result.findMany({
-        where: { assessmentId, ...u },
+        where: { status: { not: 'SUPERSEDED' as const }, assessmentId, ...u },
         select: { status: true, percentage: true, passed: true },
       }),
       getQuestionStats(assessmentId, scope),

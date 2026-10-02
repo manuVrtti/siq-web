@@ -50,7 +50,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2))
 /** Load everything the report shows. Throws NotFound if no result exists. */
 export async function getReportData(userId: string, assessmentId: string) {
   const result = await prisma.result.findFirst({
-    where: { userId, assessmentId },
+    where: { status: { not: 'SUPERSEDED' as const }, userId, assessmentId },
     select: {
       status: true,
       totalScore: true,

@@ -73,7 +73,7 @@ export default async function AssessmentResultsPage({
   // Plan 018b — integrity marker per submission (staff only).
   const attempts = await prisma.examAttempt.findMany({ where: { id: { in: items.map((r) => r.attemptId) } }, select: { id: true, assignmentId: true } })
   const assignmentOf = new Map(attempts.map((a) => [a.id, a.assignmentId]))
-  const integrity = await integrityByAssignment(attempts.map((a) => a.assignmentId))
+  const integrity = await integrityByAssignment(attempts.map((a) => a.assignmentId).filter((x): x is string => Boolean(x)))
 
   const base = `/${slug}/assessments/${id}`
   const pathname = `${base}/results`
