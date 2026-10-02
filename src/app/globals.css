@@ -287,6 +287,18 @@
       color var(--dur-2) var(--ease-spark);
   }
 
+  /* The sidebar never scrolls: rows tighten on short screens so every item fits. */
+  @media (max-height: 820px) {
+    .siq-sidebar .siq-nav-item { min-height: 32px; }
+    .siq-sidebar-top { gap: 8px; padding-top: 12px; }
+    .siq-admin-nav { gap: 14px; }
+  }
+  @media (max-height: 680px) {
+    .siq-sidebar .siq-nav-item { min-height: 28px; font-size: 13px; }
+    .siq-sidebar-top { gap: 4px; padding-top: 8px; }
+    .siq-admin-nav { gap: 8px; }
+  }
+
   .siq-nav-item svg {
     transition: transform var(--dur-2) var(--ease-spark);
   }

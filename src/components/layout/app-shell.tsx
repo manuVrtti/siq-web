@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { ArrowLeft, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 import { BrandMark, BrandWordmark } from '@/components/brand/mark'
 import NotificationBell from '@/components/layout/notification-bell'
@@ -38,8 +38,28 @@ function Brand() {
 
 function OrgLine() {
   const org = useActiveOrg()
+  const user = useCurrentUser()
+  // A Super Admin isn't part of any college — inside one they are viewing
+  // it from the platform, with a way back to the console.
+  if (user?.role === 'SUPER_ADMIN') {
+    return (
+      <div className="px-3 pb-2">
+        <p className="text-sidebar-muted text-[10px] font-medium uppercase tracking-wider">
+          Viewing as Super Admin
+        </p>
+        <p className="text-sidebar-foreground truncate text-sm font-medium">{org.name}</p>
+        <Link
+          href="/admin"
+          className="text-highlight hover:text-sidebar-foreground mt-1 inline-flex items-center gap-1 text-xs font-medium transition-colors"
+        >
+          <ArrowLeft className="size-3" aria-hidden />
+          Platform console
+        </Link>
+      </div>
+    )
+  }
   return (
-    <div className="px-3 pb-3">
+    <div className="px-3 pb-2">
       <p className="text-sidebar-muted text-[10px] font-medium uppercase tracking-wider">
         Workspace
       </p>
@@ -113,9 +133,9 @@ function Shell({ children }: { children: ReactNode }) {
     <div className="bg-background flex min-h-screen">
       {/* Desktop sidebar */}
       <aside
-        className={`bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col justify-between border-r ${collapsed ? '' : 'md:flex'}`}
+        className={`siq-sidebar bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-0 hidden h-svh w-60 shrink-0 flex-col justify-between overflow-hidden border-r ${collapsed ? '' : 'md:flex'}`}
       >
-        <div className="flex flex-col gap-3 pt-4">
+        <div className="siq-sidebar-top flex min-h-0 flex-col gap-3 pt-4">
           <div className="px-3">
             <Brand />
           </div>
@@ -157,8 +177,8 @@ function Shell({ children }: { children: ReactNode }) {
               </SheetTrigger>
               <SheetContent side="left" className="bg-sidebar text-sidebar-foreground w-64 p-0">
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
-                <div className="flex h-full flex-col justify-between pt-4">
-                  <div className="flex flex-col gap-3">
+                <div className="siq-sidebar flex h-full flex-col justify-between overflow-hidden pt-4">
+                  <div className="siq-sidebar-top flex min-h-0 flex-col gap-3">
                     <div className="px-3">
                       <Brand />
                     </div>
