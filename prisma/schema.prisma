@@ -88,6 +88,10 @@ model User {
   candidateProfile   CandidateProfile?
   headOf             DepartmentHead[]
 
+  notificationsCreated Notification[]     @relation("NotificationAuthor")
+  notificationReads    NotificationRead[]
+  userNotifications    UserNotification[] @relation("UserNotifications")
+
   @@index([role])
 }
 
@@ -124,6 +128,9 @@ model Organization {
   tags        Tag[]
   assessments Assessment[]
   batches     Batch[]
+
+  notifications     Notification[]
+  userNotifications UserNotification[]
 
   @@index([type])
   @@index([status])
@@ -164,6 +171,8 @@ model Department {
   members     OrganizationMember[]
   assessments Assessment[]
   batches     Batch[]
+
+  notifications Notification[]
 
   @@unique([orgId, code])
   @@unique([orgId, name])
@@ -737,4 +746,97 @@ model CandidateAchievement {
   profile CandidateProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@index([profileId])
+}
+
+// ============================================================
+// Notifications (in-app bell) — ported from ABTalks plans 067 / 118
+// ============================================================
+
+/// Who a broadcast announcement is for, inside its org (or platform-wide).
+enum NotificationAudience {
+  ALL
+  /// Students only.
+  STUDENTS
+  /// College Admins, HODs and recruiters — everyone who manages.
+  STAFF
+}
+
+/// Icon in the bell. Nothing branches on it.
+enum NotificationCategory {
+  GENERAL
+  ASSESSMENT
+  RESULT
+  REVIEW
+  SYSTEM
+}
+
+/// Broadcast announcement, written from the Announcements page.
+///
+/// Scope: orgId null = every college (Super Admin only). departmentId set =
+/// only that department's members (HODs must set one of theirs). Automated
+/// notifications (open tests, pending reviews) are NOT stored here — they are
+/// derived at read time in src/features/notification/derive.ts.
+model Notification {
+  id           String               @id @default(cuid())
+  orgId        String?
+  departmentId String?
+  title        String
+  body         String?
+  /// Internal path ("/abes/my-assessments") or absolute https:// URL.
+  href         String?
+  category     NotificationCategory @default(GENERAL)
+  audience     NotificationAudience @default(ALL)
+  publishedAt  DateTime             @default(now())
+  /// After this it stops showing in the bell. Null = no expiry.
+  expiresAt    DateTime?
+  /// Deactivate instead of delete (reversible).
+  isActive     Boolean              @default(true)
+  createdById  String?
+  createdAt    DateTime             @default(now())
+
+  org        Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  department Department?   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdBy  User?         @relation("NotificationAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([orgId, isActive, publishedAt(sort: Desc)])
+}
+
+/// Per-user read state for broadcast, derived and personal notifications.
+/// `notificationKey` is deliberately not a foreign key: derived items have
+/// no row. Keys are stable and never reused ("admin:<id>", "user:<id>",
+/// "open:<assignmentId>", "review:<assessmentId>:<count>").
+model NotificationRead {
+  id              String   @id @default(cuid())
+  userId          String
+  notificationKey String
+  readAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationKey])
+  @@index([userId])
+}
+
+/// A notification addressed to one person about one entity (e.g. "your result
+/// is ready"). Dedupe is enforced by the unique dedupeKey.
+model UserNotification {
+  id              String   @id @default(cuid())
+  recipientUserId String
+  /// Workspace it belongs to; null shows in every workspace.
+  orgId           String?
+  /// Key from EVENT_TYPE_REGISTRY — a String, not an enum, so adding one
+  /// needs no migration.
+  eventType       String
+  title           String
+  body            String?
+  href            String?
+  dedupeKey       String   @unique
+  primaryEntityId String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  recipient User          @relation("UserNotifications", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  org       Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, createdAt(sort: Desc)])
 }

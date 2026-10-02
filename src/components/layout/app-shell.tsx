@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Menu } from 'lucide-react'
+import { Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 import { BrandMark, BrandWordmark } from '@/components/brand/mark'
+import NotificationBell from '@/components/layout/notification-bell'
+import { NotificationProvider } from '@/components/notifications/notification-provider'
 import SidebarNav from '@/components/layout/sidebar-nav'
 import UserMenu from '@/components/layout/user-menu'
 import { Button } from '@/components/ui/button'
@@ -67,13 +69,52 @@ function SidebarFooter() {
   )
 }
 
+const SIDEBAR_KEY = 'siq:sidebar-collapsed'
+const SIDEBAR_EVENT = 'siq-sidebar'
+
+function readSidebar(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === '1'
+  } catch {
+    return false // storage blocked: start expanded
+  }
+}
+function writeSidebar(collapsed: boolean) {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0')
+  } catch {}
+  window.dispatchEvent(new Event(SIDEBAR_EVENT))
+}
+function subscribeSidebar(cb: () => void) {
+  window.addEventListener(SIDEBAR_EVENT, cb)
+  window.addEventListener('storage', cb)
+  return () => {
+    window.removeEventListener(SIDEBAR_EVENT, cb)
+    window.removeEventListener('storage', cb)
+  }
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <NotificationProvider>
+      <Shell>{children}</Shell>
+    </NotificationProvider>
+  )
+}
+
+function Shell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  // Desktop only: hide the sidebar for more room. Remembered per browser;
+  // the server snapshot is "expanded" so the first paint matches the default.
+  const collapsed = useSyncExternalStore(subscribeSidebar, readSidebar, () => false)
+  const toggleSidebar = () => writeSidebar(!collapsed)
 
   return (
     <div className="bg-background flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col justify-between border-r md:flex">
+      <aside
+        className={`bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col justify-between border-r ${collapsed ? '' : 'md:flex'}`}
+      >
         <div className="flex flex-col gap-3 pt-4">
           <div className="px-3">
             <Brand />
@@ -89,6 +130,22 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-border bg-background/80 sticky top-0 z-30 flex h-14 backdrop-blur-md shrink-0 items-center justify-between gap-3 border-b px-4 md:px-6">
           <div className="flex items-center gap-2">
+            {/* Desktop sidebar toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex"
+              onClick={toggleSidebar}
+              aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'}
+              aria-expanded={!collapsed}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="size-5" aria-hidden />
+              ) : (
+                <PanelLeftClose className="size-5" aria-hidden />
+              )}
+            </Button>
+
             {/* Mobile drawer trigger */}
             <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
               <SheetTrigger
@@ -115,13 +172,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </SheetContent>
             </Sheet>
 
-            <span className="flex items-center gap-2 md:hidden">
+            <span className={`flex items-center gap-2 ${collapsed ? '' : 'md:hidden'}`}>
               <BrandMark className="size-6" />
               <span className="text-sm font-semibold tracking-tight">SelectIQ</span>
             </span>
           </div>
 
-          <UserMenu />
+          <div className="flex items-center gap-1.5">
+            <NotificationBell />
+            <UserMenu />
+          </div>
         </header>
 
         <main className="min-w-0 flex-1 overflow-x-auto p-4 md:p-8">{children}</main>

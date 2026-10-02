@@ -5,6 +5,7 @@ import type { Prisma } from '@prisma/client'
 import { ForbiddenError, NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { userInScope, type Scope } from '@/lib/auth/scope'
+import { notifyResultGraded, safely } from '@/services/notifications/events'
 
 /**
  * Plan 016 — grading engine.
@@ -174,7 +175,7 @@ export async function gradeAttempt(attemptId: string) {
   const status = anyPending ? 'PENDING_REVIEW' : 'GRADED'
   const passed = passedFor(status, totalScore, assessment.passingScore)
 
-  return prisma.result.create({
+  const created = await prisma.result.create({
     data: {
       attemptId,
       assessmentId: attempt.assessmentId,
@@ -197,6 +198,8 @@ export async function gradeAttempt(attemptId: string) {
     },
     include: { questionResults: true },
   })
+  if (created.status === 'GRADED') await safely(() => notifyResultGraded(created.id))
+  return created
 }
 
 function passedFor(
@@ -276,7 +279,7 @@ export async function recomputeResult(resultId: string) {
   const status: 'PENDING_REVIEW' | 'GRADED' = anyPending ? 'PENDING_REVIEW' : 'GRADED'
   const passed = passedFor(status, totalScore, result.assessment.passingScore)
 
-  return prisma.result.update({
+  const updated = await prisma.result.update({
     where: { id: resultId },
     data: {
       totalScore,
@@ -288,6 +291,11 @@ export async function recomputeResult(resultId: string) {
     },
     include: { questionResults: true },
   })
+  // Review just finished → tell the student (deduped per result).
+  if (result.status === 'PENDING_REVIEW' && status === 'GRADED') {
+    await safely(() => notifyResultGraded(resultId))
+  }
+  return updated
 }
 
 /**

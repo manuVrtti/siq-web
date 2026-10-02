@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, Building2, LayoutDashboard, Menu, ScrollText, Search, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeft, Building2, LayoutDashboard, Megaphone, Menu, ScrollText, Search, ShieldCheck, Users } from 'lucide-react'
 
 import { BrandMark } from '@/components/brand/mark'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,12 @@ const GROUPS = [
     items: [
       { href: '/admin/users', label: 'All people', icon: Users },
       { href: '/admin/platform-admins', label: 'Platform admins', icon: ShieldCheck },
+    ],
+  },
+  {
+    label: 'Communication',
+    items: [
+      { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
     ],
   },
   {
