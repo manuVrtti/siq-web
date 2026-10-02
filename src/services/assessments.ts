@@ -10,6 +10,7 @@ import {
   type AssessmentInput,
   type AutoAssembleCriteria,
 } from '@/lib/validators/assessment'
+import { notifyAssignedOnPublish, safely } from '@/services/notifications/events'
 
 /**
  * Plan 012 — assessment assembly.
@@ -250,9 +251,12 @@ export async function publishAssessment(orgId: string, id: string) {
     throw new ValidationError(`Cannot publish: ${blockers.join('; ')}`)
   }
 
-  return prisma.assessment.update({
+  const published = await prisma.assessment.update({
     where: { id },
     data: { status: 'PUBLISHED' },
     include: fullInclude,
   })
+  // Students assigned while it was a draft hear about it now.
+  await safely(() => notifyAssignedOnPublish(id))
+  return published
 }

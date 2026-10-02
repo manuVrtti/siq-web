@@ -40,6 +40,9 @@ export type AuditAction =
   | 'superadmin.grant'
   | 'org.suspend'
   | 'org.reactivate'
+  | 'announcement.create'
+  | 'announcement.deactivate'
+  | 'announcement.reactivate'
 
 export async function audit(entry: {
   userId: string

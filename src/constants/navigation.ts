@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   LibraryBig,
   LineChart,
+  Megaphone,
   MessagesSquare,
   UserRound,
   Shield,
@@ -53,6 +54,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // org-wide results page is manager-only (Plan 016 gates it server-side).
   { label: 'Results', href: '/results', icon: FileCheck2, roles: MANAGERS },
   { label: 'Analytics', href: '/analytics', icon: LineChart, roles: MANAGERS },
+  { label: 'Announcements', href: '/announcements', icon: Megaphone, roles: MANAGERS },
   // Role panels: College Admin runs the college; HOD runs their department(s).
   { label: 'College admin', href: '/manage', icon: ShieldCheck, roles: ['COLLEGE_ADMIN', 'SUPER_ADMIN'] },
   { label: 'My department', href: '/department', icon: Building2, roles: ['COLLEGE_HOD'] },

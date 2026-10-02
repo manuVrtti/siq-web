@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client'
 import { assertStudentsInScope, studentWhere, type Scope } from '@/lib/auth/scope'
 import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
+import { notifyAssigned, safely } from '@/services/notifications/events'
 
 /**
  * Plan 013 — assignments.
@@ -58,10 +59,20 @@ export async function assignToCandidates(
   if (userIds.length === 0) return 0
   await assertStudentsInScope(scope, userIds)
 
+  const existing = new Set(
+    (
+      await prisma.assessmentAssignment.findMany({
+        where: { assessmentId, userId: { in: userIds } },
+        select: { userId: true },
+      })
+    ).map((r) => r.userId),
+  )
   const res = await prisma.assessmentAssignment.createMany({
     data: userIds.map((userId) => ({ assessmentId, userId })),
     skipDuplicates: true, // (assessmentId, userId) is unique — quiet no-op
   })
+  // Bell + email for the newly assigned (dedupe makes a race harmless).
+  await safely(() => notifyAssigned(assessmentId, userIds.filter((id) => !existing.has(id))))
   return res.count
 }
 
