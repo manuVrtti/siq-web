@@ -23,6 +23,8 @@ export const assessmentInputSchema = z.object({
   snapshotIntervalSec: z.number().int().min(5).max(300).optional(),
   storeSnapshots: z.boolean().optional(),
   faceMatchThreshold: z.number().min(0).max(1).optional(),
+  // Plan 021 — counts toward students' strengths & weaknesses.
+  countsForAnalytics: z.boolean().optional(),
 })
 
 export type AssessmentInput = z.infer<typeof assessmentInputSchema>

@@ -43,6 +43,13 @@ export type AuditAction =
   | 'announcement.create'
   | 'announcement.deactivate'
   | 'announcement.reactivate'
+  | 'taxonomy.topic.create'
+  | 'taxonomy.topic.update'
+  | 'taxonomy.topic.delete'
+  | 'taxonomy.skill.create'
+  | 'taxonomy.skill.update'
+  | 'taxonomy.skill.delete'
+  | 'question.tag'
 
 export async function audit(entry: {
   userId: string

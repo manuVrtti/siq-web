@@ -47,6 +47,8 @@ type Assessment = {
   snapshotIntervalSec: number
   storeSnapshots: boolean
   faceMatchThreshold: number
+  /** Plan 021 — feeds students' strengths & weaknesses. */
+  countsForAnalytics: boolean
   sections: Section[]
 }
 
@@ -56,10 +58,13 @@ export default function AssessmentBuilder({
   assessment,
   bank,
   tags,
+  untagged,
 }: {
   assessment: Assessment
   bank: BankQuestion[]
   tags: Tag[]
+  /** Plan 021 — questions in this test with no topic/skill. */
+  untagged: number
 }) {
   const router = useRouter()
   const org = useActiveOrg()
@@ -77,6 +82,7 @@ export default function AssessmentBuilder({
   const [snapshotIntervalSec, setSnapshotIntervalSec] = useState(assessment.snapshotIntervalSec)
   const [storeSnapshots, setStoreSnapshots] = useState(assessment.storeSnapshots)
   const [faceMatchThreshold, setFaceMatchThreshold] = useState(assessment.faceMatchThreshold)
+  const [countsForAnalytics, setCountsForAnalytics] = useState(assessment.countsForAnalytics)
 
   const [newSection, setNewSection] = useState('')
 
@@ -125,6 +131,7 @@ export default function AssessmentBuilder({
         snapshotIntervalSec: Number(snapshotIntervalSec),
         storeSnapshots,
         faceMatchThreshold: Number(faceMatchThreshold),
+        countsForAnalytics,
       })
     )
       setMsg({ kind: 'ok', text: 'Settings saved.' })
@@ -182,6 +189,32 @@ export default function AssessmentBuilder({
             Max attempts
             <Input type="number" min={1} value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} className="w-24" />
           </label>
+        </div>
+
+        {/* Plan 021 — analytics */}
+        <div className="flex flex-col gap-2 rounded-md border p-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={countsForAnalytics}
+              onChange={(e) => setCountsForAnalytics(e.target.checked)}
+            />
+            <span className="font-medium">Counts toward strengths &amp; weaknesses</span>
+          </label>
+          <p className="text-muted-foreground text-xs">
+            Scores from this test feed each student&apos;s topic and skill analytics. Every question must have a
+            topic and at least one skill before it can be published. Turn off for practice or trial tests.
+          </p>
+          {countsForAnalytics && untagged > 0 ? (
+            <p className="text-warning text-xs font-medium">
+              {untagged} question{untagged === 1 ? '' : 's'} in this test need{untagged === 1 ? 's' : ''} a topic and
+              skill —{' '}
+              <Link href={`/${org.slug}/questions/tagging`} className="underline underline-offset-2">
+                tag them
+              </Link>{' '}
+              before publishing.
+            </p>
+          ) : null}
         </div>
 
         {/* Plan 018 — proctoring */}

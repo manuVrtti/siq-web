@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation'
 import AssessmentBuilder from '@/components/assessments/assessment-builder'
 import { Button } from '@/components/ui/button'
 import PageHeader from '@/components/ui/page-header'
-import { getAssessment } from '@/services/assessments'
+import { countUntagged, getAssessment } from '@/services/assessments'
 import { listQuestions } from '@/services/questions'
 import { prisma } from '@/lib/prisma'
 import { requireAssessmentPage } from '@/lib/auth/page-guard'
@@ -27,9 +27,10 @@ export default async function BuildPage({
   if (!assessment) notFound()
 
   // The bank to pick from, plus tags for auto-assemble criteria.
-  const [{ items: questions }, tags] = await Promise.all([
+  const [{ items: questions }, tags, untagged] = await Promise.all([
     listQuestions(org.id, { take: 500 }),
     prisma.tag.findMany({ where: { orgId: org.id }, orderBy: { name: 'asc' } }),
+    countUntagged(id),
   ])
 
   return (
@@ -64,6 +65,7 @@ export default async function BuildPage({
           marks: q.marks,
         }))}
         tags={tags.map((t) => ({ id: t.id, name: t.name }))}
+        untagged={untagged}
       />
     </>
   )

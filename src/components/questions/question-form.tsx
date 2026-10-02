@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import TopicSkillPicker, { type TaxonomyTopic } from '@/components/questions/topic-skill-picker'
 import { cn } from '@/lib/utils'
 import { useActiveOrg } from '@/lib/org-context'
 import { DIFFICULTIES, QUESTION_TYPES } from '@/lib/validators/question'
@@ -31,6 +32,8 @@ export type QuestionFormData = {
   explanation: string
   options: Option[]
   tagIds: string[]
+  topicId: string
+  skillIds: string[]
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -51,10 +54,12 @@ function hasOptions(type: string) {
 export default function QuestionForm({
   orgId,
   orgTags,
+  topics,
   initial,
 }: {
   orgId: string
   orgTags: TagOption[]
+  topics: TaxonomyTopic[]
   initial?: QuestionFormData
 }) {
   const router = useRouter()
@@ -70,6 +75,7 @@ export default function QuestionForm({
   const [explanation, setExplanation] = useState(initial?.explanation ?? '')
   const [tagIds, setTagIds] = useState<string[]>(initial?.tagIds ?? [])
   const [newTag, setNewTag] = useState('')
+  const [tagging, setTagging] = useState({ topicId: initial?.topicId ?? '', skillIds: initial?.skillIds ?? [] })
   const [options, setOptions] = useState<Option[]>(
     initial?.options ??
       (initial?.type === 'TRUE_FALSE'
@@ -135,6 +141,11 @@ export default function QuestionForm({
   }
 
   async function submit() {
+    // Mirrors the server: every question needs a topic + at least one skill.
+    if (!tagging.topicId || tagging.skillIds.length === 0) {
+      setError('Choose a topic and at least one skill — they power students’ strengths & weaknesses.')
+      return
+    }
     setSaving(true)
     setError(null)
 
@@ -148,6 +159,8 @@ export default function QuestionForm({
       negativeMarks: Number(negativeMarks),
       explanation: explanation.trim() || undefined,
       tagIds,
+      topicId: tagging.topicId,
+      skillIds: tagging.skillIds,
       options: showOptions ? options.map((o, i) => ({ ...o, text: o.text.trim(), order: i })) : [],
     }
 
@@ -279,7 +292,17 @@ export default function QuestionForm({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Tags</label>
+        <label className="text-sm font-medium">
+          Topic &amp; skills <span className="text-destructive">*</span>
+        </label>
+        <p className="text-muted-foreground -mt-1 text-xs">
+          What this question measures. Scores roll up into each student’s strengths &amp; weaknesses.
+        </p>
+        <TopicSkillPicker topics={topics} topicId={tagging.topicId} skillIds={tagging.skillIds} onChange={setTagging} />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium">Tags (optional)</label>
         <div className="flex flex-wrap gap-1.5">
           {tags.map((tag) => {
             const on = tagIds.includes(tag.id)

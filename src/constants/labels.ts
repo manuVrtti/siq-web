@@ -64,6 +64,13 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   'announcement.create': 'posted an announcement',
   'announcement.deactivate': 'deactivated an announcement',
   'announcement.reactivate': 'restored an announcement',
+  'taxonomy.topic.create': 'added a topic',
+  'taxonomy.topic.update': 'renamed a topic',
+  'taxonomy.topic.delete': 'deleted a topic',
+  'taxonomy.skill.create': 'added a skill',
+  'taxonomy.skill.update': 'edited a skill',
+  'taxonomy.skill.delete': 'deleted a skill',
+  'question.tag': 'tagged questions',
 }
 
 export function labelOf(map: Record<string, string>, value: string): string {

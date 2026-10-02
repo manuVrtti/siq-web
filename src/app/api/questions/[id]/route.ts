@@ -52,6 +52,9 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid question')
     }
+    // Plan 021 — every question written from the form carries a topic + skill,
+    // so strengths/weaknesses can be computed from it.
+    if (!parsed.data.topicId) throw new ValidationError('Choose a topic and at least one skill')
 
     if (parsed.data.tagIds.length > 0) {
       const owned = await prisma.tag.count({

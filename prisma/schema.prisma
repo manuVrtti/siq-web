@@ -131,6 +131,8 @@ model Organization {
 
   notifications     Notification[]
   userNotifications UserNotification[]
+  topicSections     TopicSection[]
+  skillNodes        SkillNode[]
 
   @@index([type])
   @@index([status])
@@ -251,6 +253,8 @@ model Question {
   createdBy           User                 @relation(fields: [createdById], references: [id], onDelete: Restrict)
   options             QuestionOption[]
   tags                QuestionTag[]
+  topic               QuestionTopic?
+  skills              QuestionSkill[]
   assessmentQuestions AssessmentQuestion[]
 
   @@index([orgId])
@@ -330,6 +334,9 @@ model Assessment {
   startAt             DateTime?
   endAt               DateTime?
   /// Plan 018 — turns on webcam capture + activity monitoring during the attempt.
+  /// Plan 021: counts toward students' strengths & weaknesses. When true,
+  /// publishing requires every question tagged with a topic + ≥1 skill.
+  countsForAnalytics  Boolean          @default(false)
   proctoringEnabled   Boolean          @default(false)
   /// Snapshot cadence in seconds. Ignored when proctoringEnabled is false.
   snapshotIntervalSec Int              @default(30)
@@ -839,4 +846,70 @@ model UserNotification {
   org       Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([recipientUserId, createdAt(sort: Desc)])
+}
+
+// ============================================================
+// Plan 021 — two-axis taxonomy: Topic (coarse) + Skill (fine)
+// ============================================================
+
+/// A topic area a student is scored on (DSA, DBMS, Aptitude…). orgId null =
+/// the shared platform spine (same meaning in every college, so colleges
+/// stay comparable); otherwise a college's own addition.
+model TopicSection {
+  id          String   @id @default(cuid())
+  orgId       String?
+  name        String
+  /// Stable key, e.g. "DSA". Unique per scope (platform, or one college) — enforced in services/taxonomy.ts.
+  code        String
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  org       Organization?   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  skills    SkillNode[]
+  questions QuestionTopic[]
+
+  @@index([orgId])
+}
+
+/// A fine-grained skill under a topic, e.g. DSA → "Dynamic Programming".
+model SkillNode {
+  id        String   @id @default(cuid())
+  orgId     String?
+  sectionId String
+  name      String
+  code      String
+  /// Alternative spellings for normalisation, lower-case: ["dp", "dynamic programming"].
+  aliases   String[]
+  createdAt DateTime @default(now())
+
+  section   TopicSection    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  org       Organization?   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  questions QuestionSkill[]
+
+  @@index([sectionId])
+  @@index([orgId])
+}
+
+/// Exactly one topic per question.
+model QuestionTopic {
+  questionId String @id
+  sectionId  String
+
+  question Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  section  TopicSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+
+  @@index([sectionId])
+}
+
+/// One or more skills per question.
+model QuestionSkill {
+  questionId String
+  skillId    String
+
+  question Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  skill    SkillNode @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([questionId, skillId])
+  @@index([skillId])
 }

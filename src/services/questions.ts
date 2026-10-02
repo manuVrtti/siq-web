@@ -5,6 +5,7 @@ import type { Prisma, QuestionType, Difficulty } from '@prisma/client'
 import { NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import type { QuestionInput } from '@/lib/validators/question'
+import { setQuestionTagging, untaggedWhere, validateTagging } from '@/services/taxonomy'
 
 /**
  * Plan 011 — question business logic.
@@ -18,6 +19,8 @@ import type { QuestionInput } from '@/lib/validators/question'
 const questionInclude = {
   options: { orderBy: { order: 'asc' } },
   tags: { include: { tag: true } },
+  topic: { include: { section: { select: { id: true, name: true, code: true } } } },
+  skills: { include: { skill: { select: { id: true, name: true } } } },
 } satisfies Prisma.QuestionInclude
 
 export const QUESTION_SORTS = ['createdAt', 'updatedAt', 'title', 'marks', 'difficulty'] as const
@@ -27,6 +30,9 @@ export type QuestionFilters = {
   type?: QuestionType
   difficulty?: Difficulty
   tagId?: string
+  /** Plan 021 — a topic id, or 'untagged' for the backfill queue. */
+  topicId?: string
+  skillId?: string
   search?: string
   skip?: number
   take?: number
@@ -40,6 +46,10 @@ export async function listQuestions(orgId: string, filters: QuestionFilters = {}
     ...(filters.type && { type: filters.type }),
     ...(filters.difficulty && { difficulty: filters.difficulty }),
     ...(filters.tagId && { tags: { some: { tagId: filters.tagId } } }),
+    ...(filters.topicId === 'untagged'
+      ? { AND: [untaggedWhere] }
+      : filters.topicId && { topic: { is: { sectionId: filters.topicId } } }),
+    ...(filters.skillId && { skills: { some: { skillId: filters.skillId } } }),
     ...(filters.search && {
       OR: [
         { title: { contains: filters.search, mode: 'insensitive' } },
@@ -79,7 +89,9 @@ export async function getQuestion(orgId: string, id: string) {
 }
 
 export async function createQuestion(orgId: string, userId: string, data: QuestionInput) {
-  return prisma.question.create({
+  const skillIds = data.topicId ? await validateTagging(orgId, data.topicId, data.skillIds) : []
+  return prisma.$transaction(async (tx) => {
+    const q = await tx.question.create({
     data: {
       orgId,
       createdById: userId,
@@ -93,7 +105,9 @@ export async function createQuestion(orgId: string, userId: string, data: Questi
       options: { create: data.options },
       tags: { create: data.tagIds.map((tagId) => ({ tagId })) },
     },
-    include: questionInclude,
+    })
+    if (data.topicId) await setQuestionTagging(tx, q.id, data.topicId, skillIds)
+    return tx.question.findUniqueOrThrow({ where: { id: q.id }, include: questionInclude })
   })
 }
 
@@ -110,10 +124,13 @@ export async function updateQuestion(
 ) {
   // Ensures the question belongs to this org before mutating.
   await getQuestion(orgId, id)
+  const skillIds = data.topicId ? await validateTagging(orgId, data.topicId, data.skillIds) : []
 
   return prisma.$transaction(async (tx) => {
     await tx.questionOption.deleteMany({ where: { questionId: id } })
     await tx.questionTag.deleteMany({ where: { questionId: id } })
+
+    await setQuestionTagging(tx, id, data.topicId ?? null, skillIds)
 
     return tx.question.update({
       where: { id },

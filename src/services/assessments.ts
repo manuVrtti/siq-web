@@ -11,6 +11,7 @@ import {
   type AutoAssembleCriteria,
 } from '@/lib/validators/assessment'
 import { notifyAssignedOnPublish, safely } from '@/services/notifications/events'
+import { untaggedWhere } from '@/services/taxonomy'
 
 /**
  * Plan 012 — assessment assembly.
@@ -89,6 +90,9 @@ export async function createAssessment(
       ...(data.faceMatchThreshold !== undefined
         ? { faceMatchThreshold: data.faceMatchThreshold }
         : {}),
+      // Plan 021 — new tests feed analytics unless the creator opts out;
+      // tests made before the taxonomy keep the column default (false).
+      countsForAnalytics: data.countsForAnalytics ?? true,
     },
     include: fullInclude,
   })
@@ -121,6 +125,9 @@ export async function updateAssessment(orgId: string, id: string, data: Assessme
       ...(data.storeSnapshots !== undefined ? { storeSnapshots: data.storeSnapshots } : {}),
       ...(data.faceMatchThreshold !== undefined
         ? { faceMatchThreshold: data.faceMatchThreshold }
+        : {}),
+      ...(data.countsForAnalytics !== undefined
+        ? { countsForAnalytics: data.countsForAnalytics }
         : {}),
     },
     include: fullInclude,
@@ -243,10 +250,27 @@ export async function computeTotalMarks(orgId: string, assessmentId: string): Pr
   )
 }
 
+/** Questions placed in this assessment that have no topic or no skill. */
+export async function countUntagged(assessmentId: string) {
+  return prisma.question.count({
+    where: { assessmentQuestions: { some: { section: { assessmentId } } }, AND: [untaggedWhere] },
+  })
+}
+
 export async function publishAssessment(orgId: string, id: string) {
   const a = await getAssessment(orgId, id)
 
   const blockers = publishBlockers(a)
+  // Plan 021 — an analytics test must be fully tagged, or its scores could
+  // not be attributed to topics and skills.
+  if (a.countsForAnalytics) {
+    const untagged = await countUntagged(id)
+    if (untagged > 0) {
+      blockers.push(
+        `${untagged} question${untagged === 1 ? '' : 's'} need${untagged === 1 ? 's' : ''} a topic and skill (it counts toward analytics)`,
+      )
+    }
+  }
   if (blockers.length > 0) {
     throw new ValidationError(`Cannot publish: ${blockers.join('; ')}`)
   }
