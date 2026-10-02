@@ -2,8 +2,10 @@ import 'server-only'
 
 import type { CompetencyScope } from '@prisma/client'
 
+import { CUMULATIVE_REF } from '@/constants/competency-thresholds'
 import { rollup, type Difficulty, type GradedItem } from '@/lib/competency/weighting'
 import { prisma } from '@/lib/prisma'
+import { generateInsights } from '@/services/competency/insights'
 
 /**
  * Plan 025 — the competency rollup engine.
@@ -20,7 +22,7 @@ import { prisma } from '@/lib/prisma'
  * so a recompute is idempotent and a full rebuild equals the incremental one.
  */
 
-export const CUMULATIVE_REF = 'ALL'
+export { CUMULATIVE_REF }
 
 type Item = GradedItem & { sectionId: string | null; skillIds: string[] }
 
@@ -104,7 +106,10 @@ export async function computeAssessmentCompetency(userId: string, assessmentId: 
 /** The student's rolling profile in one college. */
 export async function recomputeCumulative(userId: string, orgId: string) {
   const results = await countedResults(userId, orgId)
-  return writeSlice(userId, orgId, 'CUMULATIVE', CUMULATIVE_REF, await itemsFor(results))
+  const written = await writeSlice(userId, orgId, 'CUMULATIVE', CUMULATIVE_REF, await itemsFor(results))
+  // Plan 026 — classify the fresh profile (tiers, trends, priorities, practice).
+  await generateInsights(userId, orgId)
+  return written
 }
 
 /** Grading hook: refresh this test's snapshot, then the cumulative profile. */

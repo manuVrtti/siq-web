@@ -321,7 +321,12 @@ function summaryLine(kind: 'question' | 'candidate', s: Record<string, unknown>)
   const base = `${s.total} rows · ${s.valid} ready · ${s.invalid} with problems`
   if (kind === 'question') {
     const tags = (s.newTags as string[]) ?? []
-    return tags.length ? `${base} · will create ${tags.length} new tag${tags.length === 1 ? '' : 's'}` : base
+    const valid = Number(s.valid ?? 0)
+    const tagged = Number(s.tagged ?? 0)
+    const untagged = valid - tagged
+    return `${base}${tags.length ? ` · will create ${tags.length} new tag${tags.length === 1 ? '' : 's'}` : ''}${
+      untagged > 0 ? ` · ${untagged} without a topic (tag them later under Tag questions)` : valid > 0 ? ' · all with a topic & skills' : ''
+    }`
   }
   const batches = (s.newBatches as string[]) ?? []
   return `${base} · ${s.newAccounts} new, ${s.existingAccounts} existing${
@@ -333,7 +338,9 @@ function doneLine(kind: 'question' | 'candidate', d: Record<string, number>) {
   if (kind === 'question') {
     return `Added ${d.created} question${d.created === 1 ? '' : 's'} to your bank${
       d.newTags ? ` and created ${d.newTags} tag${d.newTags === 1 ? '' : 's'}` : ''
-    }.${d.skipped ? ` ${d.skipped} row${d.skipped === 1 ? ' was' : 's were'} skipped.` : ''}`
+    }.${d.skipped ? ` ${d.skipped} row${d.skipped === 1 ? ' was' : 's were'} skipped.` : ''}${
+      d.created - (d.tagged ?? 0) > 0 ? ` ${d.created - (d.tagged ?? 0)} need a topic — see Question bank → Tag questions.` : ''
+    }`
   }
   return `Created ${d.created} new account${d.created === 1 ? '' : 's'} and linked ${d.linked} existing${
     d.batchesCreated ? `, plus ${d.batchesCreated} new batch${d.batchesCreated === 1 ? '' : 'es'}` : ''

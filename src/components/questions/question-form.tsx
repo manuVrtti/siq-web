@@ -34,6 +34,7 @@ export type QuestionFormData = {
   tagIds: string[]
   topicId: string
   skillIds: string[]
+  practiceEnabled?: boolean
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -75,6 +76,7 @@ export default function QuestionForm({
   const [explanation, setExplanation] = useState(initial?.explanation ?? '')
   const [tagIds, setTagIds] = useState<string[]>(initial?.tagIds ?? [])
   const [newTag, setNewTag] = useState('')
+  const [practiceEnabled, setPracticeEnabled] = useState(initial?.practiceEnabled ?? false)
   const [tagging, setTagging] = useState({ topicId: initial?.topicId ?? '', skillIds: initial?.skillIds ?? [] })
   const [options, setOptions] = useState<Option[]>(
     initial?.options ??
@@ -161,6 +163,7 @@ export default function QuestionForm({
       tagIds,
       topicId: tagging.topicId,
       skillIds: tagging.skillIds,
+      practiceEnabled,
       options: showOptions ? options.map((o, i) => ({ ...o, text: o.text.trim(), order: i })) : [],
     }
 
@@ -342,6 +345,27 @@ export default function QuestionForm({
           </Button>
         </div>
       </div>
+
+      <label
+        className={cn(
+          'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors',
+          practiceEnabled ? 'border-warning/50 bg-warning/5' : 'border-current/15',
+        )}
+      >
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={practiceEnabled}
+          onChange={(e) => setPracticeEnabled(e.target.checked)}
+        />
+        <span>
+          <span className="font-medium">Open for student practice</span>
+          <span className="text-muted-foreground block text-xs">
+            Students who are weak in this skill can practise it and will see the correct answer and explanation. Use it
+            only for practice questions; a test that counts toward analytics can’t include it.
+          </span>
+        </span>
+      </label>
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium">Explanation (optional)</label>

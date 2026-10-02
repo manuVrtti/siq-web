@@ -32,6 +32,8 @@ const baseSchema = z.object({
   // queue); the create/edit routes require them.
   topicId: z.string().min(1).nullish(),
   skillIds: z.array(z.string().min(1)).max(15).default([]),
+  // Plan 026 — open for student self-practice (answer becomes visible to students).
+  practiceEnabled: z.boolean().default(false),
 })
 
 /**

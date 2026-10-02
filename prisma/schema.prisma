@@ -88,11 +88,13 @@ model User {
   candidateProfile   CandidateProfile?
   headOf             DepartmentHead[]
 
-  notificationsCreated Notification[]      @relation("NotificationAuthor")
-  notificationReads    NotificationRead[]
-  userNotifications    UserNotification[]  @relation("UserNotifications")
-  sectionCompetencies  SectionCompetency[]
-  skillCompetencies    SkillCompetency[]
+  notificationsCreated    Notification[]           @relation("NotificationAuthor")
+  notificationReads       NotificationRead[]
+  userNotifications       UserNotification[]       @relation("UserNotifications")
+  sectionCompetencies     SectionCompetency[]
+  skillCompetencies       SkillCompetency[]
+  competencyInsights      CompetencyInsight[]
+  practiceRecommendations PracticeRecommendation[]
 
   @@index([role])
 }
@@ -131,13 +133,15 @@ model Organization {
   assessments Assessment[]
   batches     Batch[]
 
-  notifications       Notification[]
-  userNotifications   UserNotification[]
-  topicSections       TopicSection[]
-  skillNodes          SkillNode[]
-  sectionCompetencies SectionCompetency[]
-  skillCompetencies   SkillCompetency[]
-  cohortBaselines     CohortBaseline[]
+  notifications           Notification[]
+  userNotifications       UserNotification[]
+  topicSections           TopicSection[]
+  skillNodes              SkillNode[]
+  sectionCompetencies     SectionCompetency[]
+  skillCompetencies       SkillCompetency[]
+  cohortBaselines         CohortBaseline[]
+  competencyInsights      CompetencyInsight[]
+  practiceRecommendations PracticeRecommendation[]
 
   @@index([type])
   @@index([status])
@@ -262,6 +266,9 @@ model Question {
   topic               QuestionTopic?
   skills              QuestionSkill[]
   assessmentQuestions AssessmentQuestion[]
+  /// Plan 026 — staff opened this question for self-practice: students may see it
+  /// with its answer. Never allowed in a test that counts toward analytics.
+  practiceEnabled     Boolean              @default(false)
 
   @@index([orgId])
   @@index([type])
@@ -890,10 +897,11 @@ model SkillNode {
   aliases   String[]
   createdAt DateTime @default(now())
 
-  section      TopicSection      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  org          Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  questions    QuestionSkill[]
-  competencies SkillCompetency[]
+  section         TopicSection             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  org             Organization?            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  questions       QuestionSkill[]
+  competencies    SkillCompetency[]
+  recommendations PracticeRecommendation[]
 
   @@index([sectionId])
   @@index([orgId])
@@ -1008,4 +1016,71 @@ model CohortBaseline {
 
   @@index([orgId, dimensionType, dimensionId])
   @@index([departmentId])
+}
+
+// ============================================================
+// Plan 026 — weak-topic detection & recommendations
+// ============================================================
+
+enum CompetencyTier {
+  CRITICAL_GAP
+  NEEDS_WORK
+  ON_TRACK
+  STRONG
+}
+
+enum CompetencyTrend {
+  IMPROVING
+  STABLE
+  DECLINING
+  INSUFFICIENT_DATA
+}
+
+/// One topic or skill of one student in one college, classified. Rebuilt
+/// whenever the student's profile or the college's baselines change.
+model CompetencyInsight {
+  id            String          @id @default(cuid())
+  userId        String
+  orgId         String
+  /// "SECTION" | "SKILL"
+  dimensionType String
+  dimensionId   String
+  dimensionName String
+  /// Parent topic of a skill (the topic itself for a SECTION row).
+  sectionId     String?
+  score         Float
+  tier          CompetencyTier
+  belowAbsolute Boolean
+  belowCohort   Boolean
+  trend         CompetencyTrend
+  /// 0 = fix first. Only weak dimensions are ranked; the rest get 999.
+  priority      Int
+  computedAt    DateTime        @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId, dimensionType, dimensionId])
+  @@index([userId, orgId, priority])
+  @@index([orgId, dimensionType, tier])
+}
+
+/// "Practise Dynamic Programming": one weak skill and what to do about it.
+model PracticeRecommendation {
+  id            String   @id @default(cuid())
+  userId        String
+  orgId         String
+  skillId       String
+  skillName     String
+  reason        String
+  priority      Int
+  /// Practice-enabled questions on this skill the student hasn't answered in a graded test.
+  questionCount Int
+  createdAt     DateTime @default(now())
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  skill SkillNode    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@index([userId, orgId, priority])
 }

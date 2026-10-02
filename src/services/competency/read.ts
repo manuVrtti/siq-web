@@ -6,8 +6,8 @@ import { requireOrgAccess } from '@/lib/auth/org-access'
 import { assertStudentsInScope, getScope } from '@/lib/auth/scope'
 import { ForbiddenError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
-import { ensureFreshBaselines } from '@/services/competency/cohort-baseline'
-import { CUMULATIVE_REF } from '@/services/competency/rollup'
+import { baselineLookup, ensureFreshBaselines } from '@/services/competency/cohort-baseline'
+import { CUMULATIVE_REF } from '@/constants/competency-thresholds'
 import type { CurrentUser } from '@/types/auth'
 
 /**
@@ -100,59 +100,16 @@ export async function getSkillBreakdown(userId: string, orgId: string, sectionId
   return rows.map(({ skill, ...k }) => ({ skillId: skill.id, name: skill.name, sectionId: skill.sectionId, ...k }))
 }
 
-/** Smallest cohort a comparison is shown against — below this, stats mislead. */
-export const MIN_COHORT = 5
-
 /**
- * The student's score against their cohort for every topic and skill. Uses
- * the narrowest cohort with at least MIN_COHORT students: department × batch,
- * then department, then batch, then the whole college.
+ * The student's score against their cohort for every topic and skill (see
+ * `baselineLookup` for which cohort is used).
  */
 export async function getCompetencyVsCohort(userId: string, orgId: string) {
   await ensureFreshBaselines(orgId)
-  const [profile, member] = await Promise.all([
-    getStudentCompetencyProfile(userId, orgId),
-    prisma.organizationMember.findFirst({
-      where: { userId, orgId },
-      select: { departmentId: true, user: { select: { candidateProfile: { select: { graduationYear: true } } } } },
-    }),
-  ])
-  const dept = member?.departmentId ?? null
-  const year = member?.user.candidateProfile?.graduationYear ?? null
-  const baselines = await prisma.cohortBaseline.findMany({
-    where: {
-      orgId,
-      sampleSize: { gte: MIN_COHORT },
-      OR: [
-        { departmentId: null, batchYear: null },
-        ...(dept ? [{ departmentId: dept, batchYear: null }] : []),
-        ...(year ? [{ departmentId: null, batchYear: year }] : []),
-        ...(dept && year ? [{ departmentId: dept, batchYear: year }] : []),
-      ],
-    },
-  })
-  const rank = (b: { departmentId: string | null; batchYear: number | null }) => (b.departmentId ? 2 : 0) + (b.batchYear ? 1 : 0)
-  const best = new Map<string, (typeof baselines)[number]>()
-  for (const b of baselines) {
-    const k = `${b.dimensionType}:${b.dimensionId}`
-    const cur = best.get(k)
-    if (!cur || rank(b) > rank(cur)) best.set(k, b)
-  }
-  const cohortOf = (b: (typeof baselines)[number]) =>
-    b.departmentId && b.batchYear ? 'DEPARTMENT_BATCH' : b.departmentId ? 'DEPARTMENT' : b.batchYear ? 'BATCH' : 'COLLEGE'
+  const [profile, lookup] = await Promise.all([getStudentCompetencyProfile(userId, orgId), baselineLookup(userId, orgId)])
   const compare = (type: 'SECTION' | 'SKILL', id: string, score: number) => {
-    const b = best.get(`${type}:${id}`)
-    if (!b) return null
-    return {
-      cohort: cohortOf(b),
-      sampleSize: b.sampleSize,
-      avg: b.avgAccuracy,
-      median: b.medianAccuracy,
-      p25: b.p25Accuracy,
-      p75: b.p75Accuracy,
-      belowP25: score < b.p25Accuracy,
-      aboveP75: score > b.p75Accuracy,
-    }
+    const b = lookup.get(`${type}:${id}`)
+    return b ? { ...b, belowP25: score < b.p25, aboveP75: score > b.p75 } : null
   }
   return {
     sections: profile.sections.map((s) => ({

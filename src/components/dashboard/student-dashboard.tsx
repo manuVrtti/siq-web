@@ -2,6 +2,7 @@ import { StudentDashboardView, type StudentDashboardData } from '@/components/da
 import { firstName, greeting } from '@/lib/format'
 import { getStudentInsights, getStudentOverview } from '@/services/analytics/candidate-analytics'
 import { computeCompleteness, getProfile } from '@/services/profile'
+import { getStudentCompetencyView } from '@/services/competency/student-view'
 
 /**
  * Student dashboard — loader. Fetches, shapes plain JSON, and hands it to
@@ -21,10 +22,11 @@ export async function StudentDashboard({
   userName: string | null
   slug: string
 }) {
-  const [s, insights, profile] = await Promise.all([
+  const [s, insights, profile, view] = await Promise.all([
     getStudentOverview(orgId, userId),
     getStudentInsights(orgId, userId),
     getProfile(userId),
+    getStudentCompetencyView(userId, orgId),
   ])
   const completeness = computeCompleteness(profile)
 
@@ -60,8 +62,17 @@ export async function StudentDashboard({
       createdAt: r.createdAt.toISOString(),
     })),
     standing: insights.standing,
-    strengths: insights.strengths,
-    focus: insights.focus,
+    // Plan 027 — topic/skill competency once the student has a profile;
+    // free-form tags until then.
+    strengths: view.hasProfile
+      ? view.strengths.slice(0, 3).map((x) => ({ tag: x.name, percentage: x.score, questions: x.questions }))
+      : insights.strengths,
+    focus: view.hasProfile
+      ? view.focus.slice(0, 3).map((f) => {
+          const k = view.topics.flatMap((t) => t.skills).find((sk) => sk.id === f.skillId)
+          return { tag: f.skillName, percentage: f.score ?? 0, questions: k?.questions ?? 0 }
+        })
+      : insights.focus,
     profile: {
       percent: completeness.percent,
       next: completeness.items
