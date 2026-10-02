@@ -81,3 +81,36 @@ export async function safely(fn: () => Promise<void>): Promise<void> {
     console.error('[notify] event hook failed', String(error))
   }
 }
+
+/** Plan 024 — a mock drive round outcome (or the final shortlist when roundName is null). */
+export async function notifyDriveOutcome(e: {
+  userId: string
+  driveId: string
+  orgId: string
+  driveTitle: string
+  roundName: string | null
+  outcome: 'PENDING' | 'SHORTLISTED' | 'ELIMINATED'
+  key: string
+}): Promise<void> {
+  if (e.outcome === 'PENDING') return
+  const org = await prisma.organization.findUnique({ where: { id: e.orgId }, select: { slug: true } })
+  if (!org) return
+  const title =
+    e.roundName === null
+      ? `Final shortlist: ${e.driveTitle} 🎉`
+      : e.outcome === 'SHORTLISTED'
+        ? `Cleared ${e.roundName} · ${e.driveTitle}`
+        : `Not shortlisted after ${e.roundName} · ${e.driveTitle}`
+  await notify([
+    {
+      eventType: 'drive.outcome' as const,
+      recipientUserId: e.userId,
+      orgId: e.orgId,
+      primaryEntityId: e.driveId,
+      title,
+      body: e.outcome === 'ELIMINATED' ? 'See what to work on before the next drive.' : null,
+      href: `/${org.slug}/my-drives/${e.driveId}`,
+      dedupeKey: `drive.outcome:${e.userId}:${e.key}`,
+    },
+  ])
+}

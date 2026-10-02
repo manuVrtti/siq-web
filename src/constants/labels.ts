@@ -72,6 +72,16 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   'taxonomy.skill.delete': 'deleted a skill',
   'question.tag': 'tagged questions',
   'competency.recompute': 'recomputed student analytics',
+  'drive.create': 'created a mock drive',
+  'drive.update': 'edited a mock drive',
+  'drive.delete': 'deleted a mock drive',
+  'drive.status': 'changed a mock drive’s status',
+  'drive.round': 'changed mock drive rounds',
+  'drive.register': 'enrolled students in a mock drive',
+  'drive.round.activate': 'opened a mock drive round',
+  'drive.round.evaluate': 'closed a mock drive round',
+  'drive.override': 'overrode a mock drive outcome',
+  'drive.complete': 'completed a mock drive',
 }
 
 export function labelOf(map: Record<string, string>, value: string): string {

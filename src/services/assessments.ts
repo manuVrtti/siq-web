@@ -144,6 +144,8 @@ export async function updateAssessment(orgId: string, id: string, data: Assessme
 
 export async function deleteAssessment(orgId: string, id: string) {
   await getAssessment(orgId, id)
+  const rounds = await prisma.mockDriveRound.count({ where: { assessmentId: id } })
+  if (rounds > 0) throw new ValidationError('This test is a round of a mock drive — remove it from the drive first')
   await prisma.assessment.delete({ where: { id } })
 }
 

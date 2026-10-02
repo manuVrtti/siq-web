@@ -51,6 +51,16 @@ export type AuditAction =
   | 'taxonomy.skill.delete'
   | 'question.tag'
   | 'competency.recompute'
+  | 'drive.create'
+  | 'drive.update'
+  | 'drive.delete'
+  | 'drive.status'
+  | 'drive.round'
+  | 'drive.register'
+  | 'drive.round.activate'
+  | 'drive.round.evaluate'
+  | 'drive.override'
+  | 'drive.complete'
 
 export async function audit(entry: {
   userId: string

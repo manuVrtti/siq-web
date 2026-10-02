@@ -112,11 +112,29 @@ export async function recomputeCumulative(userId: string, orgId: string) {
   return written
 }
 
-/** Grading hook: refresh this test's snapshot, then the cumulative profile. */
+/**
+ * Plan 024 — one mock drive's snapshot: every counted round test the student
+ * has a graded result for, rolled up together (scopeRefId = driveId).
+ */
+export async function computeDriveCompetency(userId: string, driveId: string) {
+  const drive = await prisma.mockDrive.findUnique({ where: { id: driveId }, select: { orgId: true, rounds: { select: { assessmentId: true } } } })
+  if (!drive) return null
+  const ids = new Set(drive.rounds.map((r) => r.assessmentId))
+  const results = (await countedResults(userId, drive.orgId)).filter((r) => ids.has(r.assessmentId))
+  return writeSlice(userId, drive.orgId, 'DRIVE', driveId, await itemsFor(results))
+}
+
+/** Grading hook: refresh this test's snapshot, any drive it is a round of, then the cumulative profile. */
 export async function recomputeForStudent(userId: string, assessmentId: string) {
   const a = await prisma.assessment.findUnique({ where: { id: assessmentId }, select: { orgId: true } })
   if (!a) return
   await computeAssessmentCompetency(userId, assessmentId)
+  const drives = await prisma.mockDriveRound.findMany({
+    where: { assessmentId, drive: { registrations: { some: { userId } } } },
+    select: { driveId: true },
+    distinct: ['driveId'],
+  })
+  for (const d of drives) await computeDriveCompetency(userId, d.driveId)
   await recomputeCumulative(userId, a.orgId)
 }
 

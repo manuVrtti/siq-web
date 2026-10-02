@@ -95,6 +95,8 @@ model User {
   skillCompetencies       SkillCompetency[]
   competencyInsights      CompetencyInsight[]
   practiceRecommendations PracticeRecommendation[]
+  mockDrivesCreated       MockDrive[]              @relation("DriveCreator")
+  mockRegistrations       MockDriveRegistration[]
 
   @@index([role])
 }
@@ -142,6 +144,8 @@ model Organization {
   cohortBaselines         CohortBaseline[]
   competencyInsights      CompetencyInsight[]
   practiceRecommendations PracticeRecommendation[]
+  mockDrives              MockDrive[]              @relation("DriveCollege")
+  sampleDriveFronts       MockDrive[]              @relation("DriveSampleCompany")
 
   @@index([type])
   @@index([status])
@@ -183,8 +187,9 @@ model Department {
   assessments Assessment[]
   batches     Batch[]
 
-  notifications   Notification[]
-  cohortBaselines CohortBaseline[]
+  notifications    Notification[]
+  cohortBaselines  CohortBaseline[]
+  mockDriveTargets MockDriveTarget[]
 
   @@unique([orgId, code])
   @@unique([orgId, name])
@@ -370,6 +375,7 @@ model Assessment {
   sections    AssessmentSection[]
   assignments AssessmentAssignment[]
   results     Result[]
+  mockRounds  MockDriveRound[]
 
   @@index([orgId])
   @@index([status])
@@ -1083,4 +1089,136 @@ model PracticeRecommendation {
   skill SkillNode    @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@index([userId, orgId, priority])
+}
+
+// ============================================================
+// Plans 023/024 — mock placement drives
+// ============================================================
+
+enum MockDriveMode {
+  COLLEGE_SIMULATED // the placement cell invents the employer
+  SAMPLE_COMPANY // fronted by a company organization on SelectIQ (no real hiring)
+}
+
+enum MockDriveStatus {
+  DRAFT
+  SCHEDULED
+  REGISTRATION_OPEN
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum MockRoundOutcome {
+  PENDING
+  SHORTLISTED
+  ELIMINATED
+}
+
+/// A simulated recruitment drive: rounds of ordinary assessments, a funnel
+/// of cutoffs, and no real hiring. Orchestration only — exams, proctoring
+/// and grading are the normal assessment engine.
+model MockDrive {
+  id                   String          @id @default(cuid())
+  orgId                String
+  mode                 MockDriveMode
+  title                String
+  description          String?         @db.Text
+  status               MockDriveStatus @default(DRAFT)
+  employerName         String
+  employerLogo         String?
+  roleTitle            String
+  /// Display only, e.g. "12 LPA (indicative)".
+  roleCtc              String?
+  sampleCompanyOrgId   String?
+  /// Eligibility. Empty batchYears = any batch; no targets = every department.
+  batchYears           Int[]
+  minCgpa              Float?
+  startDate            DateTime?
+  endDate              DateTime?
+  registrationDeadline DateTime?
+  createdById          String
+  completedAt          DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  org           Organization            @relation("DriveCollege", fields: [orgId], references: [id], onDelete: Cascade)
+  sampleCompany Organization?           @relation("DriveSampleCompany", fields: [sampleCompanyOrgId], references: [id], onDelete: SetNull)
+  createdBy     User                    @relation("DriveCreator", fields: [createdById], references: [id])
+  rounds        MockDriveRound[]
+  targets       MockDriveTarget[]
+  registrations MockDriveRegistration[]
+
+  @@index([orgId, status])
+}
+
+/// One round = one assessment. Score = the result's percentage; cutoff null
+/// means everyone who finishes the round advances.
+model MockDriveRound {
+  id           String    @id @default(cuid())
+  driveId      String
+  name         String
+  order        Int
+  assessmentId String
+  cutoffScore  Float?
+  scheduledAt  DateTime?
+  activatedAt  DateTime?
+  evaluatedAt  DateTime?
+
+  drive      MockDrive         @relation(fields: [driveId], references: [id], onDelete: Cascade)
+  assessment Assessment        @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  results    MockRoundResult[]
+
+  @@unique([driveId, order])
+  @@index([assessmentId])
+}
+
+model MockDriveTarget {
+  driveId      String
+  departmentId String
+
+  drive      MockDrive  @relation(fields: [driveId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([driveId, departmentId])
+  @@index([departmentId])
+}
+
+model MockDriveRegistration {
+  id           String   @id @default(cuid())
+  driveId      String
+  userId       String
+  /// Rounds cleared so far (0 = none yet).
+  currentRound Int      @default(0)
+  eliminated   Boolean  @default(false)
+  /// "SELF" | "BULK"
+  source       String   @default("SELF")
+  registeredAt DateTime @default(now())
+
+  drive        MockDrive         @relation(fields: [driveId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roundResults MockRoundResult[]
+
+  @@unique([driveId, userId])
+  @@index([userId])
+}
+
+model MockRoundResult {
+  id             String           @id @default(cuid())
+  registrationId String
+  roundId        String
+  assignmentId   String?
+  /// Percentage of the graded result (0–100).
+  score          Float?
+  outcome        MockRoundOutcome @default(PENDING)
+  decidedAt      DateTime?
+  /// Set when a person (not the cutoff) decided the outcome.
+  decidedById    String?
+  overrideReason String?
+
+  registration MockDriveRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  round        MockDriveRound        @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, roundId])
+  @@index([roundId])
 }
