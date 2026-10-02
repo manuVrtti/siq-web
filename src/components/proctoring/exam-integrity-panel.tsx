@@ -1,6 +1,7 @@
 import { CheckCircle2, Eye, ShieldAlert, ShieldCheck, XCircle } from 'lucide-react'
 
 import { Pill } from '@/components/dashboard/bits'
+import { confidenceBand } from '@/lib/proctoring/identity-rules'
 import { FLAG_GROUPS, FLAG_LABEL, RISK_STYLE, assessRisk } from '@/lib/proctoring/integrity'
 import { cn } from '@/lib/utils'
 import type { getSessionForAdmin } from '@/services/proctoring'
@@ -17,6 +18,16 @@ type Session = NonNullable<Awaited<ReturnType<typeof getSessionForAdmin>>>
 const time = (d: Date | string) =>
   new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Kolkata' }).format(new Date(d))
 const pct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `${Math.round(n * 100)}%`)
+/** 018c — plain-language match bands for staff (confidence scale). */
+const BAND = {
+  STRONG: { label: 'Strong match', cls: 'text-success' },
+  LIKELY: { label: 'Likely match — review', cls: 'text-warning' },
+  DIFFERENT: { label: 'Different person', cls: 'text-destructive' },
+} as const
+const bandOf = (c: number | null | undefined) => {
+  const b = confidenceBand(c)
+  return b ? BAND[b] : null
+}
 
 function Photo({ url, label, sub }: { url: string | null; label: string; sub?: string }) {
   return (
@@ -72,9 +83,15 @@ export function ExamIntegrityPanel({ session }: { session: Session | null }) {
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium">Identity</h3>
           <div className="flex flex-wrap items-start gap-4">
-            {id ? <Photo url={id.idUrl} label="ID photo" sub={id.idSource === 'SELFIE' ? 'First verified exam selfie' : id.idSource === 'COLLEGE_UPLOAD' ? 'Uploaded by the college' : id.idSource === 'STUDENT_UPLOAD' ? 'Uploaded by the student' : undefined} /> : null}
-            {id ? <Photo url={id.liveUrl} label="Before the exam" sub={time(id.at)} /> : null}
-            {session.referenceSignedUrl ? <Photo url={session.referenceSignedUrl} label="At exam start" sub={time(session.createdAt)} /> : null}
+            {id && id.outcome === 'ENROLLED' ? (
+              <Photo url={id.liveUrl} label="Start photo · saved as ID photo" sub={`${time(id.at)} · first proctored exam`} />
+            ) : id ? (
+              <>
+                <Photo url={id.idUrl} label="ID photo" sub={id.idSource === 'SELFIE' ? 'First verified exam selfie' : id.idSource === 'COLLEGE_UPLOAD' ? 'Uploaded by the college' : id.idSource === 'STUDENT_UPLOAD' ? 'Uploaded by the student' : undefined} />
+                <Photo url={id.liveUrl} label="Start photo" sub={time(id.at)} />
+              </>
+            ) : null}
+            {!id && session.referenceSignedUrl ? <Photo url={session.referenceSignedUrl} label="Start photo" sub={time(session.createdAt)} /> : null}
             {id ? (
               <div className="flex min-w-48 flex-col gap-1 text-sm">
                 {id.outcome === 'MISMATCH' ? (
@@ -87,7 +104,14 @@ export function ExamIntegrityPanel({ session }: { session: Session | null }) {
                   </span>
                 )}
                 <span className="text-muted-foreground">
-                  Match {pct(id.matchScore)} · {id.attempts} {id.attempts === 1 ? 'try' : 'tries'}
+                  {id.outcome === 'ENROLLED' ? (
+                    'Future exams are compared with this photo.'
+                  ) : (
+                    <>
+                      <span className={cn('font-medium', bandOf(id.matchScore)?.cls)}>{bandOf(id.matchScore)?.label ?? 'No score'}</span> · {pct(id.matchScore)} confidence ·{' '}
+                      {id.attempts} {id.attempts === 1 ? 'try' : 'tries'}
+                    </>
+                  )}
                 </span>
                 <span className="text-muted-foreground text-xs">Compare the photos yourself — face matching is a guide, not proof.</span>
               </div>
@@ -107,12 +131,15 @@ export function ExamIntegrityPanel({ session }: { session: Session | null }) {
               <li key={c.id} className="flex w-32 flex-col gap-1">
                 {c.snapshotSignedUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- signed URL
-                  <img src={c.snapshotSignedUrl} alt="Random check" className={cn('aspect-[4/3] w-32 rounded-md border-2 object-cover', c.matched ? 'border-success/50' : 'border-destructive')} />
+                  <img src={c.snapshotSignedUrl} alt="Random check" className={cn('aspect-[4/3] w-32 rounded-md border-2 object-cover', c.faceCount === 1 && confidenceBand(c.matchScore) !== 'DIFFERENT' ? (confidenceBand(c.matchScore) === 'LIKELY' ? 'border-warning/60' : 'border-success/50') : 'border-destructive')} />
                 ) : (
                   <div className="bg-muted aspect-[4/3] w-32 rounded-md" />
                 )}
-                <span className={cn('text-[11px] font-medium', c.matched ? 'text-success' : 'text-destructive')}>
-                  {c.faceCount === 0 ? 'No face' : c.faceCount > 1 ? `${c.faceCount} faces` : c.matched ? `Match ${pct(c.matchScore)}` : `Different · ${pct(c.matchScore)}`}
+                <span
+                  title={c.matchScore !== null ? `${pct(c.matchScore)} confidence it’s the same person` : undefined}
+                  className={cn('text-[11px] font-medium', c.faceCount !== 1 ? 'text-destructive' : (bandOf(c.matchScore)?.cls ?? 'text-success'))}
+                >
+                  {c.faceCount === 0 ? 'No face' : c.faceCount > 1 ? `${c.faceCount} faces` : c.matchScore === null ? 'Face present' : `${bandOf(c.matchScore)?.label.replace(' — review', '')} · ${pct(c.matchScore)}`}
                 </span>
                 <span className="text-muted-foreground text-[11px]">{time(c.occurredAt)}</span>
               </li>
