@@ -19,6 +19,8 @@ export function ConfirmDialog({
   error,
   onConfirm,
   onCancel,
+  tone = 'danger',
+  confirmDisabled = false,
 }: {
   open: boolean
   title: string
@@ -28,6 +30,9 @@ export function ConfirmDialog({
   error?: string | null
   onConfirm: () => void
   onCancel: () => void
+  /** 'danger' for destructive actions (default); 'primary' for safe ones. */
+  tone?: 'danger' | 'primary'
+  confirmDisabled?: boolean
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
 
@@ -67,8 +72,8 @@ export function ConfirmDialog({
           </Button>
           <Button
             onClick={onConfirm}
-            disabled={busy}
-            className="bg-destructive hover:bg-[color-mix(in_oklab,var(--destructive),black_12%)] text-white hover:shadow-none"
+            disabled={busy || confirmDisabled}
+            className={tone === 'danger' ? 'bg-destructive hover:bg-[color-mix(in_oklab,var(--destructive),black_12%)] text-white hover:shadow-none' : undefined}
           >
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
             {confirmLabel}

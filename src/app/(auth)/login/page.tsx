@@ -33,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       </div>
 
       <p className="text-muted-foreground mt-8 text-xs leading-relaxed">
-        By continuing you agree to take assessments in the SelectIQ secure browser when your college
+        By continuing you agree to take assessments in SIQ-Browser, SelectIQ’s secure exam app, when your college
         requires it. Trouble signing in? Contact your placement cell.
       </p>
     </div>

@@ -134,14 +134,14 @@ export default function GatewayClient() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 py-10 text-center">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {mobile ? 'Open this exam on a laptop or desktop' : timedOut ? 'Secure browser required' : 'Opening SelectIQ Secure Browser…'}
+          {mobile ? 'Open this exam on a laptop or desktop' : timedOut ? 'SIQ-Browser required' : 'Opening SIQ-Browser…'}
         </h1>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
           {mobile
-            ? 'Exams run only in the SelectIQ Exam Browser, a desktop app — it can’t run on a phone or tablet. Open the exam from Assessments on your computer.'
+            ? 'Exams run only in SIQ-Browser, a desktop app — it can’t run on a phone or tablet. Open the exam from Assessments on your computer.'
             : timedOut
-              ? 'Exams run inside the SelectIQ Secure Browser. Install it, then click below to try again.'
-              : 'Your OS should be handing this exam off. If it asks for permission, approve it.'}
+              ? 'Exams run inside SIQ-Browser. Install it (one time), then click below to try again.'
+              : 'Chrome will ask “Open SIQ-Browser?” — tick Always allow and click Open.'}
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export default function GatewayClient() {
             render={<a href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" />}
           >
             <Download className="size-4" aria-hidden />
-            Download SelectIQ Secure Browser
+            Download SIQ-Browser
           </Button>
 
           {deepLink ? (
@@ -162,7 +162,7 @@ export default function GatewayClient() {
 
           <div className="w-full text-left">
             <p className="text-muted-foreground mb-2 text-xs">
-              Already installed? Copy this URL and paste it into SEB&apos;s address bar.
+              Already installed? Copy this link and paste it into SIQ-Browser.
             </p>
             <div className="flex gap-2">
               <input
@@ -181,7 +181,7 @@ export default function GatewayClient() {
         </>
       ) : (
         <p className="text-muted-foreground text-xs" aria-live="polite">
-          Waiting for the secure browser to take over…
+          Waiting for SIQ-Browser to open…
         </p>
       )}
     </main>

@@ -173,7 +173,7 @@ function Footer({ item, nowIso }: { item: BoardItem; nowIso: string }) {
       return (
         <>
           <span className="text-muted-foreground text-xs">
-            {item.bucket === 'inProgress' ? 'Your answers are saved' : 'Opens in the secure browser'}
+            {item.bucket === 'inProgress' ? 'Your answers are saved' : 'Opens in SIQ-Browser'}
           </span>
           <Link href={`/exam/${item.token}`} className={primary}>
             {item.bucket === 'inProgress' ? 'Resume' : 'Start exam'}

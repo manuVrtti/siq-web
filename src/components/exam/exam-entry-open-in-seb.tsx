@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Copy, Download } from 'lucide-react'
+import { Check, CheckCircle2, Copy, Download, ExternalLink, Laptop, MonitorCheck, RotateCw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { isMobileUserAgent } from '@/lib/seb'
@@ -16,7 +16,8 @@ import { isMobileUserAgent } from '@/lib/seb'
  * a candidate can still paste the URL into SEB's address bar as a last resort.
  */
 
-const LAUNCH_TIMEOUT_MS = 2500
+/** Chrome's “Open SIQ-Browser?” prompt keeps focus here, so give the student time to click it. */
+const LAUNCH_TIMEOUT_MS = 7000
 
 export default function ExamEntryOpenInSeb({
   token,
@@ -93,80 +94,92 @@ export default function ExamEntryOpenInSeb({
     }
   }, [examUrl])
 
+  const linkBox = (
+    <div className="flex gap-2">
+      <input
+        id="exam-url-input"
+        readOnly
+        value={examUrl}
+        aria-label="Exam link"
+        className="border-input bg-muted/40 min-w-0 flex-1 rounded-lg border px-3 py-2 font-mono text-xs outline-none"
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <Button type="button" variant="outline" size="sm" onClick={copy} className="shrink-0">
+        {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  )
+
   if (mobile) {
     return (
-      <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
-        <p className="font-medium">Open this exam on a laptop or desktop</p>
-        <p className="text-muted-foreground mt-1">
-          Exams run only in the SelectIQ Exam Browser, which is a Windows / macOS app — it can’t run on a phone or
-          tablet. On your computer, sign in to SelectIQ and open the exam from Assessments, or use this link:
-        </p>
-      </div>
-        <div className="flex gap-2">
-          <input
-            readOnly
-            value={examUrl}
-            aria-label="Exam link"
-            className="border-input flex-1 rounded-md border bg-transparent px-2.5 py-1.5 font-mono text-sm outline-none"
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <Button type="button" variant="outline" onClick={copy} className="shrink-0">
-            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
+      <div className="flex flex-col gap-4 rounded-2xl border border-warning/30 bg-warning/5 p-5">
+        <div className="flex items-start gap-3">
+          <span className="bg-warning/15 text-warning grid size-10 shrink-0 place-items-center rounded-xl">
+            <Laptop className="size-5" aria-hidden />
+          </span>
+          <div>
+            <p className="font-semibold">Open this exam on a laptop or desktop</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Exams run only in SIQ-Browser, a Windows app — it can’t run on a phone or tablet. On your computer, open the
+              exam from Assessments, or use this link:
+            </p>
+          </div>
         </div>
+        {linkBox}
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
-        <p className="font-medium">
-          {timedOut ? 'Secure browser required' : 'Opening SelectIQ Secure Browser…'}
-        </p>
-        <p className="text-muted-foreground mt-1">
-          {timedOut
-            ? 'It looks like the secure browser isn’t installed on this device yet. Download it, then click below to try again.'
-            : 'Your OS is being asked to launch the secure browser. Approve the prompt if it appears.'}
-        </p>
+    <div className="from-primary/[0.06] to-highlight/[0.06] flex flex-col gap-4 rounded-2xl border bg-gradient-to-br p-5">
+      <div className="flex items-start gap-3">
+        <span className="bg-primary text-primary-foreground relative grid size-11 shrink-0 place-items-center rounded-xl shadow-sm">
+          <MonitorCheck className="size-5" aria-hidden />
+          {!timedOut ? <span className="bg-highlight absolute -top-1 -right-1 size-3 animate-ping rounded-full" /> : null}
+        </span>
+        <div className="min-w-0">
+          <p className="font-semibold">{timedOut ? 'Didn’t open?' : 'Opening SIQ-Browser…'}</p>
+          <p className="text-muted-foreground mt-0.5 text-sm">
+            {timedOut
+              ? 'Install SIQ-Browser (one time, about 2 minutes), then open the exam again.'
+              : 'Your exam runs in SIQ-Browser, SelectIQ’s secure exam app.'}
+          </p>
+        </div>
       </div>
 
-      {timedOut ? (
-        <>
+      {!timedOut ? (
+        <ol className="flex flex-col gap-2 text-sm">
+          {[
+            <>Chrome asks <b>“Open SIQ-Browser?”</b> — tick <i>Always allow</i> and click <b>Open SIQ-Browser</b>.</>,
+            <>Sign in inside SIQ-Browser with this same account.</>,
+            <>Pass the quick system check, then start your exam.</>,
+          ].map((step, n) => (
+            <li key={n} className="flex items-start gap-2.5">
+              <span className="bg-background text-primary grid size-6 shrink-0 place-items-center rounded-full border text-xs font-semibold">{n + 1}</span>
+              <span className="pt-0.5">{step}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
-            <Button
-              render={<a href={downloadUrl} target="_blank" rel="noopener noreferrer" />}
-            >
+            <Button render={<a href={downloadUrl} target="_blank" rel="noopener noreferrer" />}>
               <Download className="size-4" aria-hidden />
-              Download SelectIQ Secure Browser
+              Download SIQ-Browser
             </Button>
             <Button type="button" variant="outline" onClick={retry}>
-              Try opening it again
+              <RotateCw className="size-4" aria-hidden />
+              Open it again
             </Button>
           </div>
-
-          <div>
-            <label htmlFor="exam-url-input" className="text-muted-foreground mb-1 block text-xs">
-              Already installed? Paste this URL into the SEB address bar.
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="exam-url-input"
-                readOnly
-                value={examUrl}
-                className="border-input flex-1 rounded-md border bg-transparent px-2.5 py-1.5 text-sm font-mono outline-none"
-                onFocus={(e) => e.currentTarget.select()}
-              />
-              <Button type="button" variant="outline" onClick={copy} className="shrink-0">
-                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
-            </div>
-          </div>
-        </>
-      ) : null}
+          <ul className="text-muted-foreground flex flex-col gap-1 text-xs">
+            <li className="flex gap-1.5"><CheckCircle2 className="text-success mt-0.5 size-3.5 shrink-0" aria-hidden /> Already installed? Click <b className="text-foreground">Open it again</b> and allow Chrome’s prompt.</li>
+            <li className="flex gap-1.5"><ExternalLink className="mt-0.5 size-3.5 shrink-0" aria-hidden /> Or paste this link into SIQ-Browser:</li>
+          </ul>
+          {linkBox}
+        </div>
+      )}
     </div>
   )
 }
