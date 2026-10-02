@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
       type: (p.get('type') as QuestionType) || undefined,
       difficulty: (p.get('difficulty') as Difficulty) || undefined,
       tagId: p.get('tagId') || undefined,
+      topicId: p.get('topicId') || undefined,
+      skillId: p.get('skillId') || undefined,
       search: p.get('search') || undefined,
       skip: p.get('skip') ? Number(p.get('skip')) : undefined,
       take: p.get('take') ? Number(p.get('take')) : undefined,
@@ -62,6 +64,9 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid question')
     }
+    // Plan 021 — every question written from the form carries a topic + skill,
+    // so strengths/weaknesses can be computed from it.
+    if (!parsed.data.topicId) throw new ValidationError('Choose a topic and at least one skill')
 
     // Tags must belong to the same org — otherwise a caller could attach
     // another organisation's tags by id.

@@ -6,6 +6,7 @@ import PageHeader from '@/components/ui/page-header'
 import { prisma } from '@/lib/prisma'
 import { getQuestion } from '@/services/questions'
 import { getOrgBySlug } from '@/services/organizations'
+import { listTaxonomy } from '@/services/taxonomy'
 import { requirePagePermission } from '@/lib/auth/page-guard'
 import { PERMISSIONS } from '@/constants/permissions'
 
@@ -26,7 +27,10 @@ export default async function EditQuestionPage({
   const question = await getQuestion(org.id, id).catch(() => null)
   if (!question) notFound()
 
-  const tags = await prisma.tag.findMany({ where: { orgId: org.id }, orderBy: { name: 'asc' } })
+  const [tags, topics] = await Promise.all([
+    prisma.tag.findMany({ where: { orgId: org.id }, orderBy: { name: 'asc' } }),
+    listTaxonomy(org.id),
+  ])
 
   return (
     <>
@@ -34,6 +38,7 @@ export default async function EditQuestionPage({
       <QuestionForm
         orgId={org.id}
         orgTags={tags.map((t) => ({ id: t.id, name: t.name }))}
+        topics={topics}
         initial={{
           id: question.id,
           type: question.type,
@@ -45,6 +50,8 @@ export default async function EditQuestionPage({
           explanation: question.explanation ?? '',
           options: question.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
           tagIds: question.tags.map((t) => t.tag.id),
+          topicId: question.topic?.sectionId ?? '',
+          skillIds: question.skills.map((s) => s.skillId),
         }}
       />
     </>

@@ -50,6 +50,9 @@ Super Admin
 | Build, publish, assign tests | ✅ | own college | own departments' tests |
 | Results, grading, proctoring review, analytics, exports | ✅ | own college | own students only |
 | Question bank | ✅ | shared college-wide | shared college-wide |
+| Topics & skills: platform spine (DSA, DBMS, Aptitude…) | ✅ | read-only | read-only |
+| Topics & skills: the college's own topics and skills | ✅ | own college | read-only |
+| Tag questions with a topic + skills (incl. bulk backfill) | ✅ | own college | own college |
 | Post announcements (bell) | ✅ every college | own college (or one department) | own departments only |
 | Suspend / reactivate accounts | ✅ | — | — |
 | Suspend / reactivate a whole college (contract, payment…) | ✅ | — | — |
@@ -85,6 +88,17 @@ Super Admin
   announcements may link to an external `https://` page.
 - Announcements are deactivated, never deleted. Every change is audited.
 
+### Topics & skills (plan 021)
+- Two levels: a **topic** (DSA, DBMS, Aptitude…) and **skills** under it (Dynamic Programming, SQL Joins…).
+  The **platform spine** is shared by every college so scores compare fairly; only Super Admins change it.
+  A college may add its **own** topics, or its own skills under a platform topic. Nobody else sees those.
+- A question has **one topic and at least one skill**, and every skill must belong to that topic. The
+  question form requires them; bulk imports may arrive untagged and go to **Question bank → Tag questions**.
+- A topic or skill that any question uses cannot be deleted; retag first.
+- Tests that **count toward strengths & weaknesses** (on by default for new tests) can't be published
+  while any of their questions is untagged. Practice tests can turn this off.
+- Every topic/skill change and every bulk tagging is audited.
+
 ## 4. Where it lives in code
 
 | Concern | File |
@@ -96,6 +110,7 @@ Super Admin
 | Suspension enforcement | `src/lib/auth/get-current-user.ts`, `src/app/api/auth/session/route.ts` |
 | "Who can do what" shown in the product | `src/components/people/access-matrix.tsx` |
 | Notifications & announcements | `src/services/notifications/*` |
+| Topics & skills, question tagging rules | `src/services/taxonomy.ts` |
 
 ## 5. The panels
 

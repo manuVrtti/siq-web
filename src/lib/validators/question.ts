@@ -27,6 +27,11 @@ const baseSchema = z.object({
   explanation: z.string().trim().max(5000).optional(),
   tagIds: z.array(z.string()).max(30).default([]),
   options: z.array(optionSchema).max(26).default([]),
+  // Plan 021 — one topic + ≥1 skill under it. Optional in the shape so the
+  // bulk importer can create untagged questions (they go to the backfill
+  // queue); the create/edit routes require them.
+  topicId: z.string().min(1).nullish(),
+  skillIds: z.array(z.string().min(1)).max(15).default([]),
 })
 
 /**
@@ -34,6 +39,11 @@ const baseSchema = z.object({
  */
 export const questionInputSchema = baseSchema.superRefine((q, ctx) => {
   const correct = q.options.filter((o) => o.isCorrect).length
+
+  if (q.topicId && q.skillIds.length === 0)
+    ctx.addIssue({ code: 'custom', message: 'Pick at least one skill for the topic', path: ['skillIds'] })
+  if (!q.topicId && q.skillIds.length > 0)
+    ctx.addIssue({ code: 'custom', message: 'Choose a topic for these skills', path: ['topicId'] })
 
   switch (q.type) {
     case 'MCQ_SINGLE':

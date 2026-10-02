@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { FileQuestion, Plus, Upload } from 'lucide-react'
+import { FileQuestion, Network, Plus, Tags, Upload } from 'lucide-react'
 
 import { Pill } from '@/components/dashboard/bits'
 import {
@@ -24,6 +24,7 @@ import { shortDateTime } from '@/lib/format'
 import { DIFFICULTIES, QUESTION_TYPES } from '@/lib/validators/question'
 import { QUESTION_SORTS, listQuestions } from '@/services/questions'
 import { getOrgBySlug } from '@/services/organizations'
+import { listTaxonomy, untaggedWhere } from '@/services/taxonomy'
 import { requirePagePermission } from '@/lib/auth/page-guard'
 import { PERMISSIONS } from '@/constants/permissions'
 
@@ -61,13 +62,15 @@ export default async function QuestionsPage({
   const type = QUESTION_TYPES.find((t) => t === p.get('type'))
   const difficulty = DIFFICULTIES.find((d) => d === p.get('difficulty'))
   const tagId = p.get('tag')
+  const topicId = p.get('topic')
 
-  const [{ items, total }, tags, bankSize] = await Promise.all([
+  const [{ items, total }, tags, bankSize, topics, untagged] = await Promise.all([
     listQuestions(org.id, {
       search: p.q || undefined,
       type,
       difficulty,
       tagId,
+      topicId,
       sort: p.sort,
       dir: p.dir,
       skip: p.skip,
@@ -75,10 +78,12 @@ export default async function QuestionsPage({
     }),
     prisma.tag.findMany({ where: { orgId: org.id }, orderBy: { name: 'asc' } }),
     prisma.question.count({ where: { orgId: org.id } }),
+    listTaxonomy(org.id),
+    prisma.question.count({ where: { orgId: org.id, AND: [untaggedWhere] } }),
   ])
 
   const pathname = `/${slug}/questions`
-  const filtered = Boolean(p.q || type || difficulty || tagId)
+  const filtered = Boolean(p.q || type || difficulty || tagId || topicId)
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -88,6 +93,10 @@ export default async function QuestionsPage({
         description={`${bankSize.toLocaleString('en-IN')} question${bankSize === 1 ? '' : 's'} · reusable across every assessment`}
         actions={
           <>
+            <Button variant="outline" render={<Link href={`${pathname}/topics`} />}>
+              <Network className="size-4" aria-hidden />
+              Topics &amp; skills
+            </Button>
             <Button variant="outline" render={<Link href={`${pathname}/import`} />}>
               <Upload className="size-4" aria-hidden />
               Import
@@ -99,6 +108,21 @@ export default async function QuestionsPage({
           </>
         }
       />
+
+      {untagged > 0 ? (
+        <Link
+          href={`${pathname}/tagging`}
+          className="siq-rise flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm transition-colors hover:bg-amber-500/15"
+        >
+          <Tags className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <span className="flex-1">
+            <strong className="font-semibold">{untagged.toLocaleString('en-IN')}</strong> question
+            {untagged === 1 ? ' has' : 's have'} no topic or skill yet. Tests that count toward analytics can’t
+            be published with them.
+          </span>
+          <span className="text-primary font-medium whitespace-nowrap">Tag them →</span>
+        </Link>
+      ) : null}
 
       <FilterBar
         searchPlaceholder="Search title or body…"
@@ -112,6 +136,14 @@ export default async function QuestionsPage({
             key: 'difficulty',
             label: 'Difficulty',
             options: DIFFICULTIES.map((d) => ({ value: d, label: labelOf(DIFFICULTY_LABEL, d) })),
+          },
+          {
+            key: 'topic',
+            label: 'Topic',
+            options: [
+              { value: 'untagged', label: 'Needs tagging' },
+              ...topics.map((t) => ({ value: t.id, label: t.name })),
+            ],
           },
           ...(tags.length > 0
             ? [{ key: 'tag', label: 'Tag', options: tags.map((t) => ({ value: t.id, label: t.name })) }]
@@ -134,11 +166,12 @@ export default async function QuestionsPage({
         />
       ) : (
         <DataTable
-          minWidth={820}
+          minWidth={980}
           footer={<Pagination pathname={pathname} params={p} total={total} />}
         >
           <THead>
             <SortHeader label="Question" field="title" pathname={pathname} params={p} />
+            <th className={TH}>Topic</th>
             <th className={TH}>Type</th>
             <SortHeader label="Difficulty" field="difficulty" pathname={pathname} params={p} />
             <SortHeader label="Marks" field="marks" pathname={pathname} params={p} align="right" />
@@ -170,6 +203,18 @@ export default async function QuestionsPage({
                       ) : null}
                     </div>
                   ) : null}
+                </td>
+                <td className={`${TD} max-w-[220px]`}>
+                  {q.topic && q.skills.length > 0 ? (
+                    <>
+                      <span className="text-xs font-medium">{q.topic.section.name}</span>
+                      <span className="text-muted-foreground block truncate text-[11px]">
+                        {q.skills.map((s) => s.skill.name).join(' · ')}
+                      </span>
+                    </>
+                  ) : (
+                    <Pill tone="warning">Needs tagging</Pill>
+                  )}
                 </td>
                 <td className={`${TD} text-muted-foreground whitespace-nowrap`}>
                   {labelOf(QUESTION_TYPE_LABEL, q.type)}
