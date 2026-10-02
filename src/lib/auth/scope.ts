@@ -72,7 +72,8 @@ export function canEditAssessment(scope: Scope, a: { departmentId: string | null
 
 /** Results this scope may see (always the student's side of the filter). */
 export function resultWhere(scope: Scope): Prisma.ResultWhereInput {
-  return { assessment: { orgId: scope.orgId }, user: { memberships: { some: memberWhere(scope) } } }
+  // Plan 016b — attempts replaced by a retake never count.
+  return { status: { not: 'SUPERSEDED' }, assessment: { orgId: scope.orgId }, user: { memberships: { some: memberWhere(scope) } } }
 }
 
 export function batchWhere(scope: Scope): Prisma.BatchWhereInput {

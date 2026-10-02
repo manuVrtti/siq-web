@@ -32,7 +32,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ org: s
     }),
     prisma.result.groupBy({
       by: ['assessmentId', 'status'],
-      where: { assessment: { orgId: org.id }, ...userInScope(scope) },
+      where: { status: { not: 'SUPERSEDED' as const }, assessment: { orgId: org.id }, ...userInScope(scope) },
       _count: { _all: true },
       _max: { createdAt: true },
     }),

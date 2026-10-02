@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 
 import ManualGradingPanel from '@/components/results/manual-grading-panel'
 import { ExamIntegrityPanel } from '@/components/proctoring/exam-integrity-panel'
+import { RetakeButton } from '@/components/results/retake-button'
+import { listRetakes } from '@/services/retake'
 import PageHeader from '@/components/ui/page-header'
 import { PERMISSIONS } from '@/constants/permissions'
 import { requireAssessmentPage } from '@/lib/auth/page-guard'
@@ -38,6 +40,15 @@ export default async function GradeResultPage({
     if (error instanceof NotFoundError) notFound()
     throw error
   }
+
+  // Plan 016b — retakes: current attempt or one replaced by a retake.
+  const attemptLink = await prisma.examAttempt.findUnique({ where: { id: result.attemptId }, select: { assignmentId: true, archivedAssignmentId: true } })
+  const assignmentId = attemptLink?.assignmentId ?? attemptLink?.archivedAssignmentId ?? null
+  const retakes = assignmentId ? await listRetakes(assignmentId) : []
+  const replaced = result.status === 'SUPERSEDED'
+  const currentResult = replaced && attemptLink?.archivedAssignmentId
+    ? await prisma.result.findFirst({ where: { attempt: { assignmentId: attemptLink.archivedAssignmentId } }, select: { id: true } })
+    : null
 
   // Fetch the questions once and the candidate's answers (attempt-scoped).
   const questionIds = result.questionResults.map((q) => q.questionId)
@@ -94,6 +105,9 @@ export default async function GradeResultPage({
         >
           ← All results
         </Link>
+        {!replaced && attemptLink?.assignmentId ? (
+          <RetakeButton resultId={result.id} studentName={result.user.name ?? result.user.email ?? 'this student'} nextHref={`/${slug}/assessments/${id}/results`} />
+        ) : null}
         <a
           href={`/api/export/candidates/${result.user.id}/report?assessmentId=${id}`}
           download
@@ -102,6 +116,35 @@ export default async function GradeResultPage({
           Download PDF report
         </a>
       </PageHeader>
+
+      {replaced ? (
+        <div className="bg-muted mb-4 rounded-xl px-4 py-3 text-sm">
+          <b>This attempt was replaced by a retake</b> — it’s kept for the record but no longer counts.
+          {currentResult ? (
+            <Link href={`/${slug}/assessments/${id}/results/${currentResult.id}/grade`} className="text-primary ml-2 font-medium hover:underline">
+              Open the new attempt →
+            </Link>
+          ) : <span className="text-muted-foreground"> The student hasn’t submitted the new attempt yet.</span>}
+        </div>
+      ) : null}
+      {retakes.length ? (
+        <div className="mb-4 rounded-xl border px-4 py-3 text-sm">
+          <p className="mb-1 font-medium">Retake history</p>
+          <ul className="text-muted-foreground flex flex-col gap-1">
+            {retakes.map((r) => (
+              <li key={r.id}>
+                {new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }).format(r.createdAt)} — allowed by{' '}
+                {r.grantedBy.name ?? r.grantedBy.email}: “{r.reason}”
+                {r.previousResultId && r.previousResultId !== result.id ? (
+                  <Link href={`/${slug}/assessments/${id}/results/${r.previousResultId}/grade`} className="text-primary ml-1 hover:underline">
+                    earlier attempt
+                  </Link>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {/* Plan 018b — staff-only exam integrity, first thing on the page. */}
       <div className="mb-6">

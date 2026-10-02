@@ -50,7 +50,7 @@ export async function exportAssessmentResults(scope: Scope, assessmentId: string
   if (!assessment) throw new NotFoundError('Assessment not found')
 
   const results = await prisma.result.findMany({
-    where: { assessmentId, ...userInScope(scope) },
+    where: { status: { not: 'SUPERSEDED' as const }, assessmentId, ...userInScope(scope) },
     orderBy: [{ percentage: 'desc' }, { createdAt: 'asc' }],
     select: {
       status: true,
@@ -163,7 +163,7 @@ export async function exportBatchResults(scope: Scope, batchId: string) {
   if (!batch) throw new NotFoundError('Batch not found')
 
   const results = await prisma.result.findMany({
-    where: { userId: { in: batch.members.map((m) => m.userId) }, assessment: { orgId } },
+    where: { status: { not: 'SUPERSEDED' as const }, userId: { in: batch.members.map((m) => m.userId) }, assessment: { orgId } },
     orderBy: [{ user: { name: 'asc' } }, { createdAt: 'asc' }],
     select: {
       status: true,

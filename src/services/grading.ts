@@ -238,6 +238,7 @@ export async function gradeSubjective(input: {
     include: { result: { include: { assessment: { select: { orgId: true } } } } },
   })
   if (!qr) throw new NotFoundError('Question result not found')
+  if (qr.result.status === 'SUPERSEDED') throw new ForbiddenError('This attempt was replaced by a retake — grade the new attempt')
 
   // Tenant guard: the grader must belong to the org that owns the assessment.
   if (qr.result.assessment.orgId !== input.scope.orgId) {
@@ -348,7 +349,7 @@ export async function listResultsForAssessment(scope: Scope, assessmentId: strin
   if (!a) throw new NotFoundError('Assessment not found')
 
   return prisma.result.findMany({
-    where: { assessmentId, ...userInScope(scope) },
+    where: { status: { not: 'SUPERSEDED' as const }, assessmentId, ...userInScope(scope) },
     orderBy: [{ status: 'asc' }, { totalScore: 'desc' }],
     include: {
       user: { select: { id: true, name: true, email: true } },
@@ -386,7 +387,7 @@ export async function queryResultsForAssessment(
 
   // Everything below — page, count and summary — is limited to the scope's
   // students, so an HOD's pass rate is their department's pass rate.
-  const base: Prisma.ResultWhereInput = { assessmentId, ...userInScope(scope) }
+  const base: Prisma.ResultWhereInput = { status: { not: 'SUPERSEDED' as const }, assessmentId, ...userInScope(scope) }
   const where: Prisma.ResultWhereInput = {
     AND: [base],
     ...(opts.outcome === 'pending' && { status: 'PENDING_REVIEW' }),
@@ -446,7 +447,7 @@ export async function queryResultsForAssessment(
 
 export async function listResultsForCandidate(userId: string) {
   return prisma.result.findMany({
-    where: { userId },
+    where: { userId, status: { not: 'SUPERSEDED' } },
     orderBy: { createdAt: 'desc' },
     include: {
       assessment: { select: { id: true, title: true, orgId: true } },

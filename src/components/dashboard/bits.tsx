@@ -49,11 +49,12 @@ export function StatusPill({
   percentage,
   passed,
 }: {
-  status: 'GRADED' | 'PENDING_REVIEW' | null
+  status: 'GRADED' | 'PENDING_REVIEW' | 'SUPERSEDED' | null
   percentage?: number | null
   passed?: boolean | null
 }) {
   if (status === null) return <Pill tone="muted">Submitted</Pill>
+  if (status === 'SUPERSEDED') return <Pill tone="muted">Replaced by a retake</Pill>
   if (status === 'PENDING_REVIEW') return <Pill tone="warning">Pending review</Pill>
   const pct = percentage === null || percentage === undefined ? null : Math.round(percentage)
   if (passed === true) return <Pill tone="success">{pct !== null ? `${pct}% · passed` : 'Passed'}</Pill>

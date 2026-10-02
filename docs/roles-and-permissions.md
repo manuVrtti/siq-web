@@ -57,6 +57,7 @@ Super Admin
 | Rebuild a college's analytics (full recompute) | ✅ | own college | — |
 | Weak spots & "students needing attention" | ✅ | own college | own departments |
 | Open a question for student practice | ✅ | own college | own college |
+| Allow a retake (fresh attempt for one student, with a reason) | ✅ | own college | own departments' students |
 | See exam integrity (identity photos, random checks, activity log) | ✅ | own college | own departments' students |
 | Create / run mock drives (rounds, cutoffs, enrol, open/close rounds, overrides) | ✅ | own college (incl. college-wide) | drives aimed only at own departments |
 | Post announcements (bell) | ✅ every college | own college (or one department) | own departments only |
@@ -138,6 +139,12 @@ Super Admin
   Overrides need a reason, are audited, notify the student, and are only possible until the next round opens.
 - Eligibility can't change once a drive starts; tests used by a drive can't be deleted; archived drives stay in
   participants' history. Drive results also feed competency as a per-drive snapshot (`scope = DRIVE`).
+
+### Retakes (plan 016b)
+- Staff give one student a fresh attempt at one test from the student's result page, with a reason (audited, student
+  notified). The earlier attempt is **kept** (answers, score, integrity log) but marked "Replaced by a retake" and no
+  longer counts anywhere (lists, averages, analytics, exports). Proctored tests ask for the identity check again.
+- Refused after the test window closed, or once the mock-drive round is closed (use Reinstate there).
 
 ### Exam integrity (plan 018b)
 - **Every exam** records activity: tab / window switches, leaving full screen, copy / cut / paste and right-click
