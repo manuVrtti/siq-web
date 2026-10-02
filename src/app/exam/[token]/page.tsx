@@ -46,7 +46,7 @@ export default async function ExamEntryPage({
   // (`/select-org` is the default landing; a future improvement is to preserve
   // the `next` query so the candidate can bookmark the invite link and land
   // in the exam automatically.)
-  if (!user) redirect('/login')
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/exam/${token}`)}`)
   if (user.mustChangePassword) redirect('/set-password')
 
   const result = await validateToken(token, user.id)

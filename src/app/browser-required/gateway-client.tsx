@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Check, Copy, Download } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { SEB_DOWNLOAD_URL, isMobileUserAgent } from '@/lib/seb'
 
 /**
  * Plan 017 — Layer 3 of exam link enforcement.
@@ -24,9 +25,7 @@ import { Button } from '@/components/ui/button'
  * same-origin `next` paths and the alphanumeric shape of a token are accepted.
  */
 
-const DOWNLOAD_URL =
-  process.env.NEXT_PUBLIC_SEB_DOWNLOAD_URL ||
-  'https://github.com/manuVrtti/siq-Secure-browser/releases/latest'
+const DOWNLOAD_URL = SEB_DOWNLOAD_URL
 
 /** How long to wait for SEB to take focus before assuming it isn't installed. */
 const LAUNCH_TIMEOUT_MS = 2500
@@ -49,6 +48,7 @@ export default function GatewayClient() {
 
   const [copied, setCopied] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+  const [mobile, setMobile] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const absoluteUrl = useMemo(
@@ -89,7 +89,13 @@ export default function GatewayClient() {
     window.addEventListener('blur', onBlur)
     document.addEventListener('visibilitychange', onVisibility)
 
-    if (deepLink) {
+    if (isMobileUserAgent(navigator.userAgent)) {
+      // Phones can't run the exam browser — explain instead of firing a dead link.
+      queueMicrotask(() => {
+        setMobile(true)
+        setTimedOut(true)
+      })
+    } else if (deepLink) {
       fire()
     } else {
       // No token → nothing to hand off. Show the manual copy panel straight
@@ -128,16 +134,18 @@ export default function GatewayClient() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 py-10 text-center">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {timedOut ? 'Secure browser required' : 'Opening SelectIQ Secure Browser…'}
+          {mobile ? 'Open this exam on a laptop or desktop' : timedOut ? 'Secure browser required' : 'Opening SelectIQ Secure Browser…'}
         </h1>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          {timedOut
-            ? 'Exams run inside the SelectIQ Secure Browser. Install it, then click below to try again.'
-            : 'Your OS should be handing this exam off. If it asks for permission, approve it.'}
+          {mobile
+            ? 'Exams run only in the SelectIQ Exam Browser, a desktop app — it can’t run on a phone or tablet. Open the exam from Assessments on your computer.'
+            : timedOut
+              ? 'Exams run inside the SelectIQ Secure Browser. Install it, then click below to try again.'
+              : 'Your OS should be handing this exam off. If it asks for permission, approve it.'}
         </p>
       </div>
 
-      {timedOut ? (
+      {timedOut && !mobile ? (
         <>
           <Button
             render={<a href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" />}

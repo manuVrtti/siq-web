@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Copy, Download } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { isMobileUserAgent } from '@/lib/seb'
 
 /**
  * Plan 017 — panel shown on `/exam/[token]` when the request did NOT come from
@@ -28,6 +29,7 @@ export default function ExamEntryOpenInSeb({
 }) {
   const [copied, setCopied] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+  const [mobile, setMobile] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const clearTimer = useCallback(() => {
@@ -60,7 +62,9 @@ export default function ExamEntryOpenInSeb({
     window.addEventListener('blur', onBlur)
     document.addEventListener('visibilitychange', onVisibility)
 
-    fire()
+    // Phones can't run the exam browser — don't fire a link that goes nowhere.
+    if (isMobileUserAgent(navigator.userAgent)) queueMicrotask(() => setMobile(true))
+    else fire()
 
     return () => {
       window.removeEventListener('blur', onBlur)
@@ -88,6 +92,33 @@ export default function ExamEntryOpenInSeb({
       }
     }
   }, [examUrl])
+
+  if (mobile) {
+    return (
+      <div className="flex flex-col gap-4">
+      <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
+        <p className="font-medium">Open this exam on a laptop or desktop</p>
+        <p className="text-muted-foreground mt-1">
+          Exams run only in the SelectIQ Exam Browser, which is a Windows / macOS app — it can’t run on a phone or
+          tablet. On your computer, sign in to SelectIQ and open the exam from Assessments, or use this link:
+        </p>
+      </div>
+        <div className="flex gap-2">
+          <input
+            readOnly
+            value={examUrl}
+            aria-label="Exam link"
+            className="border-input flex-1 rounded-md border bg-transparent px-2.5 py-1.5 font-mono text-sm outline-none"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <Button type="button" variant="outline" onClick={copy} className="shrink-0">
+            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">

@@ -32,6 +32,7 @@ export const SEB_HEADER_VALUE = 'secure-browser-v1'
 /** Where to send someone who does not have SEB installed. Env-overridable. */
 export const SEB_DOWNLOAD_URL =
   process.env.NEXT_PUBLIC_SEB_DOWNLOAD_URL ||
+  // The exam browser's repo. Its Releases must be downloadable by the public.
   'https://github.com/manuVrtti/siq-Secure-browser/releases/latest'
 
 export type SebSignals = {
@@ -76,4 +77,20 @@ export function requireSecureBrowser(
 ): void {
   if (isSecureExamBrowserRequest(headers)) return
   throw new SecureBrowserRequiredError()
+}
+
+/** Phones and tablets can't run the exam browser (desktop app). */
+export function isMobileUserAgent(ua: string): boolean {
+  return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(ua)
+}
+
+/**
+ * A same-site path that is safe to redirect to after sign-in. Rejects
+ * absolute URLs, protocol-relative (//host) and backslash tricks.
+ */
+export function safeNextPath(raw: string | null | undefined): string | null {
+  if (!raw || raw.length > 300) return null
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\') || raw.includes('://')) return null
+  if (raw === '/login' || raw.startsWith('/login?')) return null
+  return raw
 }
