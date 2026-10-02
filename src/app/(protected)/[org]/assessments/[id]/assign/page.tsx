@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import AssignmentManager from '@/components/assessments/assignment-manager'
+import { Button } from '@/components/ui/button'
 import PageHeader from '@/components/ui/page-header'
 import { getAssessment } from '@/services/assessments'
 import { listCandidates, listBatches } from '@/services/candidates'
@@ -40,8 +42,18 @@ export default async function AssignPage({
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`
 
   return (
-    <>
-      <PageHeader title={`Assign: ${assessment.title}`} description={`${org.name} · ${assessment.status.toLowerCase()}`} />
+    <div className="mx-auto flex w-full max-w-6xl flex-col">
+      <PageHeader
+        title={assessment.title}
+        description={`Assign students · ${assessment.status === 'PUBLISHED' ? 'Published' : assessment.status === 'DRAFT' ? 'Draft — students see it once you publish' : 'Archived'}`}
+      >
+        <Button variant="outline" render={<Link href={`/${slug}/assessments/${id}/build`} />}>
+          Edit test
+        </Button>
+        <Button variant="outline" render={<Link href={`/${slug}/assessments/${id}/results`} />}>
+          Results
+        </Button>
+      </PageHeader>
       <AssignmentManager
         assessmentId={assessment.id}
         candidates={candidates.map((c) => ({
@@ -55,6 +67,6 @@ export default async function AssignPage({
         assignments={JSON.parse(JSON.stringify(assignments))}
         baseUrl={baseUrl}
       />
-    </>
+    </div>
   )
 }

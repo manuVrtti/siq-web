@@ -158,7 +158,7 @@ export function ExamIntegrityPanel({ session }: { session: Session | null }) {
                   {typeof (f.metadata as { shortcut?: string } | null)?.shortcut === 'string' ? (
                     <span className="text-muted-foreground"> · {(f.metadata as { shortcut: string }).shortcut}</span>
                   ) : null}
-                  {(f.metadata as { from?: string } | null)?.from === 'exam-browser' ? <span className="text-muted-foreground"> · reported by exam browser</span> : null}
+                  {(f.metadata as { from?: string } | null)?.from === 'exam-browser' ? <span className="text-muted-foreground"> · reported by SIQ-Browser</span> : null}
                 </span>
                 {f.snapshotSignedUrl ? (
                   <a href={f.snapshotSignedUrl} target="_blank" rel="noopener noreferrer" className="text-primary text-xs hover:underline">

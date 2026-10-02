@@ -66,7 +66,7 @@ export function SceneSecureBrowser() {
             <i className="size-2.5 rounded-full bg-[#28c840]" />
           </span>
           <span className="text-muted-foreground mx-auto flex items-center gap-1 text-[11px] font-medium">
-            <Lock className="size-3" /> SelectIQ Secure Browser
+            <Lock className="size-3" /> SIQ-Browser
           </span>
           <span className="bg-primary rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white tabular-nums">42:18</span>
         </div>

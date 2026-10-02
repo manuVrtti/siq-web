@@ -41,7 +41,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           <StoryPlayer chapters={LOGIN_CHAPTERS} />
           <div className="mt-6 flex items-center gap-2 text-xs text-white/70">
             <ShieldCheck className="size-4" aria-hidden />
-            Proctored in a secure browser · results only your college can see
+            Proctored in SIQ-Browser · results only your college can see
           </div>
         </div>
       </aside>

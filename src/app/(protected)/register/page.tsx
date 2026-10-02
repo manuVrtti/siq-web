@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: 'Create your profile — SelectIQ' }
 const STEPS = [
   { icon: UserRoundCheck, title: 'Create your profile', body: 'A minute now. Add projects, skills and your résumé whenever you like.' },
   { icon: ClipboardCheck, title: 'Get assigned exams', body: 'Your placement cell assigns mock tests and drives. They appear on your dashboard with a countdown.' },
-  { icon: MonitorCheck, title: 'Take them securely', body: 'Exams open in the SelectIQ secure browser. Your answers save as you go.' },
+  { icon: MonitorCheck, title: 'Take them securely', body: 'Exams open in SIQ-Browser, our secure exam app. Your answers save as you go.' },
   { icon: BarChart3, title: 'See where you stand', body: 'Scores, how you compare with your batch, and the topics to practise next.' },
 ]
 

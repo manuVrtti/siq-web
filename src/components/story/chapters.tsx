@@ -37,7 +37,7 @@ export const LOGIN_CHAPTERS: Chapter[] = [
   {
     id: 'secure',
     eyebrow: 'Take it',
-    title: 'Sit it in the secure browser.',
+    title: 'Sit it in SIQ-Browser.',
     body: 'A calm, distraction-free exam. Answers save as you go, and proctoring keeps everyone honest.',
     art: <SceneSecureBrowser />,
   },
@@ -69,7 +69,7 @@ export function studentChapters({ orgName, deptCode }: { orgName: string; deptCo
     {
       id: 'secure',
       eyebrow: 'Take it',
-      title: 'Take it in the secure browser.',
+      title: 'Take it in SIQ-Browser.',
       body: 'Tests open in the SelectIQ app. Your answers save automatically — a dropped connection never loses work.',
       art: <SceneSecureBrowser />,
     },
