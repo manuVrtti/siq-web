@@ -53,6 +53,8 @@ Super Admin
 | Topics & skills: platform spine (DSA, DBMS, Aptitude…) | ✅ | read-only | read-only |
 | Topics & skills: the college's own topics and skills | ✅ | own college | read-only |
 | Tag questions with a topic + skills (incl. bulk backfill) | ✅ | own college | own college |
+| Read a student's strengths & weaknesses (competency profile) | ✅ | own college | own departments' students |
+| Rebuild a college's analytics (full recompute) | ✅ | own college | — |
 | Post announcements (bell) | ✅ every college | own college (or one department) | own departments only |
 | Suspend / reactivate accounts | ✅ | — | — |
 | Suspend / reactivate a whole college (contract, payment…) | ✅ | — | — |
@@ -99,6 +101,17 @@ Super Admin
   while any of their questions is untagged. Practice tests can turn this off.
 - Every topic/skill change and every bulk tagging is audited.
 
+### Strengths & weaknesses (plan 025)
+- A student's **competency profile** is per college: topic and skill scores (0–100) built from GRADED results of
+  tests that count toward analytics; the latest graded attempt per test counts. Difficulty-weighted
+  (EASY 1 · MEDIUM 1.5 · HARD 2); partial credit counts proportionally; negative marks never go below zero.
+- It is **sensitive**: readable by the student (own, in their own college), their HOD, College Admins and Super
+  Admins — never by other students, other colleges or recruiters.
+- Profiles update automatically when a result is graded or reviewed, when a graded question is retagged or edited,
+  and when a test's "counts toward analytics" setting changes. College Admins can rebuild a whole college (audited).
+- Cohort comparisons need **at least 5 students**; the narrowest cohort (department × batch → department → batch →
+  college) is used.
+
 ## 4. Where it lives in code
 
 | Concern | File |
@@ -111,6 +124,7 @@ Super Admin
 | "Who can do what" shown in the product | `src/components/people/access-matrix.tsx` |
 | Notifications & announcements | `src/services/notifications/*` |
 | Topics & skills, question tagging rules | `src/services/taxonomy.ts` |
+| Competency scoring, cohort baselines, who may read a profile | `src/services/competency/*`, `src/lib/competency/weighting.ts` |
 
 ## 5. The panels
 

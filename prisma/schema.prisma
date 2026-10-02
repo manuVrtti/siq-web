@@ -88,9 +88,11 @@ model User {
   candidateProfile   CandidateProfile?
   headOf             DepartmentHead[]
 
-  notificationsCreated Notification[]     @relation("NotificationAuthor")
+  notificationsCreated Notification[]      @relation("NotificationAuthor")
   notificationReads    NotificationRead[]
-  userNotifications    UserNotification[] @relation("UserNotifications")
+  userNotifications    UserNotification[]  @relation("UserNotifications")
+  sectionCompetencies  SectionCompetency[]
+  skillCompetencies    SkillCompetency[]
 
   @@index([role])
 }
@@ -129,10 +131,13 @@ model Organization {
   assessments Assessment[]
   batches     Batch[]
 
-  notifications     Notification[]
-  userNotifications UserNotification[]
-  topicSections     TopicSection[]
-  skillNodes        SkillNode[]
+  notifications       Notification[]
+  userNotifications   UserNotification[]
+  topicSections       TopicSection[]
+  skillNodes          SkillNode[]
+  sectionCompetencies SectionCompetency[]
+  skillCompetencies   SkillCompetency[]
+  cohortBaselines     CohortBaseline[]
 
   @@index([type])
   @@index([status])
@@ -174,7 +179,8 @@ model Department {
   assessments Assessment[]
   batches     Batch[]
 
-  notifications Notification[]
+  notifications   Notification[]
+  cohortBaselines CohortBaseline[]
 
   @@unique([orgId, code])
   @@unique([orgId, name])
@@ -865,9 +871,10 @@ model TopicSection {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
 
-  org       Organization?   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  skills    SkillNode[]
-  questions QuestionTopic[]
+  org          Organization?       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  skills       SkillNode[]
+  questions    QuestionTopic[]
+  competencies SectionCompetency[]
 
   @@index([orgId])
 }
@@ -883,9 +890,10 @@ model SkillNode {
   aliases   String[]
   createdAt DateTime @default(now())
 
-  section   TopicSection    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  org       Organization?   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  questions QuestionSkill[]
+  section      TopicSection      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  org          Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  questions    QuestionSkill[]
+  competencies SkillCompetency[]
 
   @@index([sectionId])
   @@index([orgId])
@@ -912,4 +920,92 @@ model QuestionSkill {
 
   @@id([questionId, skillId])
   @@index([skillId])
+}
+
+// ============================================================
+// Plan 025 — competency scoring & rollups
+// ============================================================
+
+enum CompetencyScope {
+  ASSESSMENT // one test
+  DRIVE // one mock drive (plans 023/024 — not produced yet)
+  CUMULATIVE // everything the student has taken in this college
+}
+
+/// A student's score on one topic, in one college, for one scope.
+/// Scores are 0–100. weightedScore weights HARD > MEDIUM > EASY and is the
+/// headline number; rawAccuracy is plain credit / questions.
+model SectionCompetency {
+  id                 String          @id @default(cuid())
+  userId             String
+  orgId              String
+  sectionId          String
+  scope              CompetencyScope
+  /// assessmentId / driveId, or "ALL" for CUMULATIVE (never null, so the unique key holds).
+  scopeRefId         String
+  questionsAttempted Int
+  questionsCorrect   Int
+  rawAccuracy        Float
+  weightedScore      Float
+  marksEarned        Float
+  marksPossible      Float
+  computedAt         DateTime        @default(now())
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  section TopicSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId, sectionId, scope, scopeRefId])
+  @@index([userId, scope])
+  @@index([orgId, scope, sectionId])
+}
+
+/// Same as SectionCompetency, for one skill.
+model SkillCompetency {
+  id                 String          @id @default(cuid())
+  userId             String
+  orgId              String
+  skillId            String
+  scope              CompetencyScope
+  scopeRefId         String
+  questionsAttempted Int
+  questionsCorrect   Int
+  rawAccuracy        Float
+  weightedScore      Float
+  marksEarned        Float
+  marksPossible      Float
+  computedAt         DateTime        @default(now())
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  skill SkillNode    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId, skillId, scope, scopeRefId])
+  @@index([userId, scope])
+  @@index([orgId, scope, skillId])
+}
+
+/// Cohort statistics of CUMULATIVE weighted scores, for "you vs your batch"
+/// and relative weakness. departmentId / batchYear null = not split by it.
+/// Rebuilt per college as a whole (delete + insert in one transaction).
+model CohortBaseline {
+  id             String   @id @default(cuid())
+  orgId          String
+  departmentId   String?
+  batchYear      Int?
+  /// "SECTION" | "SKILL"
+  dimensionType  String
+  dimensionId    String
+  avgAccuracy    Float
+  medianAccuracy Float
+  p25Accuracy    Float
+  p75Accuracy    Float
+  sampleSize     Int
+  computedAt     DateTime @default(now())
+
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  department Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, dimensionType, dimensionId])
+  @@index([departmentId])
 }

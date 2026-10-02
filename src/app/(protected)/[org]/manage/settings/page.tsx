@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AtSign, Globe, Info, Link2 } from 'lucide-react'
 
+import { RecomputeCard } from '@/components/competency/recompute-card'
 import { AccessMatrix } from '@/components/people/access-matrix'
+import { shortDateTime } from '@/lib/format'
 import { getCurrentUser } from '@/lib/auth/get-current-user'
 import { prisma } from '@/lib/prisma'
 
@@ -21,6 +23,11 @@ export default async function ManageSettingsPage({ params }: { params: Promise<{
     select: { id: true, name: true, slug: true, domain: true, type: true, createdAt: true, studentsPickDepartment: true },
   })
   if (!org) notFound()
+
+  const [profiles, latest] = await Promise.all([
+    prisma.sectionCompetency.findMany({ where: { orgId: org.id, scope: 'CUMULATIVE' }, select: { userId: true }, distinct: ['userId'] }),
+    prisma.sectionCompetency.findFirst({ where: { orgId: org.id, scope: 'CUMULATIVE' }, orderBy: { computedAt: 'desc' }, select: { computedAt: true } }),
+  ])
 
   const rows = [
     { icon: Info, label: 'College name', value: org.name },
@@ -67,6 +74,7 @@ export default async function ManageSettingsPage({ params }: { params: Promise<{
           ))}
         </dl>
       </section>
+      <RecomputeCard orgId={org.id} profiles={profiles.length} lastComputed={latest ? shortDateTime(latest.computedAt) : null} />
       <AccessMatrix highlight={user.role === 'SUPER_ADMIN' ? 'sa' : 'ca'} />
     </div>
   )

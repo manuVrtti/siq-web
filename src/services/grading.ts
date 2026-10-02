@@ -5,6 +5,7 @@ import type { Prisma } from '@prisma/client'
 import { ForbiddenError, NotFoundError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
 import { userInScope, type Scope } from '@/lib/auth/scope'
+import { recomputeForStudent } from '@/services/competency/rollup'
 import { notifyResultGraded, safely } from '@/services/notifications/events'
 
 /**
@@ -198,7 +199,11 @@ export async function gradeAttempt(attemptId: string) {
     },
     include: { questionResults: true },
   })
-  if (created.status === 'GRADED') await safely(() => notifyResultGraded(created.id))
+  if (created.status === 'GRADED') {
+    await safely(() => notifyResultGraded(created.id))
+    // Plan 025 — fold the new scores into the student's competency profile.
+    await safely(() => recomputeForStudent(created.userId, created.assessmentId))
+  }
   return created
 }
 
@@ -295,6 +300,8 @@ export async function recomputeResult(resultId: string) {
   if (result.status === 'PENDING_REVIEW' && status === 'GRADED') {
     await safely(() => notifyResultGraded(resultId))
   }
+  // Plan 025 — a final (or re-graded) result changes the competency profile.
+  if (status === 'GRADED') await safely(() => recomputeForStudent(updated.userId, updated.assessmentId))
   return updated
 }
 

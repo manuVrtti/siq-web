@@ -50,6 +50,7 @@ export type AuditAction =
   | 'taxonomy.skill.update'
   | 'taxonomy.skill.delete'
   | 'question.tag'
+  | 'competency.recompute'
 
 export async function audit(entry: {
   userId: string
