@@ -10,13 +10,14 @@ import { isMobileUserAgent } from '@/lib/seb'
  * Plan 017 — panel shown on `/exam/[token]` when the request did NOT come from
  * the SelectIQ Secure Browser.
  *
- * On mount we fire the `selectiq://exam/<token>` deep link. If SEB is
- * installed, the OS launches it and this tab loses focus — done. If nothing
- * responds in ~2.5s, we show the Download panel + a manual copy fallback so
- * a candidate can still paste the URL into SEB's address bar as a last resort.
+ * On mount we fire the `selectiq://exam/<token>` deep link. A web page can't
+ * tell whether SEB opened: Chrome's own prompt steals focus too, so a blur
+ * is not proof of a handoff. The Download link is therefore visible from the
+ * start, and after a few seconds we always switch to the full fallback
+ * (download, retry, copy link). If SEB did open, this tab is behind it.
  */
 
-/** Chrome's “Open SIQ-Browser?” prompt keeps focus here, so give the student time to click it. */
+/** Gives the student time to answer Chrome's “Open SIQ-Browser?” prompt. */
 const LAUNCH_TIMEOUT_MS = 7000
 
 export default function ExamEntryOpenInSeb({
@@ -41,8 +42,7 @@ export default function ExamEntryOpenInSeb({
   }, [])
 
   // Pure side effect: does NOT touch state synchronously so it's safe to call
-  // from the mount effect. State changes only occur later from the timeout or
-  // from the external `blur`/`visibilitychange` listeners.
+  // from the mount effect. The only state change is the deferred timeout.
   const fire = useCallback(() => {
     clearTimer()
     timerRef.current = setTimeout(() => setTimedOut(true), LAUNCH_TIMEOUT_MS)
@@ -55,23 +55,11 @@ export default function ExamEntryOpenInSeb({
   }, [fire])
 
   useEffect(() => {
-    // Blur / visibilitychange = OS handed off, we're done.
-    const onBlur = () => clearTimer()
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') clearTimer()
-    }
-    window.addEventListener('blur', onBlur)
-    document.addEventListener('visibilitychange', onVisibility)
-
     // Phones can't run the exam browser — don't fire a link that goes nowhere.
     if (isMobileUserAgent(navigator.userAgent)) queueMicrotask(() => setMobile(true))
     else fire()
 
-    return () => {
-      window.removeEventListener('blur', onBlur)
-      document.removeEventListener('visibilitychange', onVisibility)
-      clearTimer()
-    }
+    return clearTimer
   }, [fire, clearTimer])
 
   const copy = useCallback(async () => {
@@ -149,18 +137,27 @@ export default function ExamEntryOpenInSeb({
       </div>
 
       {!timedOut ? (
-        <ol className="flex flex-col gap-2 text-sm">
-          {[
-            <>Chrome asks <b>“Open SIQ-Browser?”</b> — tick <i>Always allow</i> and click <b>Open SIQ-Browser</b>.</>,
-            <>Sign in inside SIQ-Browser with this same account.</>,
-            <>Pass the quick system check, then start your exam.</>,
-          ].map((step, n) => (
-            <li key={n} className="flex items-start gap-2.5">
-              <span className="bg-background text-primary grid size-6 shrink-0 place-items-center rounded-full border text-xs font-semibold">{n + 1}</span>
-              <span className="pt-0.5">{step}</span>
-            </li>
-          ))}
-        </ol>
+        <>
+          <ol className="flex flex-col gap-2 text-sm">
+            {[
+              <>Chrome asks <b>“Open SIQ-Browser?”</b> — tick <i>Always allow</i> and click <b>Open SIQ-Browser</b>.</>,
+              <>Sign in inside SIQ-Browser with this same account.</>,
+              <>Pass the quick system check, then start your exam.</>,
+            ].map((step, n) => (
+              <li key={n} className="flex items-start gap-2.5">
+                <span className="bg-background text-primary grid size-6 shrink-0 place-items-center rounded-full border text-xs font-semibold">{n + 1}</span>
+                <span className="pt-0.5">{step}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="text-muted-foreground text-xs">
+            Don’t have SIQ-Browser, or Chrome didn’t ask?{' '}
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-medium underline underline-offset-2">
+              Download it here
+            </a>
+            .
+          </p>
+        </>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">

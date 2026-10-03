@@ -15,10 +15,10 @@ import { SEB_DOWNLOAD_URL, isMobileUserAgent } from '@/lib/seb'
  * Secure Browser. Flow:
  *
  *   1. If we have a token, immediately fire a `selectiq://exam/<token>` deep
- *      link. If SEB is installed, the OS launches it and this tab loses
- *      focus — that's success.
- *   2. If nothing responds within ~2.5s (focus still here, tab still visible),
- *      show the Download panel + copy-URL fallback.
+ *      link. A Download link is visible from the start.
+ *   2. After a few seconds, always show the Download panel + copy-URL
+ *      fallback. A page can't tell whether SEB opened (Chrome's own prompt
+ *      steals focus too), and if it did, this tab is behind it.
  *   3. Manual retry re-fires the deep link.
  *
  * `next` and `token` in the query string are attacker-controllable, so only
@@ -27,8 +27,8 @@ import { SEB_DOWNLOAD_URL, isMobileUserAgent } from '@/lib/seb'
 
 const DOWNLOAD_URL = SEB_DOWNLOAD_URL
 
-/** How long to wait for SEB to take focus before assuming it isn't installed. */
-const LAUNCH_TIMEOUT_MS = 2500
+/** Gives the student time to answer Chrome's “Open SIQ-Browser?” prompt. */
+const LAUNCH_TIMEOUT_MS = 7000
 
 function safeNextPath(raw: string | null): string {
   if (!raw) return '/'
@@ -80,15 +80,6 @@ export default function GatewayClient() {
   }, [fire])
 
   useEffect(() => {
-    // The moment the tab loses focus or is hidden, the OS handed off to SEB.
-    // Cancel the fallback so we don't nag someone who is already inside SEB.
-    const onBlur = () => clearTimer()
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') clearTimer()
-    }
-    window.addEventListener('blur', onBlur)
-    document.addEventListener('visibilitychange', onVisibility)
-
     if (isMobileUserAgent(navigator.userAgent)) {
       // Phones can't run the exam browser — explain instead of firing a dead link.
       queueMicrotask(() => {
@@ -103,11 +94,7 @@ export default function GatewayClient() {
       queueMicrotask(() => setTimedOut(true))
     }
 
-    return () => {
-      window.removeEventListener('blur', onBlur)
-      document.removeEventListener('visibilitychange', onVisibility)
-      clearTimer()
-    }
+    return clearTimer
   }, [deepLink, fire, clearTimer])
 
   const copy = useCallback(async () => {
@@ -181,7 +168,11 @@ export default function GatewayClient() {
         </>
       ) : (
         <p className="text-muted-foreground text-xs" aria-live="polite">
-          Waiting for SIQ-Browser to open…
+          Waiting for SIQ-Browser to open… Don’t have it?{' '}
+          <a href={DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" className="text-primary font-medium underline underline-offset-2">
+            Download it here
+          </a>
+          .
         </p>
       )}
     </main>
