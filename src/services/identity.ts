@@ -2,7 +2,7 @@ import 'server-only'
 
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import { prisma } from '@/lib/prisma'
-import { IDENTITY_MAX_ATTEMPTS, MIN_MATCH_SCORE } from '@/lib/proctoring/identity-rules'
+import { IDENTITY_MAX_ATTEMPTS, MIN_MATCH_CONFIDENCE } from '@/lib/proctoring/identity-rules'
 import { getSignedUrl, uploadFile } from '@/lib/storage'
 import { FILE_LIMITS } from '@/lib/validators/file'
 
@@ -95,11 +95,12 @@ export async function submitIdentityCheck(input: {
   }
 
   // Compared against an existing ID photo: the report must be self-consistent.
+  // matchScore is the calibrated confidence (018c), 0–1.
   const score = input.matchScore
   if (input.outcome === 'MATCHED') {
-    if (score === null || !(score >= MIN_MATCH_SCORE && score <= 1)) throw new ValidationError('A match needs a passing score')
+    if (score === null || !(score >= MIN_MATCH_CONFIDENCE && score <= 1)) throw new ValidationError('A match needs a passing score')
   } else if (input.outcome === 'MISMATCH') {
-    if (score !== null && !(score >= 0 && score < MIN_MATCH_SCORE)) throw new ValidationError('A mismatch needs a failing score')
+    if (score !== null && !(score >= 0 && score < MIN_MATCH_CONFIDENCE)) throw new ValidationError('A mismatch needs a failing score')
     if (attempts !== IDENTITY_MAX_ATTEMPTS) throw new ValidationError(`Try ${IDENTITY_MAX_ATTEMPTS} times before continuing`)
   } else {
     throw new ValidationError('Outcome must be MATCHED or MISMATCH')

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, CheckCircle2, Loader2, ShieldAlert, UserCheck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { describe, isMatch, loadFaceApi, loadImage, matchScore } from '@/lib/proctoring/face-identity'
+import { ISSUE_TEXT, averageDescriptor, captureFrames, confidence, describe, isMatch, loadFaceApi, loadImage } from '@/lib/proctoring/face-identity'
 import { IDENTITY_MAX_ATTEMPTS } from '@/lib/proctoring/identity-rules'
 
 /**
@@ -70,16 +70,6 @@ export default function IdentityGate({ token, onDone }: { token: string; onDone:
     }
   }
 
-  function grab(): Promise<Blob | null> {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas || video.readyState < 2) return Promise.resolve(null)
-    canvas.width = 640
-    canvas.height = 480
-    canvas.getContext('2d')?.drawImage(video, 0, 0, 640, 480)
-    return new Promise((r) => canvas.toBlob((b) => r(b), 'image/jpeg', 0.85))
-  }
-
   async function submit(blob: Blob, outcome: string, score: number | null, attempts: number) {
     const form = new FormData()
     form.append('snapshot', blob, 'identity.jpg')
@@ -96,18 +86,21 @@ export default function IdentityGate({ token, onDone }: { token: string; onDone:
     setPhase({ kind: 'checking', note: 'Loading face check…' })
     try {
       await loadFaceApi()
-      const blob = await grab()
-      if (!blob || !canvasRef.current) throw new Error('Could not read the camera')
-      setPhase({ kind: 'checking', note: 'Checking it’s you…' })
-      const live = await describe(canvasRef.current)
-      if (live.faceCount !== 1 || !live.descriptor) {
-        // Not counted as a try: just reposition.
-        setPhase({
-          kind: 'retry',
-          message: live.faceCount === 0 ? 'We can’t see a face. Sit facing the camera in good light.' : 'More than one face is visible. Only you should be in the frame.',
-        })
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      if (!video || !canvas) throw new Error('Could not read the camera')
+      setPhase({ kind: 'checking', note: 'Hold still — taking your photo…' })
+      // 018c — 3 frames, quality-checked; a bad picture never costs a try.
+      const shot = await captureFrames(video, canvas)
+      if (shot.usable.length === 0) {
+        setPhase({ kind: 'retry', message: ISSUE_TEXT[shot.issue ?? 'UNCLEAR'] })
         return
       }
+      const best = shot.usable[0]!
+      const blob = best.blob
+      if (!blob) throw new Error('Could not read the camera')
+      const liveDs = shot.usable.map((u) => u.frame.descriptor!)
+      setPhase({ kind: 'checking', note: 'Checking it’s you…' })
 
       // Look up the ID photo once.
       if (idRef.current === undefined) {
@@ -116,33 +109,36 @@ export default function IdentityGate({ token, onDone }: { token: string; onDone:
         if (!st.data.idPhotoUrl) idRef.current = { exists: false, descriptor: null }
         else {
           const img = await loadImage(st.data.idPhotoUrl)
-          idRef.current = { exists: true, descriptor: (await describe(img)).descriptor }
+          idRef.current = { exists: true, descriptor: (await describe(img, false)).descriptor }
         }
       }
       const id = idRef.current
+      const liveAvg = averageDescriptor(liveDs)!
 
       const n = attempt + 1
       setAttempt(n)
       let outcome: 'ENROLLED' | 'MATCHED' | 'MISMATCH'
       if (!id.exists) {
+        // First proctored exam: this (best) photo becomes the ID photo.
         outcome = await submit(blob, 'ENROLLED', null, n)
-        cacheRef(live.descriptor)
+        cacheRefs([liveAvg])
       } else if (!id.descriptor) {
         // The ID photo itself can't be read: no point retrying — staff review it.
         outcome = await submit(blob, 'MISMATCH', null, IDENTITY_MAX_ATTEMPTS)
-        cacheRef(live.descriptor)
+        cacheRefs([liveAvg])
       } else {
-        const score = matchScore(live.descriptor, id.descriptor)
-        if (isMatch(score)) {
-          outcome = await submit(blob, 'MATCHED', round(score), n)
-          cacheRef(id.descriptor)
+        const res = confidence(liveDs, [id.descriptor])!
+        if (isMatch(res.confidence)) {
+          outcome = await submit(blob, 'MATCHED', res.confidence, n)
+          // Random checks compare with the ID photo AND today's start photo.
+          cacheRefs([id.descriptor, liveAvg])
         } else if (n < IDENTITY_MAX_ATTEMPTS) {
-          setPhase({ kind: 'retry', message: `That didn’t match your ID photo (try ${n} of ${IDENTITY_MAX_ATTEMPTS}). Face the camera directly, remove anything covering your face, and make sure the light is in front of you.` })
+          setPhase({ kind: 'retry', message: `That didn’t match your ID photo (try ${n} of ${IDENTITY_MAX_ATTEMPTS}). Face the camera directly, take off anything covering your face, and keep the light in front of you.` })
           return
         } else {
-          outcome = await submit(blob, 'MISMATCH', round(score), n)
-          // Random checks keep comparing with the ID photo, so mismatches stay visible.
-          cacheRef(id.descriptor)
+          outcome = await submit(blob, 'MISMATCH', res.confidence, n)
+          // Random checks keep comparing with the ID photo only, so a stand-in stays visible.
+          cacheRefs([id.descriptor])
         }
       }
       stopCamera()
@@ -152,11 +148,11 @@ export default function IdentityGate({ token, onDone }: { token: string; onDone:
     }
   }
 
-  function cacheRef(d: Float32Array) {
+  function cacheRefs(ds: Float32Array[]) {
     try {
-      sessionStorage.setItem(identityRefKey(token), JSON.stringify(Array.from(d)))
+      sessionStorage.setItem(identityRefKey(token), JSON.stringify(ds.map((d) => Array.from(d))))
     } catch {
-      /* storage blocked — random checks fall back to the exam-start photo */
+      /* storage blocked — random checks still record faces and snapshots */
     }
   }
 
@@ -236,4 +232,3 @@ export default function IdentityGate({ token, onDone }: { token: string; onDone:
   )
 }
 
-const round = (n: number) => Math.round(n * 1000) / 1000

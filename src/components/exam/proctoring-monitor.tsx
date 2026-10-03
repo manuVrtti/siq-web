@@ -6,7 +6,7 @@ import { identityRefKey } from '@/components/exam/identity-gate'
 import { useActivityMonitor } from '@/hooks/use-activity-monitor'
 import { initActivitySession, postActivityFlag } from '@/lib/proctoring/activity'
 import { analyze } from '@/lib/proctoring/face-detection'
-import { describe, isMatch, matchScore } from '@/lib/proctoring/face-identity'
+import { captureFrames, confidence, isMatch } from '@/lib/proctoring/face-identity'
 import { RANDOM_CHECKS_MAX, RANDOM_CHECKS_MIN } from '@/lib/proctoring/identity-rules'
 
 /**
@@ -41,7 +41,9 @@ export default function ProctoringMonitor({ token, intervalSec, storeSnapshots, 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const refDescriptor = useRef<Float32Array | null>(null)
+  /** References for random checks: the ID photo and today's start photo (from the identity gate). */
+  const refs = useRef<Float32Array[]>([])
+  const idCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
 
   useActivityMonitor({
@@ -95,23 +97,38 @@ export default function ProctoringMonitor({ token, intervalSec, storeSnapshots, 
     }
   }, [grab, postFlag])
 
-  /** One random identity check (face-api) — always keeps its snapshot for staff. */
+  /**
+   * One random identity check (018c): 3 frames, quality-checked, median
+   * distance to the closest reference → confidence. A frame that's only too
+   * dark / turned away is retried a little later (up to twice) instead of
+   * being recorded as a mismatch. Every recorded check keeps a snapshot.
+   */
   const identity = useCallback(async () => {
-    const snap = await grab()
-    if (!snap || !canvasRef.current) return
-    try {
-      const live = await describe(canvasRef.current)
-      const ref = refDescriptor.current
-      const score = live.descriptor && ref ? matchScore(live.descriptor, ref) : null
-      const form = new FormData()
-      form.append('matched', String(live.faceCount === 1 && (score === null || isMatch(score))))
-      form.append('matchScore', score === null ? '' : String(Math.round(score * 1000) / 1000))
-      form.append('faceCount', String(live.faceCount))
-      form.append('snapshot', snap, 'check.jpg')
-      await fetch(`/api/exam/${token}/proctoring/check`, { method: 'POST', body: form })
-    } catch {
-      /* model or network hiccup: skip this one */
+    const run = async (retry: number): Promise<void> => {
+      const video = videoRef.current
+      const canvas = idCanvasRef.current
+      if (!video || !canvas) return
+      try {
+        const shot = await captureFrames(video, canvas)
+        const qualityOnly = shot.usable.length === 0 && shot.maxFaces === 1
+        if (qualityOnly && retry < 2) {
+          timers.current.push(setTimeout(() => void run(retry + 1), 20_000 + Math.random() * 20_000))
+          return
+        }
+        const snap = shot.usable[0]?.blob ?? (await grab())
+        const res = shot.usable.length && refs.current.length ? confidence(shot.usable.map((u) => u.frame.descriptor!), refs.current) : null
+        const faceCount = shot.usable.length ? 1 : shot.maxFaces
+        const form = new FormData()
+        form.append('matched', String(faceCount === 1 && (res === null || isMatch(res.confidence))))
+        form.append('matchScore', res === null ? '' : String(res.confidence))
+        form.append('faceCount', String(faceCount))
+        if (snap) form.append('snapshot', snap, 'check.jpg')
+        await fetch(`/api/exam/${token}/proctoring/check`, { method: 'POST', body: form })
+      } catch {
+        /* model or network hiccup: skip this one */
+      }
     }
+    await run(0)
   }, [grab, token])
 
   const start = useCallback(async () => {
@@ -138,27 +155,15 @@ export default function ProctoringMonitor({ token, intervalSec, storeSnapshots, 
       video.addEventListener('loadeddata', () => resolve(), { once: true })
     })
 
-    // 3. Exam-start reference photo (kept on the session for staff).
-    const reference = await grab()
-    if (reference) {
-      const form = new FormData()
-      form.append('photo', reference, 'reference.jpg')
-      await fetch(`/api/exam/${token}/proctoring/init`, { method: 'POST', body: form }).catch(() => null)
-    }
-
-    // 4. Who to compare with: the ID photo from the identity gate, else this start photo.
+    // 3. (018c) No second photo here — the identity check before the exam is
+    //    the one start photo. Random checks compare with its references.
     try {
-      const raw = sessionStorage.getItem(identityRefKey(token))
-      if (raw) refDescriptor.current = Float32Array.from(JSON.parse(raw) as number[])
-    } catch {
-      /* no cached ID descriptor */
-    }
-    if (!refDescriptor.current && canvasRef.current) {
-      try {
-        refDescriptor.current = (await describe(canvasRef.current)).descriptor
-      } catch {
-        /* identity checks will still record faces and snapshots */
+      const raw = JSON.parse(sessionStorage.getItem(identityRefKey(token)) ?? 'null') as number[] | number[][] | null
+      if (Array.isArray(raw) && raw.length) {
+        refs.current = (Array.isArray(raw[0]) ? (raw as number[][]) : [raw as number[]]).map((d) => Float32Array.from(d))
       }
+    } catch {
+      /* no cached references — checks still record faces and snapshots for staff */
     }
 
     setStatus('monitoring')
@@ -182,7 +187,7 @@ export default function ProctoringMonitor({ token, intervalSec, storeSnapshots, 
         timers.current.push(setTimeout(() => void identity(), at))
       }
     }
-  }, [deadlineAtIso, grab, identity, intervalSec, postFlag, presence, token])
+  }, [deadlineAtIso, identity, intervalSec, postFlag, presence, token])
 
   useEffect(() => {
     queueMicrotask(() => void start())
@@ -200,6 +205,7 @@ export default function ProctoringMonitor({ token, intervalSec, storeSnapshots, 
     <div aria-live="polite" className="fixed right-4 bottom-4 z-50 flex flex-col items-end gap-1">
       <video ref={videoRef} muted playsInline className="border-border pointer-events-none h-24 w-32 rounded-md border object-cover shadow" />
       <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={idCanvasRef} className="hidden" />
       <span
         className={
           'rounded-full px-2 py-0.5 text-[10px] font-medium ' +
